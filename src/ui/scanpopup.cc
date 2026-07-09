@@ -7,6 +7,8 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QTextBrowser>
+#include <QTabWidget>
 #include <algorithm>
 #include "scanpopup.hh"
 #include "folding.hh"
@@ -63,6 +65,218 @@ QString compactCjkText( QString text )
   return text;
 }
 
+struct BuddhistGlossaryEntry
+{
+  QString term;
+  QString hanViet;
+  QString pinyin;
+  QString meaningVi;
+  QString category;
+  QStringList suggestedTranslations;
+  QStringList related;
+};
+
+QString smartLookupJsonPath()
+{
+  return QCoreApplication::applicationDirPath() + QStringLiteral( "/buddhist_terms.json" );
+}
+
+QString htmlEscape( const QString & text )
+{
+  return text.toHtmlEscaped();
+}
+
+QStringList jsonStringList( const QJsonObject & obj, const QString & key )
+{
+  QStringList values;
+  const QJsonValue value = obj.value( key );
+
+  if ( value.isString() ) {
+    const QString text = normalizeSmartLookupInput( value.toString() );
+    if ( !text.isEmpty() ) {
+      values << text;
+    }
+  }
+  else if ( value.isArray() ) {
+    const QJsonArray array = value.toArray();
+    for ( const QJsonValue & item : array ) {
+      if ( item.isString() ) {
+        const QString text = normalizeSmartLookupInput( item.toString() );
+        if ( !text.isEmpty() && !values.contains( text ) ) {
+          values << text;
+        }
+      }
+    }
+  }
+
+  return values;
+}
+
+BuddhistGlossaryEntry glossaryEntryFromJsonValue( const QJsonValue & value )
+{
+  BuddhistGlossaryEntry entry;
+
+  if ( value.isString() ) {
+    entry.term = normalizeSmartLookupInput( value.toString() );
+    return entry;
+  }
+
+  if ( !value.isObject() ) {
+    return entry;
+  }
+
+  const QJsonObject obj = value.toObject();
+  entry.term            = normalizeSmartLookupInput( obj.value( QStringLiteral( "term" ) ).toString() );
+  entry.hanViet         = normalizeSmartLookupInput( obj.value( QStringLiteral( "han_viet" ) ).toString() );
+  entry.pinyin          = normalizeSmartLookupInput( obj.value( QStringLiteral( "pinyin" ) ).toString() );
+  entry.meaningVi       = normalizeSmartLookupInput( obj.value( QStringLiteral( "meaning_vi" ) ).toString() );
+  entry.category        = normalizeSmartLookupInput( obj.value( QStringLiteral( "category" ) ).toString() );
+
+  entry.suggestedTranslations = jsonStringList( obj, QStringLiteral( "suggested_translation" ) );
+  if ( entry.suggestedTranslations.isEmpty() ) {
+    entry.suggestedTranslations = jsonStringList( obj, QStringLiteral( "suggested_translations" ) );
+  }
+
+  entry.related = jsonStringList( obj, QStringLiteral( "related" ) );
+
+  return entry;
+}
+
+QList< BuddhistGlossaryEntry > fallbackBuddhistGlossaryEntries()
+{
+  return {
+    { QStringLiteral( "阿耨多羅三藐三菩提" ),
+      QStringLiteral( "a-nậu-đa-la tam-miệu tam-bồ-đề" ),
+      QString(),
+      QStringLiteral( "Vô thượng Chánh đẳng Chánh giác" ),
+      QStringLiteral( "Giác ngộ" ),
+      {},
+      {} },
+    { QStringLiteral( "觀自在菩薩" ),
+      QStringLiteral( "Quán Tự Tại Bồ Tát" ),
+      QString(),
+      QStringLiteral( "Danh hiệu Bồ-tát Quán Tự Tại" ),
+      QStringLiteral( "Bát-nhã Tâm Kinh" ),
+      {},
+      { QStringLiteral( "菩薩" ), QStringLiteral( "般若波羅蜜多" ) } },
+    { QStringLiteral( "般若波羅蜜多" ),
+      QStringLiteral( "Bát-nhã Ba-la-mật-đa" ),
+      QString(),
+      QStringLiteral( "Trí tuệ đưa đến bờ giác" ),
+      QStringLiteral( "Ba-la-mật" ),
+      {},
+      { QStringLiteral( "般若" ), QStringLiteral( "波羅蜜多" ) } },
+    { QStringLiteral( "波羅蜜多" ),
+      QStringLiteral( "Ba-la-mật-đa" ),
+      QString(),
+      QStringLiteral( "Đến bờ bên kia; sự viên mãn" ),
+      QStringLiteral( "Ba-la-mật" ),
+      {},
+      {} },
+    { QStringLiteral( "色即是空" ),
+      QStringLiteral( "sắc tức thị không" ),
+      QString(),
+      QStringLiteral( "Sắc không khác không; hình tướng là không" ),
+      QStringLiteral( "Bát-nhã Tâm Kinh" ),
+      {},
+      { QStringLiteral( "空即是色" ) } },
+    { QStringLiteral( "空即是色" ),
+      QStringLiteral( "không tức thị sắc" ),
+      QString(),
+      QStringLiteral( "Không không khác sắc; tánh không biểu hiện qua sắc" ),
+      QStringLiteral( "Bát-nhã Tâm Kinh" ),
+      {},
+      { QStringLiteral( "色即是空" ) } },
+    { QStringLiteral( "無明" ),
+      QStringLiteral( "vô minh" ),
+      QString(),
+      QStringLiteral( "Không sáng suốt, không thấy rõ chân lý; một chi trong mười hai nhân duyên" ),
+      QStringLiteral( "Thập nhị nhân duyên" ),
+      {},
+      { QStringLiteral( "十二因緣" ), QStringLiteral( "緣起" ) } },
+    { QStringLiteral( "緣起" ),
+      QStringLiteral( "duyên khởi" ),
+      QString(),
+      QStringLiteral( "Các pháp sinh khởi do nhân duyên" ),
+      QStringLiteral( "Giáo lý căn bản" ),
+      {},
+      { QStringLiteral( "十二因緣" ), QStringLiteral( "無明" ) } },
+    { QStringLiteral( "涅槃" ),
+      QStringLiteral( "Niết-bàn" ),
+      QString(),
+      QStringLiteral( "Sự tịch diệt, giải thoát khỏi khổ đau và luân hồi" ),
+      QStringLiteral( "Giải thoát" ),
+      {},
+      {} },
+    { QStringLiteral( "菩薩" ),
+      QStringLiteral( "Bồ-tát" ),
+      QString(),
+      QStringLiteral( "Bậc phát tâm giác ngộ, hành hạnh lợi mình lợi người" ),
+      QStringLiteral( "Nhân vật/địa vị tu chứng" ),
+      {},
+      {} },
+    { QStringLiteral( "般若" ),
+      QStringLiteral( "Bát-nhã" ),
+      QString(),
+      QStringLiteral( "Trí tuệ thấy rõ tánh không" ),
+      QStringLiteral( "Trí tuệ" ),
+      {},
+      { QStringLiteral( "般若波羅蜜多" ) } },
+  };
+}
+
+QList< BuddhistGlossaryEntry > loadBuddhistGlossaryEntriesFromJson()
+{
+  QFile file( smartLookupJsonPath() );
+
+  if ( !file.exists() ) {
+    qDebug( "Buddhist glossary file was not found: %s", smartLookupJsonPath().toUtf8().constData() );
+    return {};
+  }
+
+  if ( !file.open( QIODevice::ReadOnly | QIODevice::Text ) ) {
+    qWarning( "Could not open Buddhist glossary file: %s", smartLookupJsonPath().toUtf8().constData() );
+    return {};
+  }
+
+  QJsonParseError parseError;
+  const QJsonDocument doc = QJsonDocument::fromJson( file.readAll(), &parseError );
+  if ( parseError.error != QJsonParseError::NoError ) {
+    qWarning( "Could not parse Buddhist glossary file: %s", parseError.errorString().toUtf8().constData() );
+    return {};
+  }
+
+  const QJsonArray array = doc.isArray() ? doc.array() : doc.object().value( QStringLiteral( "terms" ) ).toArray();
+
+  QList< BuddhistGlossaryEntry > entries;
+  QStringList seenTerms;
+  for ( const QJsonValue & value : array ) {
+    BuddhistGlossaryEntry entry = glossaryEntryFromJsonValue( value );
+    if ( entry.term.isEmpty() || seenTerms.contains( entry.term ) ) {
+      continue;
+    }
+
+    seenTerms << entry.term;
+    entries << entry;
+  }
+
+  return entries;
+}
+
+const QList< BuddhistGlossaryEntry > & buddhistGlossaryEntries()
+{
+  static const QList< BuddhistGlossaryEntry > entries = [] {
+    const QList< BuddhistGlossaryEntry > jsonEntries = loadBuddhistGlossaryEntriesFromJson();
+    if ( !jsonEntries.isEmpty() ) {
+      return jsonEntries;
+    }
+
+    return fallbackBuddhistGlossaryEntries();
+  }();
+
+  return entries;
+}
+
 QStringList fallbackBuddhistSeedTerms()
 {
   return {
@@ -99,7 +313,7 @@ QStringList fallbackBuddhistSeedTerms()
 
 QStringList loadBuddhistSeedTermsFromJson()
 {
-  const QString path = QCoreApplication::applicationDirPath() + QStringLiteral( "/buddhist_terms.json" );
+  const QString path = smartLookupJsonPath();
   QFile file( path );
 
   if ( !file.exists() ) {
@@ -145,9 +359,15 @@ QStringList loadBuddhistSeedTermsFromJson()
 QStringList buddhistSeedTerms()
 {
   static const QStringList terms = [] {
-    const QStringList jsonTerms = loadBuddhistSeedTermsFromJson();
-    if ( !jsonTerms.isEmpty() ) {
-      return jsonTerms;
+    QStringList result;
+    for ( const BuddhistGlossaryEntry & entry : buddhistGlossaryEntries() ) {
+      if ( !entry.term.isEmpty() && !result.contains( entry.term ) ) {
+        result << entry.term;
+      }
+    }
+
+    if ( !result.isEmpty() ) {
+      return result;
     }
 
     return fallbackBuddhistSeedTerms();
@@ -214,6 +434,136 @@ QString chooseSmartLookupQuery( const QString & input, const QStringList & detec
   }
 
   return input;
+}
+QList< BuddhistGlossaryEntry > glossaryEntriesForTerms( const QString & primaryTerm, const QStringList & detectedTerms )
+{
+  QStringList wantedTerms = detectedTerms;
+  if ( !primaryTerm.isEmpty() && !wantedTerms.contains( primaryTerm ) ) {
+    wantedTerms.prepend( primaryTerm );
+  }
+
+  QList< BuddhistGlossaryEntry > result;
+  for ( const QString & wantedTerm : wantedTerms ) {
+    for ( const BuddhistGlossaryEntry & entry : buddhistGlossaryEntries() ) {
+      if ( entry.term == wantedTerm ) {
+        result << entry;
+        break;
+      }
+    }
+  }
+
+  return result;
+}
+
+QString glossaryEntryHtml( const BuddhistGlossaryEntry & entry )
+{
+  QString html;
+  html += QStringLiteral( "<div style='margin:0 0 14px 0; padding:10px; border:1px solid #ddd; border-radius:8px;'>" );
+  html += QStringLiteral( "<div style='font-size:22px; font-weight:700; margin-bottom:6px;'>%1</div>" )
+            .arg( htmlEscape( entry.term ) );
+
+  if ( !entry.hanViet.isEmpty() ) {
+    html += QStringLiteral( "<div><b>Hán Việt:</b> %1</div>" ).arg( htmlEscape( entry.hanViet ) );
+  }
+  if ( !entry.pinyin.isEmpty() ) {
+    html += QStringLiteral( "<div><b>Pinyin:</b> %1</div>" ).arg( htmlEscape( entry.pinyin ) );
+  }
+  if ( !entry.meaningVi.isEmpty() ) {
+    html += QStringLiteral( "<div><b>Nghĩa:</b> %1</div>" ).arg( htmlEscape( entry.meaningVi ) );
+  }
+  if ( !entry.category.isEmpty() ) {
+    html += QStringLiteral( "<div><b>Nhóm:</b> %1</div>" ).arg( htmlEscape( entry.category ) );
+  }
+  if ( !entry.suggestedTranslations.isEmpty() ) {
+    html += QStringLiteral( "<div><b>Gợi ý dịch:</b> %1</div>" )
+              .arg( htmlEscape( entry.suggestedTranslations.join( QStringLiteral( " / " ) ) ) );
+  }
+  if ( !entry.related.isEmpty() ) {
+    html += QStringLiteral( "<div><b>Liên quan:</b> %1</div>" )
+              .arg( htmlEscape( entry.related.join( QStringLiteral( "、" ) ) ) );
+  }
+
+  html += QStringLiteral( "</div>" );
+  return html;
+}
+
+QString glossaryHtml( const QString & primaryTerm, const QStringList & detectedTerms )
+{
+  const QList< BuddhistGlossaryEntry > entries = glossaryEntriesForTerms( primaryTerm, detectedTerms );
+
+  QString html;
+  html += QStringLiteral( "<html><head><meta charset='utf-8'></head>" );
+  html += QStringLiteral(
+    "<body style='font-family:&quot;Segoe UI&quot;, Arial, sans-serif; font-size:14px; margin:12px;'>" );
+  html += QStringLiteral( "<h2 style='margin-top:0;'>Phật học / Buddhist Glossary</h2>" );
+
+  if ( entries.isEmpty() ) {
+    html += QStringLiteral( "<p>Không có glossary cho thuật ngữ này.</p>" );
+  }
+  else {
+    for ( const BuddhistGlossaryEntry & entry : entries ) {
+      html += glossaryEntryHtml( entry );
+    }
+  }
+
+  html += QStringLiteral( "<p style='color:#777; font-size:12px;'>Nguồn dữ liệu: buddhist_terms.json</p>" );
+  html += QStringLiteral( "</body></html>" );
+  return html;
+}
+
+QTextBrowser * findBuddhistGlossaryBrowser( QTabWidget * tabs )
+{
+  if ( !tabs ) {
+    return nullptr;
+  }
+
+  for ( int i = 0; i < tabs->count(); ++i ) {
+    QTextBrowser * browser = qobject_cast< QTextBrowser * >( tabs->widget( i ) );
+    if ( browser && browser->objectName() == QStringLiteral( "buddhistGlossaryBrowser" ) ) {
+      return browser;
+    }
+  }
+
+  return nullptr;
+}
+
+void removeBuddhistGlossaryTab( QTabWidget * tabs )
+{
+  if ( !tabs ) {
+    return;
+  }
+
+  for ( int i = 0; i < tabs->count(); ++i ) {
+    QTextBrowser * browser = qobject_cast< QTextBrowser * >( tabs->widget( i ) );
+    if ( browser && browser->objectName() == QStringLiteral( "buddhistGlossaryBrowser" ) ) {
+      tabs->removeTab( i );
+      browser->deleteLater();
+      return;
+    }
+  }
+}
+
+void updateBuddhistGlossaryTab( QTabWidget * tabs, const QString & primaryTerm, const QStringList & detectedTerms )
+{
+  if ( !tabs ) {
+    return;
+  }
+
+  const QList< BuddhistGlossaryEntry > entries = glossaryEntriesForTerms( primaryTerm, detectedTerms );
+  if ( entries.isEmpty() ) {
+    removeBuddhistGlossaryTab( tabs );
+    return;
+  }
+
+  QTextBrowser * browser = findBuddhistGlossaryBrowser( tabs );
+  if ( !browser ) {
+    browser = new QTextBrowser( tabs );
+    browser->setObjectName( QStringLiteral( "buddhistGlossaryBrowser" ) );
+    browser->setOpenExternalLinks( true );
+    tabs->addTab( browser, QStringLiteral( "Phật học" ) );
+  }
+
+  browser->setHtml( glossaryHtml( primaryTerm, detectedTerms ) );
 }
 
 } // namespace
@@ -753,6 +1103,7 @@ void ScanPopup::translateWord( const QString & word )
 #endif
 
   engagePopup( false, true );
+  updateBuddhistGlossaryTab( tabWidget, pendingWord, smartTerms );
 
   if ( !smartTerms.isEmpty() && pendingWord != normalizedWord ) {
     showStatusBarMessage( tr( "Smart terms: %1" ).arg( smartTerms.join( QStringLiteral( " | " ) ) ), 8000 );
@@ -792,6 +1143,7 @@ void ScanPopup::showEngagePopup()
 #endif
 
   engagePopup( forcePopup );
+  updateBuddhistGlossaryTab( tabWidget, pendingWord, smartTerms );
 
   if ( !smartTerms.isEmpty() && pendingWord != sanitizedPhrase ) {
     showStatusBarMessage( tr( "Smart terms: %1" ).arg( smartTerms.join( QStringLiteral( " | " ) ) ), 8000 );
@@ -981,6 +1333,7 @@ void ScanPopup::translateInputFinished()
   }
 
   showTranslationFor( pendingWord );
+  updateBuddhistGlossaryTab( tabWidget, pendingWord, smartTerms );
 
   if ( !smartTerms.isEmpty() && pendingWord != normalizedWord ) {
     showStatusBarMessage( tr( "Smart terms: %1" ).arg( smartTerms.join( QStringLiteral( " | " ) ) ), 8000 );
