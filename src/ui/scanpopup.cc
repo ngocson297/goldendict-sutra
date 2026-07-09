@@ -9,6 +9,7 @@
 #include <QJsonObject>
 #include <QTextBrowser>
 #include <QTabWidget>
+#include <QUrl>
 #include <algorithm>
 #include "scanpopup.hh"
 #include "folding.hh"
@@ -567,6 +568,138 @@ void updateBuddhistGlossaryTab( QTabWidget * tabs, const QString & primaryTerm, 
   browser->setHtml( glossaryHtml( primaryTerm, detectedTerms ) );
 }
 
+QString webReferenceUrlEncode( const QString & text )
+{
+  return QString::fromLatin1( QUrl::toPercentEncoding( text ) );
+}
+
+QStringList webReferenceTerms( const QString & primaryTerm, const QStringList & detectedTerms )
+{
+  QStringList terms;
+
+  const QString primary = normalizeSmartLookupInput( primaryTerm );
+  if ( !primary.isEmpty() ) {
+    terms << primary;
+  }
+
+  for ( const QString & term : detectedTerms ) {
+    const QString normalized = normalizeSmartLookupInput( term );
+    if ( !normalized.isEmpty() && !terms.contains( normalized ) ) {
+      terms << normalized;
+    }
+  }
+
+  constexpr int maxWebReferenceTerms = 6;
+  while ( terms.size() > maxWebReferenceTerms ) {
+    terms.removeLast();
+  }
+
+  return terms;
+}
+
+QString webReferenceLinkHtml( const QString & label, const QString & url )
+{
+  return QStringLiteral( "<li><a href='%1'>%2</a></li>" ).arg( htmlEscape( url ), htmlEscape( label ) );
+}
+
+QString webReferenceHtml( const QString & primaryTerm, const QStringList & detectedTerms )
+{
+  const QStringList terms = webReferenceTerms( primaryTerm, detectedTerms );
+
+  QString html;
+  html += QStringLiteral( "<html><head><meta charset='utf-8'></head>" );
+  html += QStringLiteral(
+    "<body style='font-family:&quot;Segoe UI&quot;, Arial, sans-serif; font-size:14px; margin:12px;'>" );
+  html += QStringLiteral( "<h2 style='margin-top:0;'>Wikipedia / Web Reference</h2>" );
+
+  if ( terms.isEmpty() ) {
+    html += QStringLiteral( "<p>Không có thuật ngữ để mở nguồn tham khảo.</p>" );
+  }
+  else {
+    html +=
+      QStringLiteral( "<p style='color:#555;'>Các liên kết này mở trong trình duyệt ngoài để tham khảo nhanh.</p>" );
+
+    for ( const QString & term : terms ) {
+      const QString encoded = webReferenceUrlEncode( term );
+      html +=
+        QStringLiteral( "<div style='border:1px solid #ddd; border-radius:8px; padding:10px; margin:0 0 10px 0;'>" );
+      html += QStringLiteral( "<h3 style='margin:0 0 8px 0;'>%1</h3>" ).arg( htmlEscape( term ) );
+      html += QStringLiteral( "<ul style='margin-top:6px;'>" );
+      html += webReferenceLinkHtml( QStringLiteral( "Wikipedia tiếng Trung" ),
+                                    QStringLiteral( "https://zh.wikipedia.org/wiki/%1" ).arg( encoded ) );
+      html += webReferenceLinkHtml(
+        QStringLiteral( "Wikipedia search tiếng Anh" ),
+        QStringLiteral( "https://en.wikipedia.org/wiki/Special:Search?search=%1" ).arg( encoded ) );
+      html += webReferenceLinkHtml( QStringLiteral( "Wiktionary" ),
+                                    QStringLiteral( "https://en.wiktionary.org/wiki/%1" ).arg( encoded ) );
+      html += webReferenceLinkHtml( QStringLiteral( "Google Search" ),
+                                    QStringLiteral( "https://www.google.com/search?q=%1" ).arg( encoded ) );
+      html += QStringLiteral( "</ul>" );
+      html += QStringLiteral( "</div>" );
+    }
+  }
+
+  html += QStringLiteral(
+    "<p style='color:#777; font-size:12px;'>Gợi ý: dùng các nguồn web như tài liệu tham khảo, không thay thế glossary nội bộ.</p>" );
+  html += QStringLiteral( "</body></html>" );
+  return html;
+}
+
+QTextBrowser * findWebReferenceBrowser( QTabWidget * tabs )
+{
+  if ( !tabs ) {
+    return nullptr;
+  }
+
+  for ( int i = 0; i < tabs->count(); ++i ) {
+    QTextBrowser * browser = qobject_cast< QTextBrowser * >( tabs->widget( i ) );
+    if ( browser && browser->objectName() == QStringLiteral( "webReferenceBrowser" ) ) {
+      return browser;
+    }
+  }
+
+  return nullptr;
+}
+
+void removeWebReferenceTab( QTabWidget * tabs )
+{
+  if ( !tabs ) {
+    return;
+  }
+
+  for ( int i = 0; i < tabs->count(); ++i ) {
+    QTextBrowser * browser = qobject_cast< QTextBrowser * >( tabs->widget( i ) );
+    if ( browser && browser->objectName() == QStringLiteral( "webReferenceBrowser" ) ) {
+      tabs->removeTab( i );
+      browser->deleteLater();
+      return;
+    }
+  }
+}
+
+void updateWebReferenceTab( QTabWidget * tabs, const QString & primaryTerm, const QStringList & detectedTerms )
+{
+  if ( !tabs ) {
+    return;
+  }
+
+  const QStringList terms = webReferenceTerms( primaryTerm, detectedTerms );
+  if ( terms.isEmpty() ) {
+    removeWebReferenceTab( tabs );
+    return;
+  }
+
+  QTextBrowser * browser = findWebReferenceBrowser( tabs );
+  if ( !browser ) {
+    browser = new QTextBrowser( tabs );
+    browser->setObjectName( QStringLiteral( "webReferenceBrowser" ) );
+    browser->setOpenExternalLinks( true );
+    tabs->addTab( browser, QStringLiteral( "Web" ) );
+  }
+
+  browser->setHtml( webReferenceHtml( primaryTerm, detectedTerms ) );
+}
+
 } // namespace
 
 #ifdef Q_OS_MAC
@@ -1105,6 +1238,7 @@ void ScanPopup::translateWord( const QString & word )
 
   engagePopup( false, true );
   updateBuddhistGlossaryTab( tabWidget, pendingWord, smartTerms );
+  updateWebReferenceTab( tabWidget, pendingWord, smartTerms );
 
   if ( !smartTerms.isEmpty() && pendingWord != normalizedWord ) {
     showStatusBarMessage( tr( "Smart terms: %1" ).arg( smartTerms.join( QStringLiteral( " | " ) ) ), 8000 );
@@ -1145,6 +1279,7 @@ void ScanPopup::showEngagePopup()
 
   engagePopup( forcePopup );
   updateBuddhistGlossaryTab( tabWidget, pendingWord, smartTerms );
+  updateWebReferenceTab( tabWidget, pendingWord, smartTerms );
 
   if ( !smartTerms.isEmpty() && pendingWord != sanitizedPhrase ) {
     showStatusBarMessage( tr( "Smart terms: %1" ).arg( smartTerms.join( QStringLiteral( " | " ) ) ), 8000 );
@@ -1355,6 +1490,7 @@ void ScanPopup::translateInputFinished()
 
   showTranslationFor( pendingWord );
   updateBuddhistGlossaryTab( tabWidget, pendingWord, smartTerms );
+  updateWebReferenceTab( tabWidget, pendingWord, smartTerms );
 
   if ( !smartTerms.isEmpty() && pendingWord != normalizedWord ) {
     showStatusBarMessage( tr( "Smart terms: %1" ).arg( smartTerms.join( QStringLiteral( " | " ) ) ), 8000 );
