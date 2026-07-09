@@ -1,6 +1,6 @@
 /* This file is (c) 2008-2012 Konstantin Isakov <ikm@goldendict.org>
  * Part of GoldenDict. Licensed under GPLv3 or later, see the LICENSE file */
-
+#include <QRegularExpression>
 #include "scanpopup.hh"
 #include "folding.hh"
 #include "articlesaver.hh"
@@ -17,6 +17,28 @@ using std::set;
 using std::map;
 using std::pair;
 
+namespace {
+
+constexpr qsizetype smartLookupMaxChars = 300;
+
+QString normalizeSmartLookupInput( QString text )
+{
+  text = text.normalized( QString::NormalizationForm_C );
+
+  text.replace( QChar( 0x00A0 ), QLatin1Char( ' ' ) );
+  text.replace( QRegularExpression( QStringLiteral( "[\\r\\n\\t]+" ) ), QStringLiteral( " " ) );
+  text.replace( QRegularExpression( QStringLiteral( "\\s{2,}" ) ), QStringLiteral( " " ) );
+
+  text = text.trimmed();
+
+  if ( text.size() > smartLookupMaxChars ) {
+    text = text.left( smartLookupMaxChars ).trimmed();
+  }
+
+  return text;
+}
+
+}
 
 #ifdef Q_OS_MAC
   #include "macos/macmouseover.hh"
@@ -526,18 +548,20 @@ void ScanPopup::translateWordFromClipboard( QClipboard::Mode m )
   }
 
   QString subtype = QStringLiteral( "plain" );
-  QString str     = clipboard->text( subtype, m );
+  QString str     = normalizeSmartLookupInput( clipboard->text( subtype, m ) );
+
   if ( str.isEmpty() ) {
     return;
   }
 
   qDebug( "Translate from clipboard %d -> %s", qToUnderlying( m ), str.toStdString().c_str() );
+
   translateWord( str );
 }
 
 void ScanPopup::translateWord( const QString & word )
 {
-  pendingWord = cfg.preferences.sanitizeInputPhrase( word );
+  pendingWord = normalizeSmartLookupInput( cfg.preferences.sanitizeInputPhrase( word ) );
 
   if ( pendingWord.isEmpty() ) {
     return; // Nothing there
@@ -559,7 +583,11 @@ void ScanPopup::showEngagePopup()
 
 [[deprecated]] void ScanPopup::handleInputWord( QString const & str, bool forcePopup )
 {
-  auto sanitizedPhrase = cfg.preferences.sanitizeInputPhrase( str );
+  auto sanitizedPhrase = normalizeSmartLookupInput( cfg.preferences.sanitizeInputPhrase( str ) );
+
+  if ( sanitizedPhrase.isEmpty() ) {
+    return;
+  }
 
   if ( isVisible() && sanitizedPhrase == pendingWord ) {
     // Attempt to translate the same word we already have shown in popup.
@@ -751,7 +779,14 @@ void ScanPopup::updateSuggestionList( const QString & text )
 
 void ScanPopup::translateInputFinished()
 {
-  pendingWord = Folding::unescapeWildcardSymbols( translateBox->translateLine()->text().trimmed() );
+  pendingWord = normalizeSmartLookupInput(
+    Folding::unescapeWildcardSymbols( translateBox->translateLine()->text() )
+  );
+
+  if ( pendingWord.isEmpty() ) {
+    return;
+  }
+
   showTranslationFor( pendingWord );
 }
 
