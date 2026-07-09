@@ -2,6 +2,12 @@
  * Part of GoldenDict. Licensed under GPLv3 or later, see the LICENSE file */
 #include <QRegularExpression>
 #include <QStringList>
+#include <QCoreApplication>
+#include <QFile>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <algorithm>
 #include "scanpopup.hh"
 #include "folding.hh"
 #include "articlesaver.hh"
@@ -57,7 +63,7 @@ QString compactCjkText( QString text )
   return text;
 }
 
-QStringList buddhistSeedTerms()
+QStringList fallbackBuddhistSeedTerms()
 {
   return {
     QStringLiteral( "阿耨多羅三藐三菩提" ),
@@ -89,6 +95,65 @@ QStringList buddhistSeedTerms()
     QStringLiteral( "行" ),
     QStringLiteral( "識" ),
   };
+}
+
+QStringList loadBuddhistSeedTermsFromJson()
+{
+  const QString path = QCoreApplication::applicationDirPath() + QStringLiteral( "/buddhist_terms.json" );
+  QFile file( path );
+
+  if ( !file.exists() ) {
+    qDebug( "Smart lookup terms file was not found: %s", path.toUtf8().constData() );
+    return {};
+  }
+
+  if ( !file.open( QIODevice::ReadOnly | QIODevice::Text ) ) {
+    qWarning( "Could not open smart lookup terms file: %s", path.toUtf8().constData() );
+    return {};
+  }
+
+  QJsonParseError parseError;
+  const QJsonDocument doc = QJsonDocument::fromJson( file.readAll(), &parseError );
+  if ( parseError.error != QJsonParseError::NoError ) {
+    qWarning( "Could not parse smart lookup terms file: %s", parseError.errorString().toUtf8().constData() );
+    return {};
+  }
+
+  const QJsonArray array = doc.isArray() ? doc.array() : doc.object().value( QStringLiteral( "terms" ) ).toArray();
+
+  QStringList terms;
+  for ( const QJsonValue & value : array ) {
+    QString term;
+
+    if ( value.isString() ) {
+      term = value.toString();
+    }
+    else if ( value.isObject() ) {
+      const QJsonObject obj = value.toObject();
+      term                  = obj.value( QStringLiteral( "term" ) ).toString();
+    }
+
+    term = normalizeSmartLookupInput( term );
+    if ( !term.isEmpty() && !terms.contains( term ) ) {
+      terms << term;
+    }
+  }
+
+  return terms;
+}
+
+QStringList buddhistSeedTerms()
+{
+  static const QStringList terms = [] {
+    const QStringList jsonTerms = loadBuddhistSeedTermsFromJson();
+    if ( !jsonTerms.isEmpty() ) {
+      return jsonTerms;
+    }
+
+    return fallbackBuddhistSeedTerms();
+  }();
+
+  return terms;
 }
 
 QStringList detectSmartLookupTerms( const QString & input )
