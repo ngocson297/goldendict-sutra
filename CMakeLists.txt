@@ -234,3 +234,11 @@ else ()
 endif ()
 
 feature_summary(WHAT ALL DESCRIPTION "Build configuration:")
+
+# Install Buddhist smart lookup glossary data.
+# This keeps buddhist_terms.json beside goldendict.exe after "cmake --install build".
+set(BUDDHIST_TERMS_FILE "${CMAKE_SOURCE_DIR}/buddhist_terms.json")
+
+if(EXISTS "${BUDDHIST_TERMS_FILE}")
+  install(FILES "${BUDDHIST_TERMS_FILE}" DESTINATION ".")
+endif()
