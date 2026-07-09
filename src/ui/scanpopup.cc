@@ -29,6 +29,7 @@ using std::pair;
 namespace {
 
 constexpr qsizetype smartLookupMaxChars = 300;
+constexpr bool smartLookupAutoPinPopup  = true;
 
 QString normalizeSmartLookupInput( QString text )
 {
@@ -1152,6 +1153,26 @@ void ScanPopup::showEngagePopup()
 
 void ScanPopup::engagePopup( bool forcePopup, bool giveFocus )
 {
+  if ( smartLookupAutoPinPopup && !ui.pinButton->isChecked() ) {
+    uninterceptMouse();
+
+    ui.pinButton->setChecked( true );
+    ui.onTopButton->setVisible( true );
+
+    Qt::WindowFlags flags = pinnedWindowFlags;
+    if ( ui.onTopButton->isChecked() ) {
+      flags |= Qt::WindowStaysOnTopHint;
+    }
+    setWindowFlags( flags );
+
+#ifdef Q_OS_MACOS
+    setAttribute( Qt::WA_MacAlwaysShowToolWindow );
+#endif
+
+    hideTimer.stop();
+    cfg.pinPopupWindow = true;
+  }
+
   if ( cfg.preferences.scanToMainWindow && !forcePopup ) {
     // Send translated word to main window istead of show popup
     emit sendPhraseToMainWindow( pendingWord );
