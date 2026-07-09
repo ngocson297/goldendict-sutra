@@ -1,6 +1,7 @@
 /* This file is (c) 2008-2012 Konstantin Isakov <ikm@goldendict.org>
  * Part of GoldenDict. Licensed under GPLv3 or later, see the LICENSE file */
 #include <QRegularExpression>
+#include <QStringList>
 #include "scanpopup.hh"
 #include "folding.hh"
 #include "articlesaver.hh"
@@ -38,7 +39,119 @@ QString normalizeSmartLookupInput( QString text )
   return text;
 }
 
+bool containsCjkText( const QString & text )
+{
+  for ( const QChar ch : text ) {
+    const auto u = ch.unicode();
+    if ( ( u >= 0x3400 && u <= 0x4DBF ) || ( u >= 0x4E00 && u <= 0x9FFF ) || ( u >= 0xF900 && u <= 0xFAFF ) ) {
+      return true;
+    }
+  }
+
+  return false;
 }
+
+QString compactCjkText( QString text )
+{
+  text.remove( QRegularExpression( QStringLiteral( "\\s+" ) ) );
+  return text;
+}
+
+QStringList buddhistSeedTerms()
+{
+  return {
+    QStringLiteral( "阿耨多羅三藐三菩提" ),
+    QStringLiteral( "觀自在菩薩" ),
+    QStringLiteral( "般若波羅蜜多" ),
+    QStringLiteral( "波羅蜜多" ),
+    QStringLiteral( "色即是空" ),
+    QStringLiteral( "空即是色" ),
+    QStringLiteral( "受想行識" ),
+    QStringLiteral( "五蘊皆空" ),
+    QStringLiteral( "照見五蘊" ),
+    QStringLiteral( "舍利子" ),
+    QStringLiteral( "諸法空相" ),
+    QStringLiteral( "不生不滅" ),
+    QStringLiteral( "不垢不淨" ),
+    QStringLiteral( "不增不減" ),
+    QStringLiteral( "十二因緣" ),
+    QStringLiteral( "無明" ),
+    QStringLiteral( "緣起" ),
+    QStringLiteral( "涅槃" ),
+    QStringLiteral( "菩提" ),
+    QStringLiteral( "菩薩" ),
+    QStringLiteral( "般若" ),
+    QStringLiteral( "五蘊" ),
+    QStringLiteral( "空相" ),
+    QStringLiteral( "色" ),
+    QStringLiteral( "受" ),
+    QStringLiteral( "想" ),
+    QStringLiteral( "行" ),
+    QStringLiteral( "識" ),
+  };
+}
+
+QStringList detectSmartLookupTerms( const QString & input )
+{
+  if ( !containsCjkText( input ) ) {
+    return {};
+  }
+
+  const QString compactInput = compactCjkText( input );
+  struct Match
+  {
+    int position;
+    int length;
+    QString term;
+  };
+
+  QList< Match > matches;
+  for ( const QString & term : buddhistSeedTerms() ) {
+    const int position = compactInput.indexOf( term );
+    if ( position >= 0 ) {
+      matches.push_back( Match{ position, static_cast< int >( term.size() ), term } );
+    }
+  }
+
+  std::sort( matches.begin(), matches.end(), []( const Match & lhs, const Match & rhs ) {
+    if ( lhs.position != rhs.position ) {
+      return lhs.position < rhs.position;
+    }
+    return lhs.length > rhs.length;
+  } );
+
+  QStringList terms;
+  for ( const Match & match : matches ) {
+    if ( !terms.contains( match.term ) ) {
+      terms << match.term;
+    }
+  }
+
+  return terms;
+}
+
+QString chooseSmartLookupQuery( const QString & input, const QStringList & detectedTerms )
+{
+  if ( detectedTerms.isEmpty() ) {
+    return input;
+  }
+
+  const QString compactInput = compactCjkText( input );
+  if ( compactInput == detectedTerms.first() ) {
+    return input;
+  }
+
+  // If the clipboard contains a whole sutra sentence, use the first detected
+  // Buddhist term as the dictionary lookup query. The remaining terms are shown
+  // in the popup status bar as hints.
+  if ( compactInput.size() > detectedTerms.first().size() + 2 || detectedTerms.size() > 1 ) {
+    return detectedTerms.first();
+  }
+
+  return input;
+}
+
+} // namespace
 
 #ifdef Q_OS_MAC
   #include "macos/macmouseover.hh"
@@ -561,7 +674,10 @@ void ScanPopup::translateWordFromClipboard( QClipboard::Mode m )
 
 void ScanPopup::translateWord( const QString & word )
 {
-  pendingWord = normalizeSmartLookupInput( cfg.preferences.sanitizeInputPhrase( word ) );
+  const QString normalizedWord = normalizeSmartLookupInput( cfg.preferences.sanitizeInputPhrase( word ) );
+  const QStringList smartTerms = detectSmartLookupTerms( normalizedWord );
+
+  pendingWord = chooseSmartLookupQuery( normalizedWord, smartTerms );
 
   if ( pendingWord.isEmpty() ) {
     return; // Nothing there
@@ -572,6 +688,10 @@ void ScanPopup::translateWord( const QString & word )
 #endif
 
   engagePopup( false, true );
+
+  if ( !smartTerms.isEmpty() && pendingWord != normalizedWord ) {
+    showStatusBarMessage( tr( "Smart terms: %1" ).arg( smartTerms.join( QStringLiteral( " | " ) ) ), 8000 );
+  }
 }
 
 #ifdef WITH_X11
@@ -581,21 +701,23 @@ void ScanPopup::showEngagePopup()
 }
 #endif
 
-[[deprecated]] void ScanPopup::handleInputWord( QString const & str, bool forcePopup )
+[[deprecated]] void ScanPopup::handleInputWord( const QString & str, bool forcePopup )
 {
-  auto sanitizedPhrase = normalizeSmartLookupInput( cfg.preferences.sanitizeInputPhrase( str ) );
+  const QString sanitizedPhrase = normalizeSmartLookupInput( cfg.preferences.sanitizeInputPhrase( str ) );
+  const QStringList smartTerms  = detectSmartLookupTerms( sanitizedPhrase );
+  const QString smartQuery      = chooseSmartLookupQuery( sanitizedPhrase, smartTerms );
 
-  if ( sanitizedPhrase.isEmpty() ) {
+  if ( smartQuery.isEmpty() ) {
     return;
   }
 
-  if ( isVisible() && sanitizedPhrase == pendingWord ) {
+  if ( isVisible() && smartQuery == pendingWord ) {
     // Attempt to translate the same word we already have shown in popup.
     // Ignore it, as it is probably a spurious mouseover event.
     return;
   }
 
-  pendingWord = sanitizedPhrase;
+  pendingWord = smartQuery;
 
 #ifdef WITH_X11
   if ( cfg.preferences.showScanFlag ) {
@@ -605,6 +727,10 @@ void ScanPopup::showEngagePopup()
 #endif
 
   engagePopup( forcePopup );
+
+  if ( !smartTerms.isEmpty() && pendingWord != sanitizedPhrase ) {
+    showStatusBarMessage( tr( "Smart terms: %1" ).arg( smartTerms.join( QStringLiteral( " | " ) ) ), 8000 );
+  }
 }
 
 void ScanPopup::engagePopup( bool forcePopup, bool giveFocus )
@@ -684,7 +810,7 @@ void ScanPopup::engagePopup( bool forcePopup, bool giveFocus )
     }
 
     // This produced some funky mouse grip-related bugs so we commented it out
-    //QApplication::processEvents(); // Make window appear immediately no matter what
+    // QApplication::processEvents(); // Make window appear immediately no matter what
   }
   else {
     // Pinned-down window isn't always on top, so we need to raise it
@@ -779,15 +905,21 @@ void ScanPopup::updateSuggestionList( const QString & text )
 
 void ScanPopup::translateInputFinished()
 {
-  pendingWord = normalizeSmartLookupInput(
-    Folding::unescapeWildcardSymbols( translateBox->translateLine()->text() )
-  );
+  const QString normalizedWord =
+    normalizeSmartLookupInput( Folding::unescapeWildcardSymbols( translateBox->translateLine()->text() ) );
+  const QStringList smartTerms = detectSmartLookupTerms( normalizedWord );
+
+  pendingWord = chooseSmartLookupQuery( normalizedWord, smartTerms );
 
   if ( pendingWord.isEmpty() ) {
     return;
   }
 
   showTranslationFor( pendingWord );
+
+  if ( !smartTerms.isEmpty() && pendingWord != normalizedWord ) {
+    showStatusBarMessage( tr( "Smart terms: %1" ).arg( smartTerms.join( QStringLiteral( " | " ) ) ), 8000 );
+  }
 }
 
 void ScanPopup::showTranslationFor( const QString & word ) const
@@ -1248,7 +1380,7 @@ void ScanPopup::sendWordToFavoritesButton_clicked()
     return;
   }
   auto current_exist = isWordPresentedInFavorites( definition->getTitle() );
-  //if current_exist=false( not exist ),  after click ,the word should be in the favorite which is blueStar
+  // if current_exist=false( not exist ),  after click ,the word should be in the favorite which is blueStar
   ui.sendWordToFavoritesButton->setIcon( !current_exist ? blueStarIcon : starIcon );
   emit sendWordToFavorites( definition->getTitle() );
 }
