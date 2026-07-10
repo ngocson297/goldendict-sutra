@@ -9,6 +9,12 @@
 #include <QJsonObject>
 #include <QTextBrowser>
 #include <QTabWidget>
+#include <QToolButton>
+#include <QTimer>
+#include <QTextDocument>
+#include <QSettings>
+#include <QApplication>
+#include <QActionGroup>
 #include <QUrl>
 #include <algorithm>
 #include "scanpopup.hh"
@@ -31,6 +37,192 @@ namespace {
 
 constexpr qsizetype smartLookupMaxChars = 300;
 constexpr bool smartLookupAutoPinPopup  = true;
+
+
+enum class SutraPopupLayoutMode
+{
+  Auto,
+  Fixed,
+  FitToResults
+};
+
+constexpr int sutraPopupFitMinWidth  = 520;
+constexpr int sutraPopupFitMinHeight = 320;
+constexpr int sutraPopupFitMaxWidthPercent  = 80;
+constexpr int sutraPopupFitMaxHeightPercent = 82;
+
+QString sutraPopupLayoutModeSettingsKey()
+{
+  return QStringLiteral( "SutraEdition/PopupLayoutMode" );
+}
+
+QString sutraPopupFixedGeometrySettingsKey()
+{
+  return QStringLiteral( "SutraEdition/PopupFixedGeometry" );
+}
+
+QString sutraPopupLayoutModeToString( SutraPopupLayoutMode mode )
+{
+  switch ( mode ) {
+    case SutraPopupLayoutMode::Fixed:
+      return QStringLiteral( "fixed" );
+    case SutraPopupLayoutMode::FitToResults:
+      return QStringLiteral( "fit" );
+    case SutraPopupLayoutMode::Auto:
+    default:
+      return QStringLiteral( "auto" );
+  }
+}
+
+SutraPopupLayoutMode sutraPopupLayoutModeFromString( const QString & value )
+{
+  const QString normalized = value.trimmed().toLower();
+
+  if ( normalized == QStringLiteral( "fixed" ) ) {
+    return SutraPopupLayoutMode::Fixed;
+  }
+
+  if ( normalized == QStringLiteral( "fit" ) ) {
+    return SutraPopupLayoutMode::FitToResults;
+  }
+
+  return SutraPopupLayoutMode::Auto;
+}
+
+SutraPopupLayoutMode loadSutraPopupLayoutMode()
+{
+  QSettings settings;
+  return sutraPopupLayoutModeFromString(
+    settings.value( sutraPopupLayoutModeSettingsKey(), QStringLiteral( "auto" ) ).toString() );
+}
+
+void saveSutraPopupLayoutMode( SutraPopupLayoutMode mode )
+{
+  QSettings settings;
+  settings.setValue( sutraPopupLayoutModeSettingsKey(), sutraPopupLayoutModeToString( mode ) );
+}
+
+QRect safeSutraPopupGeometry( QRect geometry )
+{
+  QScreen * screen = QGuiApplication::screenAt( geometry.center() );
+
+  if ( !screen ) {
+    screen = QGuiApplication::primaryScreen();
+  }
+
+  if ( !screen ) {
+    return geometry;
+  }
+
+  const QRect available = screen->availableGeometry();
+
+  const int maxWidth  = qMax( sutraPopupFitMinWidth, available.width() * sutraPopupFitMaxWidthPercent / 100 );
+  const int maxHeight = qMax( sutraPopupFitMinHeight, available.height() * sutraPopupFitMaxHeightPercent / 100 );
+
+  geometry.setWidth( qBound( sutraPopupFitMinWidth, geometry.width(), maxWidth ) );
+  geometry.setHeight( qBound( sutraPopupFitMinHeight, geometry.height(), maxHeight ) );
+
+  if ( geometry.right() > available.right() ) {
+    geometry.moveRight( available.right() );
+  }
+  if ( geometry.bottom() > available.bottom() ) {
+    geometry.moveBottom( available.bottom() );
+  }
+  if ( geometry.left() < available.left() ) {
+    geometry.moveLeft( available.left() );
+  }
+  if ( geometry.top() < available.top() ) {
+    geometry.moveTop( available.top() );
+  }
+
+  return geometry;
+}
+
+void saveSutraPopupFixedGeometry( QWidget * popup )
+{
+  if ( !popup ) {
+    return;
+  }
+
+  QSettings settings;
+  settings.setValue( sutraPopupFixedGeometrySettingsKey(), popup->geometry() );
+  saveSutraPopupLayoutMode( SutraPopupLayoutMode::Fixed );
+}
+
+QRect loadSutraPopupFixedGeometry( QWidget * popup )
+{
+  QSettings settings;
+  QRect geometry = settings.value( sutraPopupFixedGeometrySettingsKey() ).toRect();
+
+  if ( !geometry.isValid() && popup ) {
+    geometry = popup->geometry();
+  }
+
+  if ( !geometry.isValid() ) {
+    geometry = QRect( 120, 120, 760, 520 );
+  }
+
+  return safeSutraPopupGeometry( geometry );
+}
+
+QSize fitSutraPopupSizeFromCurrentTab( QWidget * popup, QTabWidget * tabs )
+{
+  QSize target = popup ? popup->size() : QSize( 760, 520 );
+
+  if ( target.width() < 700 ) {
+    target.setWidth( 700 );
+  }
+  if ( target.height() < 460 ) {
+    target.setHeight( 460 );
+  }
+
+  if ( tabs ) {
+    if ( QTextBrowser * browser = qobject_cast< QTextBrowser * >( tabs->currentWidget() ) ) {
+      const QSize documentSize = browser->document()->size().toSize();
+      if ( documentSize.isValid() ) {
+        target.setWidth( qMax( target.width(), documentSize.width() + 80 ) );
+        target.setHeight( qMax( sutraPopupFitMinHeight, documentSize.height() + 190 ) );
+      }
+    }
+    else if ( tabs->currentWidget() ) {
+      const QSize hint = tabs->currentWidget()->sizeHint();
+      if ( hint.isValid() ) {
+        target.setWidth( qMax( target.width(), hint.width() + 80 ) );
+        target.setHeight( qMax( target.height(), hint.height() + 140 ) );
+      }
+    }
+  }
+
+  return target;
+}
+
+void fitSutraPopupToResults( QWidget * popup, QTabWidget * tabs )
+{
+  if ( !popup ) {
+    return;
+  }
+
+  QRect geometry = popup->geometry();
+  geometry.setSize( fitSutraPopupSizeFromCurrentTab( popup, tabs ) );
+  popup->setGeometry( safeSutraPopupGeometry( geometry ) );
+}
+
+void applySutraPopupLayoutMode( QWidget * popup, QTabWidget * tabs )
+{
+  switch ( loadSutraPopupLayoutMode() ) {
+    case SutraPopupLayoutMode::Fixed:
+      if ( popup ) {
+        popup->setGeometry( loadSutraPopupFixedGeometry( popup ) );
+      }
+      break;
+    case SutraPopupLayoutMode::FitToResults:
+      fitSutraPopupToResults( popup, tabs );
+      break;
+    case SutraPopupLayoutMode::Auto:
+    default:
+      break;
+  }
+}
 
 QString normalizeSmartLookupInput( QString text )
 {
@@ -457,115 +649,50 @@ QList< BuddhistGlossaryEntry > glossaryEntriesForTerms( const QString & primaryT
   return result;
 }
 
-QString glossaryFieldHtml( const QString & label, const QString & value )
-{
-  if ( value.trimmed().isEmpty() ) {
-    return QString();
-  }
-
-  return QStringLiteral(
-           "<div class='gd-field'>"
-           "<div class='gd-label'>%1</div>"
-           "<div class='gd-value'>%2</div>"
-           "</div>" )
-    .arg( htmlEscape( label ), htmlEscape( value ) );
-}
-
 QString glossaryEntryHtml( const BuddhistGlossaryEntry & entry )
 {
   QString html;
-  html += QStringLiteral( "<section class='gd-card'>" );
-
-  html += QStringLiteral(
-            "<div class='gd-term-row'>"
-            "<div class='gd-term'>%1</div>"
-            "<div class='gd-badge'>Thuật ngữ</div>"
-            "</div>" )
+  html += QStringLiteral( "<div style='margin:0 0 14px 0; padding:10px; border:1px solid #ddd; border-radius:8px;'>" );
+  html += QStringLiteral( "<div style='font-size:22px; font-weight:700; margin-bottom:6px;'>%1</div>" )
             .arg( htmlEscape( entry.term ) );
 
   if ( !entry.hanViet.isEmpty() ) {
-    html += QStringLiteral( "<div class='gd-hanviet'>%1</div>" ).arg( htmlEscape( entry.hanViet ) );
+    html += QStringLiteral( "<div><b>Hán Việt:</b> %1</div>" ).arg( htmlEscape( entry.hanViet ) );
   }
-
-  html += QStringLiteral( "<div class='gd-grid'>" );
-  html += glossaryFieldHtml( QStringLiteral( "Pinyin" ), entry.pinyin );
-  html += glossaryFieldHtml( QStringLiteral( "Nghĩa tiếng Việt" ), entry.meaningVi );
-  html += glossaryFieldHtml( QStringLiteral( "Nhóm" ), entry.category );
-
+  if ( !entry.pinyin.isEmpty() ) {
+    html += QStringLiteral( "<div><b>Pinyin:</b> %1</div>" ).arg( htmlEscape( entry.pinyin ) );
+  }
+  if ( !entry.meaningVi.isEmpty() ) {
+    html += QStringLiteral( "<div><b>Nghĩa:</b> %1</div>" ).arg( htmlEscape( entry.meaningVi ) );
+  }
+  if ( !entry.category.isEmpty() ) {
+    html += QStringLiteral( "<div><b>Nhóm:</b> %1</div>" ).arg( htmlEscape( entry.category ) );
+  }
   if ( !entry.suggestedTranslations.isEmpty() ) {
-    html +=
-      glossaryFieldHtml( QStringLiteral( "Gợi ý dịch" ), entry.suggestedTranslations.join( QStringLiteral( " / " ) ) );
+    html += QStringLiteral( "<div><b>Gợi ý dịch:</b> %1</div>" )
+              .arg( htmlEscape( entry.suggestedTranslations.join( QStringLiteral( " / " ) ) ) );
   }
-
   if ( !entry.related.isEmpty() ) {
-    html += glossaryFieldHtml( QStringLiteral( "Liên quan" ), entry.related.join( QStringLiteral( "、" ) ) );
+    html += QStringLiteral( "<div><b>Liên quan:</b> %1</div>" )
+              .arg( htmlEscape( entry.related.join( QStringLiteral( "、" ) ) ) );
   }
 
   html += QStringLiteral( "</div>" );
-  html += QStringLiteral( "</section>" );
   return html;
 }
 
-QString glossaryHtml( const QString & primaryTerm, const QStringList & detectedTerms, const QString & sourceText )
+QString glossaryHtml( const QString & primaryTerm, const QStringList & detectedTerms )
 {
   const QList< BuddhistGlossaryEntry > entries = glossaryEntriesForTerms( primaryTerm, detectedTerms );
 
   QString html;
-  html += QStringLiteral( "<html><head><meta charset='utf-8'>" );
+  html += QStringLiteral( "<html><head><meta charset='utf-8'></head>" );
   html += QStringLiteral(
-    "<style>"
-    "body{font-family:'Segoe UI',Arial,sans-serif;font-size:14px;margin:12px;background:#f7f7f7;color:#222;}"
-    ".gd-header{margin:0 0 12px 0;padding:12px 14px;border-radius:10px;background:#ffffff;border:1px solid #e3e3e3;}"
-    ".gd-title{font-size:18px;font-weight:700;margin:0 0 6px 0;}"
-    ".gd-subtitle{font-size:12px;color:#666;line-height:1.45;}"
-    ".gd-smart{margin-top:8px;padding:8px 10px;border-radius:8px;background:#eef6ff;border:1px solid #cfe7ff;color:#234;}"
-    ".gd-source{margin-top:6px;}"
-    ".gd-source-text{margin-top:4px;padding:7px 8px;border-radius:6px;background:#fff;border:1px solid #d9ebff;line-height:1.55;word-break:break-word;}"
-    ".gd-card{margin:0 0 12px 0;padding:14px;border-radius:12px;background:#fff;border:1px solid #dedede;}"
-    ".gd-term-row{display:flex;align-items:center;justify-content:space-between;gap:8px;}"
-    ".gd-term{font-size:24px;font-weight:800;line-height:1.25;}"
-    ".gd-badge{font-size:11px;padding:3px 8px;border-radius:999px;background:#eaf7e8;color:#246b2a;border:1px solid #cde8c8;white-space:nowrap;}"
-    ".gd-hanviet{font-size:17px;font-weight:600;color:#0b5cad;margin-top:4px;}"
-    ".gd-grid{margin-top:12px;}"
-    ".gd-field{margin-top:9px;padding-top:9px;border-top:1px solid #eeeeee;}"
-    ".gd-label{font-size:12px;color:#777;text-transform:uppercase;letter-spacing:.02em;margin-bottom:3px;}"
-    ".gd-value{font-size:14px;line-height:1.55;}"
-    ".gd-empty{padding:12px;border-radius:10px;background:#fff7e6;border:1px solid #ffe1a6;color:#5b4300;}"
-    ".gd-footer{color:#777;font-size:12px;margin-top:8px;}"
-    "</style></head>" );
-  html += QStringLiteral( "<body>" );
-
-  html += QStringLiteral(
-    "<div class='gd-header'>"
-    "<div class='gd-title'>Phật học</div>"
-    "<div class='gd-subtitle'>Tra cứu thuật ngữ Hán văn / Phật học từ dữ liệu <b>buddhist_terms.json</b>.</div>" );
-
-  if ( !primaryTerm.trimmed().isEmpty() ) {
-    html += QStringLiteral( "<div class='gd-smart'><b>Đang tra:</b> %1" ).arg( htmlEscape( primaryTerm ) );
-    QStringList relatedTerms = detectedTerms;
-    relatedTerms.removeAll( primaryTerm );
-    if ( !relatedTerms.isEmpty() ) {
-      html += QStringLiteral( "<br><b>Thuật ngữ nhận diện thêm:</b> %1" )
-                .arg( htmlEscape( relatedTerms.join( QStringLiteral( "、" ) ) ) );
-    }
-
-    const QString normalizedSource = normalizeSmartLookupInput( sourceText );
-    if ( !normalizedSource.isEmpty() && normalizedSource != primaryTerm ) {
-      html += QStringLiteral(
-                "<div class='gd-source'>"
-                "<b>Từ câu/đoạn gốc:</b>"
-                "<div class='gd-source-text'>%1</div>"
-                "</div>" )
-                .arg( htmlEscape( normalizedSource ) );
-    }
-
-    html += QStringLiteral( "</div>" );
-  }
-
-  html += QStringLiteral( "</div>" );
+    "<body style='font-family:&quot;Segoe UI&quot;, Arial, sans-serif; font-size:14px; margin:12px;'>" );
+  html += QStringLiteral( "<h2 style='margin-top:0;'>Phật học / Buddhist Glossary</h2>" );
 
   if ( entries.isEmpty() ) {
-    html += QStringLiteral( "<div class='gd-empty'>Không có glossary cho thuật ngữ này.</div>" );
+    html += QStringLiteral( "<p>Không có glossary cho thuật ngữ này.</p>" );
   }
   else {
     for ( const BuddhistGlossaryEntry & entry : entries ) {
@@ -573,59 +700,9 @@ QString glossaryHtml( const QString & primaryTerm, const QStringList & detectedT
     }
   }
 
-  html += QStringLiteral( "<div class='gd-footer'>Nguồn dữ liệu: buddhist_terms.json</div>" );
+  html += QStringLiteral( "<p style='color:#777; font-size:12px;'>Nguồn dữ liệu: buddhist_terms.json</p>" );
   html += QStringLiteral( "</body></html>" );
   return html;
-}
-
-
-int findSutraWelcomeTabIndex( QTabWidget * tabs )
-{
-  if ( !tabs ) {
-    return -1;
-  }
-
-  for ( int i = 0; i < tabs->count(); ++i ) {
-    QTextBrowser * browser = qobject_cast< QTextBrowser * >( tabs->widget( i ) );
-    if ( browser && browser->objectName() == QStringLiteral( "sutraWelcomeBrowser" ) ) {
-      return i;
-    }
-  }
-
-  return -1;
-}
-
-void moveSutraWelcomeTabToEnd( QTabWidget * tabs )
-{
-  if ( !tabs ) {
-    return;
-  }
-
-  const int welcomeIndex = findSutraWelcomeTabIndex( tabs );
-  const int lastIndex    = tabs->count() - 1;
-
-  if ( welcomeIndex < 0 || welcomeIndex >= lastIndex ) {
-    return;
-  }
-
-  QWidget * widget      = tabs->widget( welcomeIndex );
-  const QIcon icon      = tabs->tabIcon( welcomeIndex );
-  const QString text    = tabs->tabText( welcomeIndex );
-  const QString tip     = tabs->tabToolTip( welcomeIndex );
-  const QString whats   = tabs->tabWhatsThis( welcomeIndex );
-  const QVariant data   = tabs->tabBar()->tabData( welcomeIndex );
-  const bool wasCurrent = tabs->currentIndex() == welcomeIndex;
-
-  tabs->removeTab( welcomeIndex );
-
-  const int newIndex = tabs->addTab( widget, icon, text );
-  tabs->setTabToolTip( newIndex, tip );
-  tabs->setTabWhatsThis( newIndex, whats );
-  tabs->tabBar()->setTabData( newIndex, data );
-
-  if ( wasCurrent ) {
-    tabs->setCurrentIndex( newIndex );
-  }
 }
 
 QTextBrowser * findBuddhistGlossaryBrowser( QTabWidget * tabs )
@@ -660,10 +737,7 @@ void removeBuddhistGlossaryTab( QTabWidget * tabs )
   }
 }
 
-void updateBuddhistGlossaryTab( QTabWidget * tabs,
-                                const QString & primaryTerm,
-                                const QStringList & detectedTerms,
-                                const QString & sourceText )
+void updateBuddhistGlossaryTab( QTabWidget * tabs, const QString & primaryTerm, const QStringList & detectedTerms )
 {
   if ( !tabs ) {
     return;
@@ -683,285 +757,7 @@ void updateBuddhistGlossaryTab( QTabWidget * tabs,
     tabs->addTab( browser, QStringLiteral( "Phật học" ) );
   }
 
-  browser->setHtml( glossaryHtml( primaryTerm, detectedTerms, sourceText ) );
-  moveSutraWelcomeTabToEnd( tabs );
-}
-
-
-QString sutraTranslationValue( const BuddhistGlossaryEntry & entry, bool meaningMode )
-{
-  if ( meaningMode && !entry.suggestedTranslations.isEmpty() ) {
-    return entry.suggestedTranslations.first();
-  }
-
-  if ( !entry.hanViet.isEmpty() ) {
-    return entry.hanViet;
-  }
-
-  if ( meaningMode && !entry.meaningVi.isEmpty() ) {
-    return entry.meaningVi;
-  }
-
-  if ( !entry.suggestedTranslations.isEmpty() ) {
-    return entry.suggestedTranslations.first();
-  }
-
-  return entry.term;
-}
-
-QList< BuddhistGlossaryEntry > sutraTranslationEntries( const QString & primaryTerm, const QStringList & detectedTerms )
-{
-  QList< BuddhistGlossaryEntry > entries = glossaryEntriesForTerms( primaryTerm, detectedTerms );
-
-  std::sort( entries.begin(),
-             entries.end(),
-             []( const BuddhistGlossaryEntry & lhs, const BuddhistGlossaryEntry & rhs ) {
-               return lhs.term.size() > rhs.term.size();
-             } );
-
-  return entries;
-}
-
-QString sutraReplaceTermsWithGlossary( QString text, QList< BuddhistGlossaryEntry > entries, bool meaningMode )
-{
-  if ( text.trimmed().isEmpty() || entries.isEmpty() ) {
-    return text;
-  }
-
-  std::sort( entries.begin(),
-             entries.end(),
-             []( const BuddhistGlossaryEntry & lhs, const BuddhistGlossaryEntry & rhs ) {
-               return lhs.term.size() > rhs.term.size();
-             } );
-
-  for ( const BuddhistGlossaryEntry & entry : entries ) {
-    if ( entry.term.isEmpty() ) {
-      continue;
-    }
-
-    const QString replacement = sutraTranslationValue( entry, meaningMode );
-    if ( replacement.isEmpty() || replacement == entry.term ) {
-      continue;
-    }
-
-    text.replace( entry.term, replacement );
-  }
-
-  return text;
-}
-
-QString sutraTranslationTermRowsHtml( const QList< BuddhistGlossaryEntry > & entries )
-{
-  if ( entries.isEmpty() ) {
-    return QStringLiteral( "<div class='tr-empty'>Chưa nhận diện được thuật ngữ Phật học trong đoạn này.</div>" );
-  }
-
-  QString html;
-  html += QStringLiteral( "<table class='tr-table'>" );
-  html += QStringLiteral( "<tr><th>Hán</th><th>Hán Việt</th><th>Nghĩa / gợi ý</th></tr>" );
-
-  for ( const BuddhistGlossaryEntry & entry : entries ) {
-    QString hint;
-    if ( !entry.suggestedTranslations.isEmpty() ) {
-      hint = entry.suggestedTranslations.join( QStringLiteral( " / " ) );
-    }
-    else {
-      hint = entry.meaningVi;
-    }
-
-    html += QStringLiteral( "<tr><td class='tr-han'>%1</td><td>%2</td><td>%3</td></tr>" )
-              .arg( htmlEscape( entry.term ),
-                    htmlEscape( entry.hanViet.isEmpty() ? QStringLiteral( "—" ) : entry.hanViet ),
-                    htmlEscape( hint.isEmpty() ? QStringLiteral( "—" ) : hint ) );
-  }
-
-  html += QStringLiteral( "</table>" );
-  return html;
-}
-
-QString sutraParagraphTranslationHtml( const QString & primaryTerm,
-                                       const QStringList & detectedTerms,
-                                       const QString & sourceText )
-{
-  const QString normalizedSource               = normalizeSmartLookupInput( sourceText );
-  const QList< BuddhistGlossaryEntry > entries = sutraTranslationEntries( primaryTerm, detectedTerms );
-  const QString hanVietSuggestion              = sutraReplaceTermsWithGlossary( normalizedSource, entries, false );
-  const QString meaningSuggestion              = sutraReplaceTermsWithGlossary( normalizedSource, entries, true );
-
-  QString html;
-  html += QStringLiteral( "<html><head><meta charset='utf-8'>" );
-  html += QStringLiteral(
-    "<style>"
-    "body{font-family:'Segoe UI',Arial,sans-serif;font-size:14px;margin:12px;background:#f7f7f7;color:#222;}"
-    ".tr-header{margin:0 0 12px 0;padding:12px 14px;border-radius:10px;background:#ffffff;border:1px solid #e3e3e3;}"
-    ".tr-title{font-size:18px;font-weight:800;margin:0 0 6px 0;color:#1f2937;}"
-    ".tr-subtitle{font-size:12px;color:#666;line-height:1.45;}"
-    ".tr-card{margin:0 0 12px 0;padding:14px;border-radius:12px;background:#fff;border:1px solid #dedede;}"
-    ".tr-label{font-size:12px;color:#777;text-transform:uppercase;letter-spacing:.02em;margin-bottom:6px;font-weight:700;}"
-    ".tr-text{font-size:15px;line-height:1.65;word-break:break-word;}"
-    ".tr-original{font-size:17px;line-height:1.75;word-break:break-word;}"
-    ".tr-note{margin-top:8px;color:#6b7280;font-size:12px;line-height:1.5;}"
-    ".tr-table{width:100%;border-collapse:collapse;font-size:13px;}"
-    ".tr-table th{background:#eef6ff;color:#234;text-align:left;border:1px solid #d7e9ff;padding:7px;}"
-    ".tr-table td{border:1px solid #e5e7eb;padding:7px;vertical-align:top;line-height:1.45;}"
-    ".tr-han{font-size:15px;font-weight:700;color:#111827;}"
-    ".tr-empty{padding:10px;border-radius:8px;background:#fff7e6;border:1px solid #ffe1a6;color:#5b4300;}"
-    ".tr-footer{color:#777;font-size:12px;margin-top:8px;}"
-    "</style></head><body>" );
-
-  html += QStringLiteral(
-    "<div class='tr-header'>"
-    "<div class='tr-title'>Dịch đoạn</div>"
-    "<div class='tr-subtitle'>Bản dịch hỗ trợ bằng glossary nội bộ. Tính năng này không dùng AI/API, nên nên xem như bản gợi ý để đọc và hiệu đính.</div>"
-    "</div>" );
-
-  html +=
-    QStringLiteral(
-      "<section class='tr-card'><div class='tr-label'>Nguyên văn</div><div class='tr-original'>%1</div></section>" )
-      .arg( htmlEscape( normalizedSource ) );
-
-  html += QStringLiteral( "<section class='tr-card'><div class='tr-label'>Thuật ngữ nhận diện</div>%1</section>" )
-            .arg( sutraTranslationTermRowsHtml( entries ) );
-
-  html +=
-    QStringLiteral(
-      "<section class='tr-card'><div class='tr-label'>Bản Hán Việt gợi ý</div><div class='tr-text'>%1</div><div class='tr-note'>Tự động thay thuật ngữ Hán bằng Hán Việt trong buddhist_terms.json.</div></section>" )
-      .arg( htmlEscape( hanVietSuggestion ) );
-
-  html +=
-    QStringLiteral(
-      "<section class='tr-card'><div class='tr-label'>Dịch nghĩa tham khảo</div><div class='tr-text'>%1</div><div class='tr-note'>Đây là bản thay thế thuật ngữ theo glossary, chưa phải bản dịch văn học hoàn chỉnh.</div></section>" )
-      .arg( htmlEscape( meaningSuggestion ) );
-
-  html += QStringLiteral(
-    "<div class='tr-footer'>Nguồn dữ liệu: buddhist_terms.json · Phase 3A glossary-based translation</div>" );
-  html += QStringLiteral( "</body></html>" );
-  return html;
-}
-
-QTextBrowser * findSutraTranslationBrowser( QTabWidget * tabs )
-{
-  if ( !tabs ) {
-    return nullptr;
-  }
-
-  for ( int i = 0; i < tabs->count(); ++i ) {
-    QTextBrowser * browser = qobject_cast< QTextBrowser * >( tabs->widget( i ) );
-    if ( browser && browser->objectName() == QStringLiteral( "sutraTranslationBrowser" ) ) {
-      return browser;
-    }
-  }
-
-  return nullptr;
-}
-
-void removeSutraTranslationTab( QTabWidget * tabs )
-{
-  if ( !tabs ) {
-    return;
-  }
-
-  for ( int i = 0; i < tabs->count(); ++i ) {
-    QTextBrowser * browser = qobject_cast< QTextBrowser * >( tabs->widget( i ) );
-    if ( browser && browser->objectName() == QStringLiteral( "sutraTranslationBrowser" ) ) {
-      tabs->removeTab( i );
-      browser->deleteLater();
-      return;
-    }
-  }
-}
-
-void updateSutraTranslationTab( QTabWidget * tabs,
-                                const QString & primaryTerm,
-                                const QStringList & detectedTerms,
-                                const QString & sourceText )
-{
-  if ( !tabs ) {
-    return;
-  }
-
-  const QString normalizedSource = normalizeSmartLookupInput( sourceText );
-  if ( normalizedSource.isEmpty() || !containsCjkText( normalizedSource ) ) {
-    removeSutraTranslationTab( tabs );
-    return;
-  }
-
-  QTextBrowser * browser = findSutraTranslationBrowser( tabs );
-  if ( !browser ) {
-    browser = new QTextBrowser( tabs );
-    browser->setObjectName( QStringLiteral( "sutraTranslationBrowser" ) );
-    browser->setOpenExternalLinks( true );
-    tabs->addTab( browser, QStringLiteral( "Dịch đoạn" ) );
-  }
-
-  browser->setHtml( sutraParagraphTranslationHtml( primaryTerm, detectedTerms, normalizedSource ) );
-  moveSutraWelcomeTabToEnd( tabs );
-}
-
-QString welcomeHtml()
-{
-  QString html;
-  html += QStringLiteral( "<html><head><meta charset='utf-8'>" );
-  html += QStringLiteral(
-    "<style>"
-    "body{font-family:'Segoe UI',Arial,sans-serif;font-size:14px;margin:0;background:#f6f7fb;color:#222;}"
-    ".wrap{padding:16px;}"
-    ".hero{padding:18px 18px 16px 18px;border-radius:14px;background:#ffffff;border:1px solid #e1e4ea;box-shadow:0 1px 3px rgba(0,0,0,.05);}"
-    ".title{font-size:22px;font-weight:800;margin:0 0 6px 0;color:#1f2937;}"
-    ".subtitle{font-size:13px;line-height:1.55;color:#5b6472;margin:0;}"
-    ".steps{margin-top:14px;display:block;}"
-    ".step{margin:10px 0;padding:12px;border-radius:12px;background:#fff;border:1px solid #e4e7ee;}"
-    ".num{display:inline-block;min-width:24px;height:24px;line-height:24px;text-align:center;border-radius:999px;background:#0b5cad;color:#fff;font-weight:700;margin-right:8px;}"
-    ".step-title{font-weight:700;color:#1f2937;}"
-    ".step-text{margin-top:6px;color:#4b5563;line-height:1.55;}"
-    ".kbd{display:inline-block;padding:2px 6px;border:1px solid #cfd6e4;border-radius:5px;background:#f9fafb;font-family:Consolas,monospace;font-size:12px;color:#111827;}"
-    ".features{margin-top:14px;padding:12px;border-radius:12px;background:#eef6ff;border:1px solid #cfe7ff;color:#223;}"
-    ".features b{color:#0b5cad;}"
-    ".hint{margin-top:12px;font-size:12px;line-height:1.5;color:#6b7280;}"
-    "</style></head><body>" );
-
-  html += QStringLiteral(
-    "<div class='wrap'>"
-    "<div class='hero'>"
-    "<div class='title'>GoldenDict Sutra</div>"
-    "<p class='subtitle'>Bản tùy biến GoldenDict-ng để tra cứu Hán văn và thuật ngữ Phật học nhanh hơn trong lúc đọc/dịch kinh.</p>"
-    "</div>"
-
-    "<div class='steps'>"
-    "<div class='step'>"
-    "<span class='num'>1</span><span class='step-title'>Bôi đen chữ Hán hoặc câu kinh</span>"
-    "<div class='step-text'>Có thể chọn một từ, một cụm, hoặc cả câu nhiều dòng.</div>"
-    "</div>"
-
-    "<div class='step'>"
-    "<span class='num'>2</span><span class='step-title'>Bấm <span class='kbd'>Ctrl+C</span>, <span class='kbd'>Ctrl+C</span></span>"
-    "<div class='step-text'>Popup sẽ tự mở và tự ghim để không bị tắt khi rê chuột ra ngoài.</div>"
-    "</div>"
-
-    "<div class='step'>"
-    "<span class='num'>3</span><span class='step-title'>Xem tab Phật học, Dịch đoạn và Web</span>"
-    "<div class='step-text'>Tab Phật học hiển thị thuật ngữ; tab Dịch đoạn tạo bản Hán Việt và dịch nghĩa tham khảo bằng glossary nội bộ.</div>"
-    "</div>"
-    "</div>"
-
-    "<div class='features'>"
-    "<b>Đã bật:</b> Smart lookup, nhận diện thuật ngữ Phật học, glossary từ buddhist_terms.json, tab Dịch đoạn, tab Web tham khảo, popup tự pin."
-    "</div>"
-
-    "<div class='hint'>Gợi ý: nếu copy cả câu nhưng popup tra một cụm ngắn hơn, đó là Smart Lookup đang ưu tiên thuật ngữ Phật học quan trọng nhất trong câu.</div>"
-    "</div>"
-    "</body></html>" );
-
-  return html;
-}
-
-QTextBrowser * createWelcomeBrowser( QWidget * parent )
-{
-  auto * browser = new QTextBrowser( parent );
-  browser->setObjectName( QStringLiteral( "sutraWelcomeBrowser" ) );
-  browser->setOpenExternalLinks( true );
-  browser->setHtml( welcomeHtml() );
-  return browser;
+  browser->setHtml( glossaryHtml( primaryTerm, detectedTerms ) );
 }
 
 QString webReferenceUrlEncode( const QString & text )
@@ -1094,7 +890,6 @@ void updateWebReferenceTab( QTabWidget * tabs, const QString & primaryTerm, cons
   }
 
   browser->setHtml( webReferenceHtml( primaryTerm, detectedTerms ) );
-  moveSutraWelcomeTabToEnd( tabs );
 }
 
 } // namespace
@@ -1197,9 +992,6 @@ ScanPopup::ScanPopup( QWidget * parent,
   tabWidget->addTab( definition, tr( "Definition" ) );
   tabWidget->tabBar()->setTabButton( 0, QTabBar::RightSide, nullptr );
   tabWidget->tabBar()->setTabButton( 0, QTabBar::LeftSide, nullptr );
-
-  QTextBrowser * welcomeBrowser = createWelcomeBrowser( tabWidget );
-  tabWidget->addTab( welcomeBrowser, QStringLiteral( "Hướng dẫn" ) );
 
   setCentralWidget( tabWidget );
 
@@ -1314,6 +1106,90 @@ ScanPopup::ScanPopup( QWidget * parent,
 
   ui.pinButton->setChecked( cfg.pinPopupWindow );
 
+
+  ui.pinButton->setToolTip(
+    ui.pinButton->toolTip() + tr( "\nClick: popup options / tùy chọn popup" ) );
+
+  QMenu * sutraPopupLayoutMenu = new QMenu( tr( "Popup options" ), ui.pinButton );
+
+  QAction * sutraPopupPinAction = sutraPopupLayoutMenu->addAction(
+    tr( "Pin / keep popup open" ) );
+  sutraPopupPinAction->setCheckable( true );
+
+  sutraPopupLayoutMenu->addSeparator();
+
+  QActionGroup * sutraPopupLayoutGroup = new QActionGroup( sutraPopupLayoutMenu );
+
+  QAction * sutraPopupAutoAction = sutraPopupLayoutMenu->addAction(
+    tr( "Auto - let GoldenDict decide" ) );
+  QAction * sutraPopupFixedAction = sutraPopupLayoutMenu->addAction(
+    tr( "Fix current size and position" ) );
+  QAction * sutraPopupFitAction = sutraPopupLayoutMenu->addAction(
+    tr( "Fit window size to results" ) );
+
+  for ( QAction * action : { sutraPopupAutoAction, sutraPopupFixedAction, sutraPopupFitAction } ) {
+    action->setCheckable( true );
+    sutraPopupLayoutGroup->addAction( action );
+  }
+
+  const auto updateSutraPopupLayoutMenu = [ this,
+                                            sutraPopupPinAction,
+                                            sutraPopupAutoAction,
+                                            sutraPopupFixedAction,
+                                            sutraPopupFitAction ] {
+    sutraPopupPinAction->setChecked( ui.pinButton->isChecked() );
+
+    switch ( loadSutraPopupLayoutMode() ) {
+      case SutraPopupLayoutMode::Fixed:
+        sutraPopupFixedAction->setChecked( true );
+        break;
+      case SutraPopupLayoutMode::FitToResults:
+        sutraPopupFitAction->setChecked( true );
+        break;
+      case SutraPopupLayoutMode::Auto:
+      default:
+        sutraPopupAutoAction->setChecked( true );
+        break;
+    }
+  };
+
+  connect( sutraPopupLayoutMenu, &QMenu::aboutToShow, this, updateSutraPopupLayoutMenu );
+
+  connect( sutraPopupPinAction, &QAction::triggered, this, [ this ]( bool checked ) {
+    ui.pinButton->setChecked( checked );
+    pinButtonClicked( checked );
+    showStatusBarMessage( checked ? tr( "Popup pinned" ) : tr( "Popup unpinned" ), 4000 );
+  } );
+
+  connect( sutraPopupAutoAction, &QAction::triggered, this, [ this ] {
+    saveSutraPopupLayoutMode( SutraPopupLayoutMode::Auto );
+    showStatusBarMessage( tr( "Popup layout: Auto" ), 4000 );
+  } );
+
+  connect( sutraPopupFixedAction, &QAction::triggered, this, [ this ] {
+    saveSutraPopupFixedGeometry( this );
+    showStatusBarMessage( tr( "Popup layout: fixed current size and position" ), 5000 );
+  } );
+
+  connect( sutraPopupFitAction, &QAction::triggered, this, [ this ] {
+    saveSutraPopupLayoutMode( SutraPopupLayoutMode::FitToResults );
+    fitSutraPopupToResults( this, tabWidget );
+    showStatusBarMessage( tr( "Popup layout: fit to results" ), 4000 );
+  } );
+
+  if ( QToolButton * pinToolButton = qobject_cast< QToolButton * >( ui.pinButton ) ) {
+    pinToolButton->setMenu( sutraPopupLayoutMenu );
+    pinToolButton->setPopupMode( QToolButton::InstantPopup );
+  }
+  else {
+    connect( ui.pinButton, &QAbstractButton::clicked, this, [ = ] {
+      updateSutraPopupLayoutMenu();
+      sutraPopupLayoutMenu->exec( ui.pinButton->mapToGlobal( QPoint( 0, ui.pinButton->height() ) ) );
+    } );
+  }
+
+  applySutraPopupLayoutMode( this, tabWidget );
+
   if ( cfg.pinPopupWindow ) {
     Qt::WindowFlags flags = pinnedWindowFlags;
     if ( cfg.popupWindowAlwaysOnTop ) {
@@ -1372,7 +1248,7 @@ ScanPopup::ScanPopup( QWidget * parent,
 
   connect( &wordFinder, &WordFinder::finished, this, &ScanPopup::prefixMatchFinished );
 
-  connect( ui.pinButton, &QAbstractButton::clicked, this, &ScanPopup::pinButtonClicked );
+  // Pin button left-click opens popup options menu. Pin/unpin is handled by the menu action above.
 
   connect( definition, &ArticleView::pageLoaded, this, &ScanPopup::pageLoaded );
 
@@ -1637,8 +1513,7 @@ void ScanPopup::translateWord( const QString & word )
 #endif
 
   engagePopup( false, true );
-  updateBuddhistGlossaryTab( tabWidget, pendingWord, smartTerms, normalizedWord );
-  updateSutraTranslationTab( tabWidget, pendingWord, smartTerms, normalizedWord );
+  updateBuddhistGlossaryTab( tabWidget, pendingWord, smartTerms );
   updateWebReferenceTab( tabWidget, pendingWord, smartTerms );
 
   if ( !smartTerms.isEmpty() && pendingWord != normalizedWord ) {
@@ -1679,8 +1554,7 @@ void ScanPopup::showEngagePopup()
 #endif
 
   engagePopup( forcePopup );
-  updateBuddhistGlossaryTab( tabWidget, pendingWord, smartTerms, sanitizedPhrase );
-  updateSutraTranslationTab( tabWidget, pendingWord, smartTerms, sanitizedPhrase );
+  updateBuddhistGlossaryTab( tabWidget, pendingWord, smartTerms );
   updateWebReferenceTab( tabWidget, pendingWord, smartTerms );
 
   if ( !smartTerms.isEmpty() && pendingWord != sanitizedPhrase ) {
@@ -1805,6 +1679,11 @@ void ScanPopup::engagePopup( bool forcePopup, bool giveFocus )
   translateBox->setText( Folding::escapeWildcardSymbols( pendingWord ), false );
 
   showTranslationFor( pendingWord );
+
+  applySutraPopupLayoutMode( this, tabWidget );
+  QTimer::singleShot( 250, this, [ this ] {
+    applySutraPopupLayoutMode( this, tabWidget );
+  } );
 }
 
 QString ScanPopup::elideInputWord() const
@@ -1891,8 +1770,7 @@ void ScanPopup::translateInputFinished()
   }
 
   showTranslationFor( pendingWord );
-  updateBuddhistGlossaryTab( tabWidget, pendingWord, smartTerms, normalizedWord );
-  updateSutraTranslationTab( tabWidget, pendingWord, smartTerms, normalizedWord );
+  updateBuddhistGlossaryTab( tabWidget, pendingWord, smartTerms );
   updateWebReferenceTab( tabWidget, pendingWord, smartTerms );
 
   if ( !smartTerms.isEmpty() && pendingWord != normalizedWord ) {
@@ -2134,6 +2012,10 @@ void ScanPopup::closeEvent( QCloseEvent * ev )
     pinnedGeometry = saveGeometry();
   }
 
+  if ( isVisible() && loadSutraPopupLayoutMode() == SutraPopupLayoutMode::Fixed ) {
+    saveSutraPopupFixedGeometry( this );
+  }
+
   QMainWindow::closeEvent( ev );
 }
 
@@ -2141,6 +2023,10 @@ void ScanPopup::moveEvent( QMoveEvent * ev )
 {
   if ( isVisible() && ui.pinButton->isChecked() ) {
     pinnedGeometry = saveGeometry();
+  }
+
+  if ( isVisible() && loadSutraPopupLayoutMode() == SutraPopupLayoutMode::Fixed ) {
+    saveSutraPopupFixedGeometry( this );
   }
 
   QMainWindow::moveEvent( ev );
