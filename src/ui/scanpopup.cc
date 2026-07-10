@@ -84,6 +84,39 @@ void saveSutraPopupFontSize( int fontSize )
                      qBound( sutraPopupMinFontSize, fontSize, sutraPopupMaxFontSize ) );
 }
 
+QString sutraPopupOpacitySettingsKey()
+{
+  return QStringLiteral( "SutraEdition/PopupOpacityPercent" );
+}
+
+constexpr int sutraPopupDefaultOpacityPercent = 100;
+constexpr int sutraPopupMinOpacityPercent     = 75;
+constexpr int sutraPopupMaxOpacityPercent     = 100;
+
+int loadSutraPopupOpacityPercent()
+{
+  QSettings settings;
+  return qBound( sutraPopupMinOpacityPercent,
+                 settings.value( sutraPopupOpacitySettingsKey(), sutraPopupDefaultOpacityPercent ).toInt(),
+                 sutraPopupMaxOpacityPercent );
+}
+
+void saveSutraPopupOpacityPercent( int opacityPercent )
+{
+  QSettings settings;
+  settings.setValue( sutraPopupOpacitySettingsKey(),
+                     qBound( sutraPopupMinOpacityPercent, opacityPercent, sutraPopupMaxOpacityPercent ) );
+}
+
+void applySutraPopupOpacity( QWidget * popup )
+{
+  if ( !popup ) {
+    return;
+  }
+
+  popup->setWindowOpacity( loadSutraPopupOpacityPercent() / 100.0 );
+}
+
 QString sutraPopupLayoutModeToString( SutraPopupLayoutMode mode )
 {
   switch ( mode ) {
@@ -1202,17 +1235,42 @@ ScanPopup::ScanPopup( QWidget * parent,
     } );
   }
 
+
+  QMenu * sutraPopupTransparencyMenu         = sutraPopupLayoutMenu->addMenu( tr( "Transparency" ) );
+  QActionGroup * sutraPopupTransparencyGroup = new QActionGroup( sutraPopupTransparencyMenu );
+  QList< QAction * > sutraPopupTransparencyActions;
+
+  for ( int opacityPercent : { 75, 80, 85, 90, 95, 100 } ) {
+    QAction * opacityAction = sutraPopupTransparencyMenu->addAction( tr( "%1%" ).arg( opacityPercent ) );
+    opacityAction->setCheckable( true );
+    opacityAction->setData( opacityPercent );
+    sutraPopupTransparencyGroup->addAction( opacityAction );
+    sutraPopupTransparencyActions << opacityAction;
+
+    connect( opacityAction, &QAction::triggered, this, [ this, opacityPercent ] {
+      saveSutraPopupOpacityPercent( opacityPercent );
+      applySutraPopupOpacity( this );
+      showStatusBarMessage( tr( "Popup transparency: %1%" ).arg( opacityPercent ), 4000 );
+    } );
+  }
+
   const auto updateSutraPopupLayoutMenu = [ this,
                                             sutraPopupPinAction,
                                             sutraPopupAutoAction,
                                             sutraPopupFixedAction,
                                             sutraPopupFitAction,
-                                            sutraPopupFontSizeActions ] {
+                                            sutraPopupFontSizeActions,
+                                            sutraPopupTransparencyActions ] {
     sutraPopupPinAction->setChecked( ui.pinButton->isChecked() );
 
     const int currentFontSize = loadSutraPopupFontSize();
     for ( QAction * fontAction : sutraPopupFontSizeActions ) {
       fontAction->setChecked( fontAction->data().toInt() == currentFontSize );
+    }
+
+    const int currentOpacityPercent = loadSutraPopupOpacityPercent();
+    for ( QAction * opacityAction : sutraPopupTransparencyActions ) {
+      opacityAction->setChecked( opacityAction->data().toInt() == currentOpacityPercent );
     }
 
     switch ( loadSutraPopupLayoutMode() ) {
@@ -1265,6 +1323,7 @@ ScanPopup::ScanPopup( QWidget * parent,
   }
 
   applySutraPopupLayoutMode( this, tabWidget );
+  applySutraPopupOpacity( this );
 
   if ( cfg.pinPopupWindow ) {
     Qt::WindowFlags flags = pinnedWindowFlags;
