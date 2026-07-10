@@ -39,15 +39,14 @@ constexpr qsizetype smartLookupMaxChars = 300;
 constexpr bool smartLookupAutoPinPopup  = true;
 
 
-enum class SutraPopupLayoutMode
-{
+enum class SutraPopupLayoutMode {
   Auto,
   Fixed,
   FitToResults
 };
 
-constexpr int sutraPopupFitMinWidth  = 520;
-constexpr int sutraPopupFitMinHeight = 320;
+constexpr int sutraPopupFitMinWidth         = 520;
+constexpr int sutraPopupFitMinHeight        = 320;
 constexpr int sutraPopupFitMaxWidthPercent  = 80;
 constexpr int sutraPopupFitMaxHeightPercent = 82;
 
@@ -59,6 +58,30 @@ QString sutraPopupLayoutModeSettingsKey()
 QString sutraPopupFixedGeometrySettingsKey()
 {
   return QStringLiteral( "SutraEdition/PopupFixedGeometry" );
+}
+
+QString sutraPopupFontSizeSettingsKey()
+{
+  return QStringLiteral( "SutraEdition/PopupFontSize" );
+}
+
+constexpr int sutraPopupDefaultFontSize = 14;
+constexpr int sutraPopupMinFontSize     = 11;
+constexpr int sutraPopupMaxFontSize     = 28;
+
+int loadSutraPopupFontSize()
+{
+  QSettings settings;
+  return qBound( sutraPopupMinFontSize,
+                 settings.value( sutraPopupFontSizeSettingsKey(), sutraPopupDefaultFontSize ).toInt(),
+                 sutraPopupMaxFontSize );
+}
+
+void saveSutraPopupFontSize( int fontSize )
+{
+  QSettings settings;
+  settings.setValue( sutraPopupFontSizeSettingsKey(),
+                     qBound( sutraPopupMinFontSize, fontSize, sutraPopupMaxFontSize ) );
 }
 
 QString sutraPopupLayoutModeToString( SutraPopupLayoutMode mode )
@@ -651,9 +674,12 @@ QList< BuddhistGlossaryEntry > glossaryEntriesForTerms( const QString & primaryT
 
 QString glossaryEntryHtml( const BuddhistGlossaryEntry & entry )
 {
+  const int fontSize = loadSutraPopupFontSize();
+
   QString html;
   html += QStringLiteral( "<div style='margin:0 0 14px 0; padding:10px; border:1px solid #ddd; border-radius:8px;'>" );
-  html += QStringLiteral( "<div style='font-size:22px; font-weight:700; margin-bottom:6px;'>%1</div>" )
+  html += QStringLiteral( "<div style='font-size:%1px; font-weight:700; margin-bottom:6px;'>%2</div>" )
+            .arg( fontSize + 8 )
             .arg( htmlEscape( entry.term ) );
 
   if ( !entry.hanViet.isEmpty() ) {
@@ -684,11 +710,13 @@ QString glossaryEntryHtml( const BuddhistGlossaryEntry & entry )
 QString glossaryHtml( const QString & primaryTerm, const QStringList & detectedTerms )
 {
   const QList< BuddhistGlossaryEntry > entries = glossaryEntriesForTerms( primaryTerm, detectedTerms );
+  const int fontSize                           = loadSutraPopupFontSize();
 
   QString html;
   html += QStringLiteral( "<html><head><meta charset='utf-8'></head>" );
-  html += QStringLiteral(
-    "<body style='font-family:&quot;Segoe UI&quot;, Arial, sans-serif; font-size:14px; margin:12px;'>" );
+  html +=
+    QStringLiteral( "<body style='font-family:&quot;Segoe UI&quot;, Arial, sans-serif; font-size:%1px; margin:12px;'>" )
+      .arg( fontSize );
   html += QStringLiteral( "<h2 style='margin-top:0;'>Phật học / Buddhist Glossary</h2>" );
 
   if ( entries.isEmpty() ) {
@@ -700,7 +728,8 @@ QString glossaryHtml( const QString & primaryTerm, const QStringList & detectedT
     }
   }
 
-  html += QStringLiteral( "<p style='color:#777; font-size:12px;'>Nguồn dữ liệu: buddhist_terms.json</p>" );
+  html += QStringLiteral( "<p style='color:#777; font-size:%1px;'>Nguồn dữ liệu: buddhist_terms.json</p>" )
+            .arg( qMax( 10, fontSize - 2 ) );
   html += QStringLiteral( "</body></html>" );
   return html;
 }
@@ -797,11 +826,13 @@ QString webReferenceLinkHtml( const QString & label, const QString & url )
 QString webReferenceHtml( const QString & primaryTerm, const QStringList & detectedTerms )
 {
   const QStringList terms = webReferenceTerms( primaryTerm, detectedTerms );
+  const int fontSize      = loadSutraPopupFontSize();
 
   QString html;
   html += QStringLiteral( "<html><head><meta charset='utf-8'></head>" );
-  html += QStringLiteral(
-    "<body style='font-family:&quot;Segoe UI&quot;, Arial, sans-serif; font-size:14px; margin:12px;'>" );
+  html +=
+    QStringLiteral( "<body style='font-family:&quot;Segoe UI&quot;, Arial, sans-serif; font-size:%1px; margin:12px;'>" )
+      .arg( fontSize );
   html += QStringLiteral( "<h2 style='margin-top:0;'>Wikipedia / Web Reference</h2>" );
 
   if ( terms.isEmpty() ) {
@@ -831,8 +862,10 @@ QString webReferenceHtml( const QString & primaryTerm, const QStringList & detec
     }
   }
 
-  html += QStringLiteral(
-    "<p style='color:#777; font-size:12px;'>Gợi ý: dùng các nguồn web như tài liệu tham khảo, không thay thế glossary nội bộ.</p>" );
+  html +=
+    QStringLiteral(
+      "<p style='color:#777; font-size:%1px;'>Gợi ý: dùng các nguồn web như tài liệu tham khảo, không thay thế glossary nội bộ.</p>" )
+      .arg( qMax( 10, fontSize - 2 ) );
   html += QStringLiteral( "</body></html>" );
   return html;
 }
@@ -890,6 +923,25 @@ void updateWebReferenceTab( QTabWidget * tabs, const QString & primaryTerm, cons
   }
 
   browser->setHtml( webReferenceHtml( primaryTerm, detectedTerms ) );
+}
+
+void refreshSutraCustomTabs( QTabWidget * tabs, const QString & primaryTerm, const QString & currentInputText )
+{
+  QString lookupText = normalizeSmartLookupInput( Folding::unescapeWildcardSymbols( currentInputText ) );
+
+  if ( lookupText.isEmpty() ) {
+    lookupText = primaryTerm;
+  }
+
+  const QStringList smartTerms = detectSmartLookupTerms( lookupText );
+  QString smartQuery           = chooseSmartLookupQuery( lookupText, smartTerms );
+
+  if ( smartQuery.isEmpty() ) {
+    smartQuery = primaryTerm;
+  }
+
+  updateBuddhistGlossaryTab( tabs, smartQuery, smartTerms );
+  updateWebReferenceTab( tabs, smartQuery, smartTerms );
 }
 
 } // namespace
@@ -1107,37 +1159,61 @@ ScanPopup::ScanPopup( QWidget * parent,
   ui.pinButton->setChecked( cfg.pinPopupWindow );
 
 
-  ui.pinButton->setToolTip(
-    ui.pinButton->toolTip() + tr( "\nClick: popup options / tùy chọn popup" ) );
+  ui.pinButton->setToolTip( ui.pinButton->toolTip() + tr( "\nClick: popup options / tùy chọn popup" ) );
 
   QMenu * sutraPopupLayoutMenu = new QMenu( tr( "Popup options" ), ui.pinButton );
 
-  QAction * sutraPopupPinAction = sutraPopupLayoutMenu->addAction(
-    tr( "Pin / keep popup open" ) );
+  QAction * sutraPopupPinAction = sutraPopupLayoutMenu->addAction( tr( "Pin / keep popup open" ) );
   sutraPopupPinAction->setCheckable( true );
 
   sutraPopupLayoutMenu->addSeparator();
 
   QActionGroup * sutraPopupLayoutGroup = new QActionGroup( sutraPopupLayoutMenu );
 
-  QAction * sutraPopupAutoAction = sutraPopupLayoutMenu->addAction(
-    tr( "Auto - let GoldenDict decide" ) );
-  QAction * sutraPopupFixedAction = sutraPopupLayoutMenu->addAction(
-    tr( "Fix current size and position" ) );
-  QAction * sutraPopupFitAction = sutraPopupLayoutMenu->addAction(
-    tr( "Fit window size to results" ) );
+  QAction * sutraPopupAutoAction  = sutraPopupLayoutMenu->addAction( tr( "Auto - let GoldenDict decide" ) );
+  QAction * sutraPopupFixedAction = sutraPopupLayoutMenu->addAction( tr( "Fix current size and position" ) );
+  QAction * sutraPopupFitAction   = sutraPopupLayoutMenu->addAction( tr( "Fit window size to results" ) );
 
   for ( QAction * action : { sutraPopupAutoAction, sutraPopupFixedAction, sutraPopupFitAction } ) {
     action->setCheckable( true );
     sutraPopupLayoutGroup->addAction( action );
   }
 
+  sutraPopupLayoutMenu->addSeparator();
+
+  QMenu * sutraPopupFontSizeMenu         = sutraPopupLayoutMenu->addMenu( tr( "Font size" ) );
+  QActionGroup * sutraPopupFontSizeGroup = new QActionGroup( sutraPopupFontSizeMenu );
+  QList< QAction * > sutraPopupFontSizeActions;
+
+  for ( int fontSize : { 12, 14, 16, 18, 20, 22, 24 } ) {
+    QAction * fontAction = sutraPopupFontSizeMenu->addAction( tr( "%1 px" ).arg( fontSize ) );
+    fontAction->setCheckable( true );
+    fontAction->setData( fontSize );
+    sutraPopupFontSizeGroup->addAction( fontAction );
+    sutraPopupFontSizeActions << fontAction;
+
+    connect( fontAction, &QAction::triggered, this, [ this, fontSize ] {
+      saveSutraPopupFontSize( fontSize );
+      refreshSutraCustomTabs( tabWidget, pendingWord, translateBox->translateLine()->text() );
+      if ( loadSutraPopupLayoutMode() == SutraPopupLayoutMode::FitToResults ) {
+        fitSutraPopupToResults( this, tabWidget );
+      }
+      showStatusBarMessage( tr( "Popup font size: %1 px" ).arg( fontSize ), 4000 );
+    } );
+  }
+
   const auto updateSutraPopupLayoutMenu = [ this,
                                             sutraPopupPinAction,
                                             sutraPopupAutoAction,
                                             sutraPopupFixedAction,
-                                            sutraPopupFitAction ] {
+                                            sutraPopupFitAction,
+                                            sutraPopupFontSizeActions ] {
     sutraPopupPinAction->setChecked( ui.pinButton->isChecked() );
+
+    const int currentFontSize = loadSutraPopupFontSize();
+    for ( QAction * fontAction : sutraPopupFontSizeActions ) {
+      fontAction->setChecked( fontAction->data().toInt() == currentFontSize );
+    }
 
     switch ( loadSutraPopupLayoutMode() ) {
       case SutraPopupLayoutMode::Fixed:
