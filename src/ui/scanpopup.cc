@@ -108,6 +108,15 @@ void saveSutraPopupOpacityPercent( int opacityPercent )
                      qBound( sutraPopupMinOpacityPercent, opacityPercent, sutraPopupMaxOpacityPercent ) );
 }
 
+void resetSutraPopupAppearanceDefaults()
+{
+  QSettings settings;
+  settings.setValue( sutraPopupLayoutModeSettingsKey(), QStringLiteral( "auto" ) );
+  settings.remove( sutraPopupFixedGeometrySettingsKey() );
+  settings.setValue( sutraPopupFontSizeSettingsKey(), sutraPopupDefaultFontSize );
+  settings.setValue( sutraPopupOpacitySettingsKey(), sutraPopupDefaultOpacityPercent );
+}
+
 void applySutraPopupOpacity( QWidget * popup )
 {
   if ( !popup ) {
@@ -1254,6 +1263,10 @@ ScanPopup::ScanPopup( QWidget * parent,
     } );
   }
 
+  sutraPopupLayoutMenu->addSeparator();
+
+  QAction * sutraPopupRestoreDefaultsAction = sutraPopupLayoutMenu->addAction( tr( "Restore popup defaults" ) );
+
   const auto updateSutraPopupLayoutMenu = [ this,
                                             sutraPopupPinAction,
                                             sutraPopupAutoAction,
@@ -1309,6 +1322,14 @@ ScanPopup::ScanPopup( QWidget * parent,
     saveSutraPopupLayoutMode( SutraPopupLayoutMode::FitToResults );
     fitSutraPopupToResults( this, tabWidget );
     showStatusBarMessage( tr( "Popup layout: fit to results" ), 4000 );
+  } );
+
+  connect( sutraPopupRestoreDefaultsAction, &QAction::triggered, this, [ this ] {
+    resetSutraPopupAppearanceDefaults();
+    applySutraPopupOpacity( this );
+    refreshSutraCustomTabs( tabWidget, pendingWord, translateBox->translateLine()->text() );
+    applySutraPopupLayoutMode( this, tabWidget );
+    showStatusBarMessage( tr( "Popup defaults restored: Auto layout, 14 px, 100% opacity" ), 5000 );
   } );
 
   if ( QToolButton * pinToolButton = qobject_cast< QToolButton * >( ui.pinButton ) ) {
