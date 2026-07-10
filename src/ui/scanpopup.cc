@@ -688,6 +688,216 @@ void updateBuddhistGlossaryTab( QTabWidget * tabs,
 }
 
 
+QString sutraTranslationValue( const BuddhistGlossaryEntry & entry, bool meaningMode )
+{
+  if ( meaningMode && !entry.suggestedTranslations.isEmpty() ) {
+    return entry.suggestedTranslations.first();
+  }
+
+  if ( !entry.hanViet.isEmpty() ) {
+    return entry.hanViet;
+  }
+
+  if ( meaningMode && !entry.meaningVi.isEmpty() ) {
+    return entry.meaningVi;
+  }
+
+  if ( !entry.suggestedTranslations.isEmpty() ) {
+    return entry.suggestedTranslations.first();
+  }
+
+  return entry.term;
+}
+
+QList< BuddhistGlossaryEntry > sutraTranslationEntries( const QString & primaryTerm, const QStringList & detectedTerms )
+{
+  QList< BuddhistGlossaryEntry > entries = glossaryEntriesForTerms( primaryTerm, detectedTerms );
+
+  std::sort( entries.begin(),
+             entries.end(),
+             []( const BuddhistGlossaryEntry & lhs, const BuddhistGlossaryEntry & rhs ) {
+               return lhs.term.size() > rhs.term.size();
+             } );
+
+  return entries;
+}
+
+QString sutraReplaceTermsWithGlossary( QString text, QList< BuddhistGlossaryEntry > entries, bool meaningMode )
+{
+  if ( text.trimmed().isEmpty() || entries.isEmpty() ) {
+    return text;
+  }
+
+  std::sort( entries.begin(),
+             entries.end(),
+             []( const BuddhistGlossaryEntry & lhs, const BuddhistGlossaryEntry & rhs ) {
+               return lhs.term.size() > rhs.term.size();
+             } );
+
+  for ( const BuddhistGlossaryEntry & entry : entries ) {
+    if ( entry.term.isEmpty() ) {
+      continue;
+    }
+
+    const QString replacement = sutraTranslationValue( entry, meaningMode );
+    if ( replacement.isEmpty() || replacement == entry.term ) {
+      continue;
+    }
+
+    text.replace( entry.term, replacement );
+  }
+
+  return text;
+}
+
+QString sutraTranslationTermRowsHtml( const QList< BuddhistGlossaryEntry > & entries )
+{
+  if ( entries.isEmpty() ) {
+    return QStringLiteral( "<div class='tr-empty'>Chưa nhận diện được thuật ngữ Phật học trong đoạn này.</div>" );
+  }
+
+  QString html;
+  html += QStringLiteral( "<table class='tr-table'>" );
+  html += QStringLiteral( "<tr><th>Hán</th><th>Hán Việt</th><th>Nghĩa / gợi ý</th></tr>" );
+
+  for ( const BuddhistGlossaryEntry & entry : entries ) {
+    QString hint;
+    if ( !entry.suggestedTranslations.isEmpty() ) {
+      hint = entry.suggestedTranslations.join( QStringLiteral( " / " ) );
+    }
+    else {
+      hint = entry.meaningVi;
+    }
+
+    html += QStringLiteral( "<tr><td class='tr-han'>%1</td><td>%2</td><td>%3</td></tr>" )
+              .arg( htmlEscape( entry.term ),
+                    htmlEscape( entry.hanViet.isEmpty() ? QStringLiteral( "—" ) : entry.hanViet ),
+                    htmlEscape( hint.isEmpty() ? QStringLiteral( "—" ) : hint ) );
+  }
+
+  html += QStringLiteral( "</table>" );
+  return html;
+}
+
+QString sutraParagraphTranslationHtml( const QString & primaryTerm,
+                                       const QStringList & detectedTerms,
+                                       const QString & sourceText )
+{
+  const QString normalizedSource               = normalizeSmartLookupInput( sourceText );
+  const QList< BuddhistGlossaryEntry > entries = sutraTranslationEntries( primaryTerm, detectedTerms );
+  const QString hanVietSuggestion              = sutraReplaceTermsWithGlossary( normalizedSource, entries, false );
+  const QString meaningSuggestion              = sutraReplaceTermsWithGlossary( normalizedSource, entries, true );
+
+  QString html;
+  html += QStringLiteral( "<html><head><meta charset='utf-8'>" );
+  html += QStringLiteral(
+    "<style>"
+    "body{font-family:'Segoe UI',Arial,sans-serif;font-size:14px;margin:12px;background:#f7f7f7;color:#222;}"
+    ".tr-header{margin:0 0 12px 0;padding:12px 14px;border-radius:10px;background:#ffffff;border:1px solid #e3e3e3;}"
+    ".tr-title{font-size:18px;font-weight:800;margin:0 0 6px 0;color:#1f2937;}"
+    ".tr-subtitle{font-size:12px;color:#666;line-height:1.45;}"
+    ".tr-card{margin:0 0 12px 0;padding:14px;border-radius:12px;background:#fff;border:1px solid #dedede;}"
+    ".tr-label{font-size:12px;color:#777;text-transform:uppercase;letter-spacing:.02em;margin-bottom:6px;font-weight:700;}"
+    ".tr-text{font-size:15px;line-height:1.65;word-break:break-word;}"
+    ".tr-original{font-size:17px;line-height:1.75;word-break:break-word;}"
+    ".tr-note{margin-top:8px;color:#6b7280;font-size:12px;line-height:1.5;}"
+    ".tr-table{width:100%;border-collapse:collapse;font-size:13px;}"
+    ".tr-table th{background:#eef6ff;color:#234;text-align:left;border:1px solid #d7e9ff;padding:7px;}"
+    ".tr-table td{border:1px solid #e5e7eb;padding:7px;vertical-align:top;line-height:1.45;}"
+    ".tr-han{font-size:15px;font-weight:700;color:#111827;}"
+    ".tr-empty{padding:10px;border-radius:8px;background:#fff7e6;border:1px solid #ffe1a6;color:#5b4300;}"
+    ".tr-footer{color:#777;font-size:12px;margin-top:8px;}"
+    "</style></head><body>" );
+
+  html += QStringLiteral(
+    "<div class='tr-header'>"
+    "<div class='tr-title'>Dịch đoạn</div>"
+    "<div class='tr-subtitle'>Bản dịch hỗ trợ bằng glossary nội bộ. Tính năng này không dùng AI/API, nên nên xem như bản gợi ý để đọc và hiệu đính.</div>"
+    "</div>" );
+
+  html +=
+    QStringLiteral(
+      "<section class='tr-card'><div class='tr-label'>Nguyên văn</div><div class='tr-original'>%1</div></section>" )
+      .arg( htmlEscape( normalizedSource ) );
+
+  html += QStringLiteral( "<section class='tr-card'><div class='tr-label'>Thuật ngữ nhận diện</div>%1</section>" )
+            .arg( sutraTranslationTermRowsHtml( entries ) );
+
+  html +=
+    QStringLiteral(
+      "<section class='tr-card'><div class='tr-label'>Bản Hán Việt gợi ý</div><div class='tr-text'>%1</div><div class='tr-note'>Tự động thay thuật ngữ Hán bằng Hán Việt trong buddhist_terms.json.</div></section>" )
+      .arg( htmlEscape( hanVietSuggestion ) );
+
+  html +=
+    QStringLiteral(
+      "<section class='tr-card'><div class='tr-label'>Dịch nghĩa tham khảo</div><div class='tr-text'>%1</div><div class='tr-note'>Đây là bản thay thế thuật ngữ theo glossary, chưa phải bản dịch văn học hoàn chỉnh.</div></section>" )
+      .arg( htmlEscape( meaningSuggestion ) );
+
+  html += QStringLiteral(
+    "<div class='tr-footer'>Nguồn dữ liệu: buddhist_terms.json · Phase 3A glossary-based translation</div>" );
+  html += QStringLiteral( "</body></html>" );
+  return html;
+}
+
+QTextBrowser * findSutraTranslationBrowser( QTabWidget * tabs )
+{
+  if ( !tabs ) {
+    return nullptr;
+  }
+
+  for ( int i = 0; i < tabs->count(); ++i ) {
+    QTextBrowser * browser = qobject_cast< QTextBrowser * >( tabs->widget( i ) );
+    if ( browser && browser->objectName() == QStringLiteral( "sutraTranslationBrowser" ) ) {
+      return browser;
+    }
+  }
+
+  return nullptr;
+}
+
+void removeSutraTranslationTab( QTabWidget * tabs )
+{
+  if ( !tabs ) {
+    return;
+  }
+
+  for ( int i = 0; i < tabs->count(); ++i ) {
+    QTextBrowser * browser = qobject_cast< QTextBrowser * >( tabs->widget( i ) );
+    if ( browser && browser->objectName() == QStringLiteral( "sutraTranslationBrowser" ) ) {
+      tabs->removeTab( i );
+      browser->deleteLater();
+      return;
+    }
+  }
+}
+
+void updateSutraTranslationTab( QTabWidget * tabs,
+                                const QString & primaryTerm,
+                                const QStringList & detectedTerms,
+                                const QString & sourceText )
+{
+  if ( !tabs ) {
+    return;
+  }
+
+  const QString normalizedSource = normalizeSmartLookupInput( sourceText );
+  if ( normalizedSource.isEmpty() || !containsCjkText( normalizedSource ) ) {
+    removeSutraTranslationTab( tabs );
+    return;
+  }
+
+  QTextBrowser * browser = findSutraTranslationBrowser( tabs );
+  if ( !browser ) {
+    browser = new QTextBrowser( tabs );
+    browser->setObjectName( QStringLiteral( "sutraTranslationBrowser" ) );
+    browser->setOpenExternalLinks( true );
+    tabs->addTab( browser, QStringLiteral( "Dịch đoạn" ) );
+  }
+
+  browser->setHtml( sutraParagraphTranslationHtml( primaryTerm, detectedTerms, normalizedSource ) );
+  moveSutraWelcomeTabToEnd( tabs );
+}
+
 QString welcomeHtml()
 {
   QString html;
@@ -729,13 +939,13 @@ QString welcomeHtml()
     "</div>"
 
     "<div class='step'>"
-    "<span class='num'>3</span><span class='step-title'>Xem tab Phật học và Web</span>"
-    "<div class='step-text'>Tab Phật học hiển thị Hán Việt, nghĩa tiếng Việt, gợi ý dịch và thuật ngữ liên quan.</div>"
+    "<span class='num'>3</span><span class='step-title'>Xem tab Phật học, Dịch đoạn và Web</span>"
+    "<div class='step-text'>Tab Phật học hiển thị thuật ngữ; tab Dịch đoạn tạo bản Hán Việt và dịch nghĩa tham khảo bằng glossary nội bộ.</div>"
     "</div>"
     "</div>"
 
     "<div class='features'>"
-    "<b>Đã bật:</b> Smart lookup, nhận diện thuật ngữ Phật học, glossary từ buddhist_terms.json, tab Web tham khảo, popup tự pin."
+    "<b>Đã bật:</b> Smart lookup, nhận diện thuật ngữ Phật học, glossary từ buddhist_terms.json, tab Dịch đoạn, tab Web tham khảo, popup tự pin."
     "</div>"
 
     "<div class='hint'>Gợi ý: nếu copy cả câu nhưng popup tra một cụm ngắn hơn, đó là Smart Lookup đang ưu tiên thuật ngữ Phật học quan trọng nhất trong câu.</div>"
@@ -1428,6 +1638,7 @@ void ScanPopup::translateWord( const QString & word )
 
   engagePopup( false, true );
   updateBuddhistGlossaryTab( tabWidget, pendingWord, smartTerms, normalizedWord );
+  updateSutraTranslationTab( tabWidget, pendingWord, smartTerms, normalizedWord );
   updateWebReferenceTab( tabWidget, pendingWord, smartTerms );
 
   if ( !smartTerms.isEmpty() && pendingWord != normalizedWord ) {
@@ -1469,6 +1680,7 @@ void ScanPopup::showEngagePopup()
 
   engagePopup( forcePopup );
   updateBuddhistGlossaryTab( tabWidget, pendingWord, smartTerms, sanitizedPhrase );
+  updateSutraTranslationTab( tabWidget, pendingWord, smartTerms, sanitizedPhrase );
   updateWebReferenceTab( tabWidget, pendingWord, smartTerms );
 
   if ( !smartTerms.isEmpty() && pendingWord != sanitizedPhrase ) {
@@ -1680,6 +1892,7 @@ void ScanPopup::translateInputFinished()
 
   showTranslationFor( pendingWord );
   updateBuddhistGlossaryTab( tabWidget, pendingWord, smartTerms, normalizedWord );
+  updateSutraTranslationTab( tabWidget, pendingWord, smartTerms, normalizedWord );
   updateWebReferenceTab( tabWidget, pendingWord, smartTerms );
 
   if ( !smartTerms.isEmpty() && pendingWord != normalizedWord ) {
