@@ -248,6 +248,7 @@ void processCommandLine( QCoreApplication * app, GDOptions * result )
   }
 }
 
+
 int main( int argc, char ** argv )
 {
 #if defined( WITH_X11 )
