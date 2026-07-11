@@ -362,6 +362,73 @@ void sendSutraStartupLeftDoubleClickAt( const QPoint & globalPos )
   SendInput( 4, inputs, sizeof( INPUT ) );
 }
 
+
+void sendSutraStartupLeftClickAt( const QPoint & globalPos )
+{
+  SetCursorPos( globalPos.x(), globalPos.y() );
+
+  INPUT inputs[ 2 ] = {};
+
+  inputs[ 0 ].type       = INPUT_MOUSE;
+  inputs[ 0 ].mi.dwFlags = MOUSEEVENTF_LEFTDOWN;
+
+  inputs[ 1 ].type       = INPUT_MOUSE;
+  inputs[ 1 ].mi.dwFlags = MOUSEEVENTF_LEFTUP;
+
+  SendInput( 2, inputs, sizeof( INPUT ) );
+}
+
+void sendSutraStartupLineSelectionAt( const QPoint & globalPos )
+{
+  sendSutraStartupLeftClickAt( globalPos );
+
+  INPUT inputs[ 6 ] = {};
+
+  // Home
+  inputs[ 0 ].type   = INPUT_KEYBOARD;
+  inputs[ 0 ].ki.wVk = VK_HOME;
+
+  inputs[ 1 ].type       = INPUT_KEYBOARD;
+  inputs[ 1 ].ki.wVk     = VK_HOME;
+  inputs[ 1 ].ki.dwFlags = KEYEVENTF_KEYUP;
+
+  // Shift down
+  inputs[ 2 ].type   = INPUT_KEYBOARD;
+  inputs[ 2 ].ki.wVk = VK_SHIFT;
+
+  // End
+  inputs[ 3 ].type   = INPUT_KEYBOARD;
+  inputs[ 3 ].ki.wVk = VK_END;
+
+  inputs[ 4 ].type       = INPUT_KEYBOARD;
+  inputs[ 4 ].ki.wVk     = VK_END;
+  inputs[ 4 ].ki.dwFlags = KEYEVENTF_KEYUP;
+
+  // Shift up
+  inputs[ 5 ].type       = INPUT_KEYBOARD;
+  inputs[ 5 ].ki.wVk     = VK_SHIFT;
+  inputs[ 5 ].ki.dwFlags = KEYEVENTF_KEYUP;
+
+  SendInput( 6, inputs, sizeof( INPUT ) );
+}
+
+bool sutraStartupIsTooShortCjkLookupText( const QString & text )
+{
+  const QString trimmed = text.trimmed();
+
+  if ( trimmed.size() > 2 ) {
+    return false;
+  }
+
+  for ( const QChar & ch : trimmed ) {
+    if ( sutraStartupIsCjkChar( ch ) ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 QString sutraStartupTextFromBstr( BSTR text )
 {
   if ( !text ) {
@@ -666,7 +733,7 @@ private:
     releaseSutraStartupAltKeys();
     sendSutraStartupLeftDoubleClickAt( globalPos );
 
-    QTimer::singleShot( 140, this, [ this, previousClipboardText ] {
+    QTimer::singleShot( 140, this, [ this, previousClipboardText, globalPos ] {
       QClipboard * clipboard = QApplication::clipboard();
 
       if ( !clipboard ) {
@@ -677,7 +744,7 @@ private:
       clipboard->clear( QClipboard::Clipboard );
       sendSutraStartupCtrlC();
 
-      QTimer::singleShot( 220, this, [ this, previousClipboardText ] {
+      QTimer::singleShot( 220, this, [ this, previousClipboardText, globalPos ] {
         QClipboard * clipboard = QApplication::clipboard();
 
         if ( !clipboard ) {
@@ -687,12 +754,50 @@ private:
 
         const QString capturedText = clipboard->text( QClipboard::Clipboard );
 
-        if ( !capturedText.trimmed().isEmpty() ) {
-          openLookup( capturedText );
+        if ( !sutraStartupIsTooShortCjkLookupText( capturedText ) ) {
+          if ( !capturedText.trimmed().isEmpty() ) {
+            openLookup( capturedText );
+          }
+
+          clipboard->setText( previousClipboardText, QClipboard::Clipboard );
+          lookupInProgress = false;
+          return;
         }
 
-        clipboard->setText( previousClipboardText, QClipboard::Clipboard );
-        lookupInProgress = false;
+        sendSutraStartupLineSelectionAt( globalPos );
+
+        QTimer::singleShot( 120, this, [ this, previousClipboardText, capturedText ] {
+          QClipboard * clipboard = QApplication::clipboard();
+
+          if ( !clipboard ) {
+            lookupInProgress = false;
+            return;
+          }
+
+          clipboard->clear( QClipboard::Clipboard );
+          sendSutraStartupCtrlC();
+
+          QTimer::singleShot( 220, this, [ this, previousClipboardText, capturedText ] {
+            QClipboard * clipboard = QApplication::clipboard();
+
+            if ( !clipboard ) {
+              lookupInProgress = false;
+              return;
+            }
+
+            const QString lineText = clipboard->text( QClipboard::Clipboard ).trimmed();
+
+            if ( !lineText.isEmpty() && lineText != capturedText.trimmed() ) {
+              openLookup( lineText );
+            }
+            else if ( !capturedText.trimmed().isEmpty() ) {
+              openLookup( capturedText );
+            }
+
+            clipboard->setText( previousClipboardText, QClipboard::Clipboard );
+            lookupInProgress = false;
+          } );
+        } );
       } );
     } );
   }
