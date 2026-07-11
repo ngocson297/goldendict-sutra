@@ -5,6 +5,19 @@
 #include "logger.hh"
 #include "mainwindow.hh"
 #include "version.hh"
+#include <QClipboard>
+#include <QDateTime>
+#include <QElapsedTimer>
+#include <QPoint>
+#include <QProcess>
+#include <QSettings>
+#include <QTimer>
+
+#ifdef Q_OS_WIN
+#include <windows.h>
+#include <oleauto.h>
+#include <uiautomation.h>
+#endif
 #include <QByteArray>
 #include <QCommandLineParser>
 #include <QFile>
@@ -24,12 +37,14 @@
 #endif
 
 #ifdef Q_OS_WIN32
-  #include <windows.h>
   #include <QStyleFactory>
 #endif
 
 
 #ifdef Q_OS_WIN
+#include <windows.h>
+#include <oleauto.h>
+#include <uiautomation.h>
   #include "hotkey/winhotkeyapplication.hh"
 using GD_QApplication = QHotkeyApplication;
 #else
@@ -249,6 +264,451 @@ void processCommandLine( QCoreApplication * app, GDOptions * result )
 }
 
 
+#ifdef Q_OS_WIN
+
+#include <windows.h>
+#include <oleauto.h>
+#include <uiautomation.h>
+namespace {
+
+enum class SutraStartupMouseLookupMode
+{
+  Disabled       = 0,
+  CtrlRightClick = 1,
+  CtrlLeftClick  = 2,
+  AltRightClick  = 3
+};
+
+QString sutraStartupMouseLookupModeSettingsKey()
+{
+  return QStringLiteral( "SutraEdition/MouseLookupMode" );
+}
+
+SutraStartupMouseLookupMode loadSutraStartupMouseLookupMode()
+{
+  QSettings settings;
+  const int value = qBound( 0,
+                            settings.value( sutraStartupMouseLookupModeSettingsKey(), 1 ).toInt(),
+                            3 );
+  return static_cast< SutraStartupMouseLookupMode >( value );
+}
+
+void sendSutraStartupVirtualKey( WORD virtualKey, bool down )
+{
+  INPUT input = {};
+  input.type   = INPUT_KEYBOARD;
+  input.ki.wVk = virtualKey;
+
+  if ( !down ) {
+    input.ki.dwFlags = KEYEVENTF_KEYUP;
+  }
+
+  SendInput( 1, &input, sizeof( INPUT ) );
+}
+
+void releaseSutraStartupControlKeys()
+{
+  sendSutraStartupVirtualKey( VK_CONTROL, false );
+  sendSutraStartupVirtualKey( VK_LCONTROL, false );
+  sendSutraStartupVirtualKey( VK_RCONTROL, false );
+}
+
+void releaseSutraStartupAltKeys()
+{
+  sendSutraStartupVirtualKey( VK_MENU, false );
+  sendSutraStartupVirtualKey( VK_LMENU, false );
+  sendSutraStartupVirtualKey( VK_RMENU, false );
+}
+
+void sendSutraStartupCtrlC()
+{
+  INPUT inputs[ 4 ] = {};
+
+  inputs[ 0 ].type   = INPUT_KEYBOARD;
+  inputs[ 0 ].ki.wVk = VK_CONTROL;
+
+  inputs[ 1 ].type   = INPUT_KEYBOARD;
+  inputs[ 1 ].ki.wVk = 'C';
+
+  inputs[ 2 ].type       = INPUT_KEYBOARD;
+  inputs[ 2 ].ki.wVk     = 'C';
+  inputs[ 2 ].ki.dwFlags = KEYEVENTF_KEYUP;
+
+  inputs[ 3 ].type       = INPUT_KEYBOARD;
+  inputs[ 3 ].ki.wVk     = VK_CONTROL;
+  inputs[ 3 ].ki.dwFlags = KEYEVENTF_KEYUP;
+
+  SendInput( 4, inputs, sizeof( INPUT ) );
+}
+
+void sendSutraStartupLeftDoubleClickAt( const QPoint & globalPos )
+{
+  SetCursorPos( globalPos.x(), globalPos.y() );
+
+  INPUT inputs[ 4 ] = {};
+
+  inputs[ 0 ].type       = INPUT_MOUSE;
+  inputs[ 0 ].mi.dwFlags = MOUSEEVENTF_LEFTDOWN;
+
+  inputs[ 1 ].type       = INPUT_MOUSE;
+  inputs[ 1 ].mi.dwFlags = MOUSEEVENTF_LEFTUP;
+
+  inputs[ 2 ].type       = INPUT_MOUSE;
+  inputs[ 2 ].mi.dwFlags = MOUSEEVENTF_LEFTDOWN;
+
+  inputs[ 3 ].type       = INPUT_MOUSE;
+  inputs[ 3 ].mi.dwFlags = MOUSEEVENTF_LEFTUP;
+
+  SendInput( 4, inputs, sizeof( INPUT ) );
+}
+
+QString sutraStartupTextFromBstr( BSTR text )
+{
+  if ( !text ) {
+    return {};
+  }
+
+  QString result = QString::fromWCharArray( text, static_cast< int >( SysStringLen( text ) ) );
+  SysFreeString( text );
+  return result;
+}
+
+QString sutraStartupTextFromUiAutomationRange( IUIAutomationTextRange * range )
+{
+  if ( !range ) {
+    return {};
+  }
+
+  range->ExpandToEnclosingUnit( TextUnit_Line );
+
+  BSTR text = nullptr;
+  if ( FAILED( range->GetText( 600, &text ) ) ) {
+    return {};
+  }
+
+  return sutraStartupTextFromBstr( text ).trimmed();
+}
+
+QString sutraStartupUiAutomationTextAtPoint( const QPoint & globalPos )
+{
+  HRESULT coInitResult = CoInitializeEx( nullptr, COINIT_APARTMENTTHREADED );
+  const bool shouldUninitializeCom = SUCCEEDED( coInitResult );
+
+  IUIAutomation * automation = nullptr;
+  HRESULT hr = CoCreateInstance( CLSID_CUIAutomation,
+                                 nullptr,
+                                 CLSCTX_INPROC_SERVER,
+                                 IID_PPV_ARGS( &automation ) );
+
+  if ( FAILED( hr ) || !automation ) {
+    if ( shouldUninitializeCom ) {
+      CoUninitialize();
+    }
+
+    return {};
+  }
+
+  POINT point;
+  point.x = globalPos.x();
+  point.y = globalPos.y();
+
+  IUIAutomationElement * element = nullptr;
+  hr = automation->ElementFromPoint( point, &element );
+
+  if ( FAILED( hr ) || !element ) {
+    automation->Release();
+
+    if ( shouldUninitializeCom ) {
+      CoUninitialize();
+    }
+
+    return {};
+  }
+
+  IUIAutomationTreeWalker * walker = nullptr;
+  automation->get_ControlViewWalker( &walker );
+
+  QString result;
+  IUIAutomationElement * currentElement = element;
+
+  for ( int depth = 0; currentElement && depth < 8 && result.trimmed().isEmpty(); ++depth ) {
+    IUIAutomationTextPattern * textPattern = nullptr;
+
+    hr = currentElement->GetCurrentPatternAs( UIA_TextPatternId,
+                                              IID_PPV_ARGS( &textPattern ) );
+
+    if ( SUCCEEDED( hr ) && textPattern ) {
+      IUIAutomationTextRange * textRange = nullptr;
+      hr = textPattern->RangeFromPoint( point, &textRange );
+
+      if ( SUCCEEDED( hr ) && textRange ) {
+        result = sutraStartupTextFromUiAutomationRange( textRange );
+        textRange->Release();
+      }
+
+      textPattern->Release();
+    }
+
+    if ( !result.trimmed().isEmpty() || !walker ) {
+      break;
+    }
+
+    IUIAutomationElement * parentElement = nullptr;
+    hr = walker->GetParentElement( currentElement, &parentElement );
+
+    if ( FAILED( hr ) || !parentElement ) {
+      break;
+    }
+
+    if ( currentElement != element ) {
+      currentElement->Release();
+    }
+
+    currentElement = parentElement;
+  }
+
+  if ( currentElement && currentElement != element ) {
+    currentElement->Release();
+  }
+
+  if ( walker ) {
+    walker->Release();
+  }
+
+  element->Release();
+  automation->Release();
+
+  if ( shouldUninitializeCom ) {
+    CoUninitialize();
+  }
+
+  return result.trimmed();
+}
+
+bool sutraStartupIsCjkChar( const QChar & ch )
+{
+  const uint u = ch.unicode();
+  return ( u >= 0x3400 && u <= 0x4DBF )
+      || ( u >= 0x4E00 && u <= 0x9FFF )
+      || ( u >= 0xF900 && u <= 0xFAFF );
+}
+
+QString sutraStartupCleanLookupText( const QString & text )
+{
+  QString result = text.trimmed();
+  result.replace( QChar( 0x3000 ), QLatin1Char( ' ' ) );
+  result.replace( QLatin1Char( '\r' ), QLatin1Char( '\n' ) );
+
+  while ( result.contains( QStringLiteral( "\n\n" ) ) ) {
+    result.replace( QStringLiteral( "\n\n" ), QStringLiteral( "\n" ) );
+  }
+
+  if ( result.size() <= 220 ) {
+    return result;
+  }
+
+  int firstCjk = -1;
+  for ( int i = 0; i < result.size(); ++i ) {
+    if ( sutraStartupIsCjkChar( result.at( i ) ) ) {
+      firstCjk = i;
+      break;
+    }
+  }
+
+  if ( firstCjk < 0 ) {
+    return result.left( 220 ).trimmed();
+  }
+
+  const int start = qMax( 0, firstCjk - 60 );
+  return result.mid( start, 220 ).trimmed();
+}
+
+class SutraStartupMouseLookupHook final : public QObject
+{
+public:
+  explicit SutraStartupMouseLookupHook( QObject * parent = nullptr ):
+    QObject( parent )
+  {
+  }
+
+  bool ensureInstalled()
+  {
+    if ( hook ) {
+      return true;
+    }
+
+    instance = this;
+    hook = SetWindowsHookExW( WH_MOUSE_LL, &SutraStartupMouseLookupHook::mouseProc, GetModuleHandleW( nullptr ), 0 );
+
+    if ( !hook ) {
+      qWarning() << "Unable to install Sutra startup mouse lookup hook. Error:" << GetLastError();
+      return false;
+    }
+
+    qInfo() << "Sutra startup mouse lookup hook installed";
+    return true;
+  }
+
+  ~SutraStartupMouseLookupHook() override
+  {
+    if ( hook ) {
+      UnhookWindowsHookEx( hook );
+      hook = nullptr;
+    }
+
+    if ( instance == this ) {
+      instance = nullptr;
+    }
+  }
+
+private:
+  static bool isControlPressed()
+  {
+    return ( GetAsyncKeyState( VK_CONTROL ) & 0x8000 )
+        || ( GetAsyncKeyState( VK_LCONTROL ) & 0x8000 )
+        || ( GetAsyncKeyState( VK_RCONTROL ) & 0x8000 );
+  }
+
+  static bool isAltPressed()
+  {
+    return ( GetAsyncKeyState( VK_MENU ) & 0x8000 )
+        || ( GetAsyncKeyState( VK_LMENU ) & 0x8000 )
+        || ( GetAsyncKeyState( VK_RMENU ) & 0x8000 );
+  }
+
+  static bool shouldHandleMouseLookupEvent( SutraStartupMouseLookupMode mode, WPARAM wParam )
+  {
+    switch ( mode ) {
+      case SutraStartupMouseLookupMode::CtrlRightClick:
+        return isControlPressed() && ( wParam == WM_RBUTTONDOWN || wParam == WM_RBUTTONUP );
+      case SutraStartupMouseLookupMode::CtrlLeftClick:
+        return isControlPressed() && ( wParam == WM_LBUTTONDOWN || wParam == WM_LBUTTONUP );
+      case SutraStartupMouseLookupMode::AltRightClick:
+        return isAltPressed() && ( wParam == WM_RBUTTONDOWN || wParam == WM_RBUTTONUP );
+      case SutraStartupMouseLookupMode::Disabled:
+      default:
+        return false;
+    }
+  }
+
+  static bool isMouseLookupDownEvent( SutraStartupMouseLookupMode mode, WPARAM wParam )
+  {
+    switch ( mode ) {
+      case SutraStartupMouseLookupMode::CtrlLeftClick:
+        return wParam == WM_LBUTTONDOWN;
+      case SutraStartupMouseLookupMode::AltRightClick:
+      case SutraStartupMouseLookupMode::CtrlRightClick:
+        return wParam == WM_RBUTTONDOWN;
+      case SutraStartupMouseLookupMode::Disabled:
+      default:
+        return false;
+    }
+  }
+
+  static LRESULT CALLBACK mouseProc( int code, WPARAM wParam, LPARAM lParam )
+  {
+    if ( code == HC_ACTION && instance ) {
+      const SutraStartupMouseLookupMode mode = loadSutraStartupMouseLookupMode();
+
+      if ( shouldHandleMouseLookupEvent( mode, wParam ) ) {
+        if ( isMouseLookupDownEvent( mode, wParam ) && !instance->lookupInProgress ) {
+          const MSLLHOOKSTRUCT * mouseInfo = reinterpret_cast< const MSLLHOOKSTRUCT * >( lParam );
+          const QPoint globalPos( mouseInfo->pt.x, mouseInfo->pt.y );
+
+          QTimer::singleShot( 0, instance, [ globalPos ] {
+            if ( instance ) {
+              instance->lookupAt( globalPos );
+            }
+          } );
+        }
+
+        return 1;
+      }
+    }
+
+    return CallNextHookEx( instance ? instance->hook : nullptr, code, wParam, lParam );
+  }
+
+  void openLookup( const QString & rawText )
+  {
+    const QString lookupText = sutraStartupCleanLookupText( rawText );
+
+    if ( lookupText.isEmpty() ) {
+      return;
+    }
+
+    QProcess::startDetached( QCoreApplication::applicationFilePath(),
+                              QStringList() << QStringLiteral( "--scanpopup" ) << lookupText );
+  }
+
+  void lookupAt( const QPoint & globalPos )
+  {
+    lookupInProgress = true;
+
+    const QString contextText = sutraStartupUiAutomationTextAtPoint( globalPos );
+
+    if ( !contextText.trimmed().isEmpty() ) {
+      openLookup( contextText );
+      lookupInProgress = false;
+      return;
+    }
+
+    QClipboard * clipboard = QApplication::clipboard();
+
+    if ( !clipboard ) {
+      lookupInProgress = false;
+      return;
+    }
+
+    const QString previousClipboardText = clipboard->text( QClipboard::Clipboard );
+
+    releaseSutraStartupControlKeys();
+    releaseSutraStartupAltKeys();
+    sendSutraStartupLeftDoubleClickAt( globalPos );
+
+    QTimer::singleShot( 140, this, [ this, previousClipboardText ] {
+      QClipboard * clipboard = QApplication::clipboard();
+
+      if ( !clipboard ) {
+        lookupInProgress = false;
+        return;
+      }
+
+      clipboard->clear( QClipboard::Clipboard );
+      sendSutraStartupCtrlC();
+
+      QTimer::singleShot( 220, this, [ this, previousClipboardText ] {
+        QClipboard * clipboard = QApplication::clipboard();
+
+        if ( !clipboard ) {
+          lookupInProgress = false;
+          return;
+        }
+
+        const QString capturedText = clipboard->text( QClipboard::Clipboard );
+
+        if ( !capturedText.trimmed().isEmpty() ) {
+          openLookup( capturedText );
+        }
+
+        clipboard->setText( previousClipboardText, QClipboard::Clipboard );
+        lookupInProgress = false;
+      } );
+    } );
+  }
+
+  HHOOK hook = nullptr;
+  bool lookupInProgress = false;
+
+  static SutraStartupMouseLookupHook * instance;
+};
+
+SutraStartupMouseLookupHook * SutraStartupMouseLookupHook::instance = nullptr;
+
+} // namespace
+
+#endif
+
 int main( int argc, char ** argv )
 {
 #if defined( WITH_X11 )
@@ -339,6 +799,9 @@ int main( int argc, char ** argv )
 
 #ifdef Q_OS_WIN
 
+#include <windows.h>
+#include <oleauto.h>
+#include <uiautomation.h>
   // Under Windows, increase the amount of fopen()-able file descriptors from
   // the default 512 up to 8192.
   _setmaxstdio( 8192 );
@@ -523,6 +986,14 @@ int main( int argc, char ** argv )
   // Prevent app from quitting spontaneously when it works with popup
   // and with the main window closed.
   app.setQuitOnLastWindowClosed( false );
+
+#ifdef Q_OS_WIN
+#include <windows.h>
+#include <oleauto.h>
+#include <uiautomation.h>
+  SutraStartupMouseLookupHook sutraStartupMouseLookupHook( &app );
+  sutraStartupMouseLookupHook.ensureInstalled();
+#endif
 
   MainWindow m( cfg );
 

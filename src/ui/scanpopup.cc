@@ -116,7 +116,7 @@ QString sutraPopupFontSizeSettingsKey()
 
 constexpr int sutraPopupDefaultFontSize = 14;
 constexpr int sutraPopupMinFontSize     = 11;
-constexpr int sutraPopupMaxFontSize     = 28;
+constexpr int sutraPopupMaxFontSize     = 36;
 
 int loadSutraPopupFontSize()
 {
@@ -133,6 +133,51 @@ void saveSutraPopupFontSize( int fontSize )
                      qBound( sutraPopupMinFontSize, fontSize, sutraPopupMaxFontSize ) );
 }
 
+
+double sutraPopupFontZoomFactor()
+{
+  return qBound( 0.70,
+                 static_cast< double >( loadSutraPopupFontSize() ) / static_cast< double >( sutraPopupDefaultFontSize ),
+                 2.60 );
+}
+
+void applySutraPopupTextBrowserFont( QTextBrowser * browser )
+{
+  if ( !browser ) {
+    return;
+  }
+
+  const int fontSize = loadSutraPopupFontSize();
+
+  QFont font = browser->font();
+  font.setPixelSize( fontSize );
+  browser->setFont( font );
+
+  if ( browser->document() ) {
+    browser->document()->setDefaultFont( font );
+  }
+
+  browser->setStyleSheet(
+    QStringLiteral( "QTextBrowser { font-size: %1px; }" ).arg( fontSize ) );
+}
+
+void applySutraPopupFontSizeToTabs( QTabWidget * tabs )
+{
+  if ( !tabs ) {
+    return;
+  }
+
+  const int fontSize = loadSutraPopupFontSize();
+
+  tabs->setStyleSheet(
+    QStringLiteral( "QTabBar::tab { font-size: %1px; }" ).arg( qMax( 10, fontSize - 1 ) ) );
+
+  for ( int i = 0; i < tabs->count(); ++i ) {
+    if ( QTextBrowser * browser = qobject_cast< QTextBrowser * >( tabs->widget( i ) ) ) {
+      applySutraPopupTextBrowserFont( browser );
+    }
+  }
+}
 QString sutraPopupOpacitySettingsKey()
 {
   return QStringLiteral( "SutraEdition/PopupOpacityPercent" );
@@ -1343,6 +1388,7 @@ void updateBuddhistGlossaryTab( QTabWidget * tabs, const QString & primaryTerm, 
   }
 
   browser->setHtml( glossaryHtml( primaryTerm, detectedTerms ) );
+  applySutraPopupTextBrowserFont( browser );
 }
 
 QString webReferenceUrlEncode( const QString & text )
@@ -1479,6 +1525,7 @@ void updateWebReferenceTab( QTabWidget * tabs, const QString & primaryTerm, cons
   }
 
   browser->setHtml( webReferenceHtml( primaryTerm, detectedTerms ) );
+  applySutraPopupTextBrowserFont( browser );
 }
 
 void refreshSutraCustomTabs( QTabWidget * tabs, const QString & primaryTerm, const QString & currentInputText )
@@ -1741,7 +1788,7 @@ ScanPopup::ScanPopup( QWidget * parent,
   QActionGroup * sutraPopupFontSizeGroup = new QActionGroup( sutraPopupFontSizeMenu );
   QList< QAction * > sutraPopupFontSizeActions;
 
-  for ( int fontSize : { 12, 14, 16, 18, 20, 22, 24 } ) {
+  for ( int fontSize : { 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 32, 36 } ) {
     QAction * fontAction = sutraPopupFontSizeMenu->addAction( tr( "%1 px" ).arg( fontSize ) );
     fontAction->setCheckable( true );
     fontAction->setData( fontSize );
@@ -1750,7 +1797,9 @@ ScanPopup::ScanPopup( QWidget * parent,
 
     connect( fontAction, &QAction::triggered, this, [ this, fontSize ] {
       saveSutraPopupFontSize( fontSize );
+      applyZoomFactor();
       refreshSutraCustomTabs( tabWidget, pendingWord, translateBox->translateLine()->text() );
+      applySutraPopupFontSizeToTabs( tabWidget );
       if ( loadSutraPopupLayoutMode() == SutraPopupLayoutMode::FitToResults ) {
         fitSutraPopupToResults( this, tabWidget );
       }
@@ -1884,6 +1933,7 @@ ScanPopup::ScanPopup( QWidget * parent,
     resetSutraPopupAppearanceDefaults();
     applySutraPopupOpacity( this );
     refreshSutraCustomTabs( tabWidget, pendingWord, translateBox->translateLine()->text() );
+      applySutraPopupFontSizeToTabs( tabWidget );
     applySutraPopupLayoutMode( this, tabWidget );
     showStatusBarMessage( tr( "Popup defaults restored: Auto layout, 14 px, 100% opacity, Ctrl + Right Click" ), 5000 );
   } );
@@ -2292,7 +2342,7 @@ void ScanPopup::applyZoomFactor() const
 {
   for ( int i = 0; i < tabWidget->count(); ++i ) {
     if ( auto view = qobject_cast< ArticleView * >( tabWidget->widget( i ) ) ) {
-      view->setZoomFactor( cfg.preferences.zoomFactor );
+      view->setZoomFactor( cfg.preferences.zoomFactor * sutraPopupFontZoomFactor() );
     }
   }
 }
