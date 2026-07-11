@@ -14,7 +14,20 @@
 #include <QTextDocument>
 #include <QSettings>
 #include <QApplication>
+#include <QClipboard>
 #include <QActionGroup>
+#include <QPointer>
+#include <functional>
+#ifdef Q_OS_WIN
+  #ifndef NOMINMAX
+    #define NOMINMAX
+  #endif
+  #include <windows.h>
+  #include <UIAutomationClient.h>
+  #include <oleauto.h>
+  #pragma comment( lib, "uiautomationcore.lib" )
+  #pragma comment( lib, "oleaut32.lib" )
+#endif
 #include <QHBoxLayout>
 #include <QUrl>
 #include <algorithm>
@@ -126,6 +139,288 @@ void applySutraPopupOpacity( QWidget * popup )
 
   popup->setWindowOpacity( loadSutraPopupOpacityPercent() / 100.0 );
 }
+
+#ifdef Q_OS_WIN
+
+void sendSutraVirtualKey( WORD virtualKey, bool down )
+{
+  INPUT input  = {};
+  input.type   = INPUT_KEYBOARD;
+  input.ki.wVk = virtualKey;
+
+  if ( !down ) {
+    input.ki.dwFlags = KEYEVENTF_KEYUP;
+  }
+
+  SendInput( 1, &input, sizeof( INPUT ) );
+}
+
+void releaseSutraControlKeys()
+{
+  sendSutraVirtualKey( VK_CONTROL, false );
+  sendSutraVirtualKey( VK_LCONTROL, false );
+  sendSutraVirtualKey( VK_RCONTROL, false );
+}
+
+void sendSutraCtrlC()
+{
+  INPUT inputs[ 4 ] = {};
+
+  inputs[ 0 ].type   = INPUT_KEYBOARD;
+  inputs[ 0 ].ki.wVk = VK_CONTROL;
+
+  inputs[ 1 ].type   = INPUT_KEYBOARD;
+  inputs[ 1 ].ki.wVk = 'C';
+
+  inputs[ 2 ].type       = INPUT_KEYBOARD;
+  inputs[ 2 ].ki.wVk     = 'C';
+  inputs[ 2 ].ki.dwFlags = KEYEVENTF_KEYUP;
+
+  inputs[ 3 ].type       = INPUT_KEYBOARD;
+  inputs[ 3 ].ki.wVk     = VK_CONTROL;
+  inputs[ 3 ].ki.dwFlags = KEYEVENTF_KEYUP;
+
+  SendInput( 4, inputs, sizeof( INPUT ) );
+}
+
+void sendSutraLeftDoubleClickAt( const QPoint & globalPos )
+{
+  SetCursorPos( globalPos.x(), globalPos.y() );
+
+  INPUT inputs[ 4 ] = {};
+
+  inputs[ 0 ].type       = INPUT_MOUSE;
+  inputs[ 0 ].mi.dwFlags = MOUSEEVENTF_LEFTDOWN;
+
+  inputs[ 1 ].type       = INPUT_MOUSE;
+  inputs[ 1 ].mi.dwFlags = MOUSEEVENTF_LEFTUP;
+
+  inputs[ 2 ].type       = INPUT_MOUSE;
+  inputs[ 2 ].mi.dwFlags = MOUSEEVENTF_LEFTDOWN;
+
+  inputs[ 3 ].type       = INPUT_MOUSE;
+  inputs[ 3 ].mi.dwFlags = MOUSEEVENTF_LEFTUP;
+
+  SendInput( 4, inputs, sizeof( INPUT ) );
+}
+
+QString sutraTextFromBstr( BSTR text )
+{
+  if ( !text ) {
+    return {};
+  }
+
+  QString result = QString::fromWCharArray( text, static_cast< int >( SysStringLen( text ) ) );
+  SysFreeString( text );
+  return result;
+}
+
+QString sutraTextFromUiAutomationRange( IUIAutomationTextRange * range )
+{
+  if ( !range ) {
+    return {};
+  }
+
+  // A single CJK character is often not enough. Capture the surrounding line,
+  // then the smart glossary will choose the longest matching Buddhist term.
+  range->ExpandToEnclosingUnit( TextUnit_Line );
+
+  BSTR text = nullptr;
+  if ( FAILED( range->GetText( 600, &text ) ) ) {
+    return {};
+  }
+
+  return sutraTextFromBstr( text );
+}
+
+QString sutraUiAutomationTextAtPoint( const QPoint & globalPos )
+{
+  HRESULT coInitResult             = CoInitializeEx( nullptr, COINIT_APARTMENTTHREADED );
+  const bool shouldUninitializeCom = SUCCEEDED( coInitResult );
+
+  IUIAutomation * automation = nullptr;
+  HRESULT hr = CoCreateInstance( CLSID_CUIAutomation, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS( &automation ) );
+
+  if ( FAILED( hr ) || !automation ) {
+    if ( shouldUninitializeCom ) {
+      CoUninitialize();
+    }
+
+    return {};
+  }
+
+  POINT point;
+  point.x = globalPos.x();
+  point.y = globalPos.y();
+
+  IUIAutomationElement * element = nullptr;
+  hr                             = automation->ElementFromPoint( point, &element );
+
+  if ( FAILED( hr ) || !element ) {
+    automation->Release();
+
+    if ( shouldUninitializeCom ) {
+      CoUninitialize();
+    }
+
+    return {};
+  }
+
+  IUIAutomationTreeWalker * walker = nullptr;
+  automation->get_ControlViewWalker( &walker );
+
+  QString result;
+  IUIAutomationElement * currentElement = element;
+
+  for ( int depth = 0; currentElement && depth < 8 && result.trimmed().isEmpty(); ++depth ) {
+    IUIAutomationTextPattern * textPattern = nullptr;
+
+    hr = currentElement->GetCurrentPatternAs( UIA_TextPatternId, IID_PPV_ARGS( &textPattern ) );
+
+    if ( SUCCEEDED( hr ) && textPattern ) {
+      IUIAutomationTextRange * textRange = nullptr;
+      hr                                 = textPattern->RangeFromPoint( point, &textRange );
+
+      if ( SUCCEEDED( hr ) && textRange ) {
+        result = sutraTextFromUiAutomationRange( textRange );
+        textRange->Release();
+      }
+
+      textPattern->Release();
+    }
+
+    if ( !result.trimmed().isEmpty() || !walker ) {
+      break;
+    }
+
+    IUIAutomationElement * parentElement = nullptr;
+    hr                                   = walker->GetParentElement( currentElement, &parentElement );
+
+    if ( FAILED( hr ) || !parentElement ) {
+      break;
+    }
+
+    if ( currentElement != element ) {
+      currentElement->Release();
+    }
+
+    currentElement = parentElement;
+  }
+
+  if ( currentElement && currentElement != element ) {
+    currentElement->Release();
+  }
+
+  if ( walker ) {
+    walker->Release();
+  }
+
+  element->Release();
+  automation->Release();
+
+  if ( shouldUninitializeCom ) {
+    CoUninitialize();
+  }
+
+  return result;
+}
+
+class SutraCtrlRightClickLookupHook final
+{
+public:
+  void setCallback( std::function< void( QPoint ) > callback_ )
+  {
+    callback = std::move( callback_ );
+  }
+
+  bool ensureInstalled()
+  {
+    if ( hook ) {
+      return true;
+    }
+
+    instance = this;
+    hook = SetWindowsHookExW( WH_MOUSE_LL, &SutraCtrlRightClickLookupHook::mouseProc, GetModuleHandleW( nullptr ), 0 );
+
+    if ( !hook ) {
+      qWarning() << "Unable to install Sutra Ctrl+Right Click lookup hook. Error:" << GetLastError();
+      return false;
+    }
+
+    return true;
+  }
+
+  ~SutraCtrlRightClickLookupHook()
+  {
+    if ( hook ) {
+      UnhookWindowsHookEx( hook );
+      hook = nullptr;
+    }
+
+    if ( instance == this ) {
+      instance = nullptr;
+    }
+  }
+
+private:
+  static bool isControlPressed()
+  {
+    return ( GetAsyncKeyState( VK_CONTROL ) & 0x8000 ) || ( GetAsyncKeyState( VK_LCONTROL ) & 0x8000 )
+      || ( GetAsyncKeyState( VK_RCONTROL ) & 0x8000 );
+  }
+
+  static LRESULT CALLBACK mouseProc( int code, WPARAM wParam, LPARAM lParam )
+  {
+    if ( code == HC_ACTION && instance && isControlPressed() ) {
+      const bool isRightDown = wParam == WM_RBUTTONDOWN;
+      const bool isRightUp   = wParam == WM_RBUTTONUP;
+
+      if ( isRightDown || isRightUp ) {
+        if ( isRightDown && instance->callback ) {
+          const MSLLHOOKSTRUCT * mouseInfo = reinterpret_cast< const MSLLHOOKSTRUCT * >( lParam );
+          const QPoint globalPos( mouseInfo->pt.x, mouseInfo->pt.y );
+          const auto callbackCopy = instance->callback;
+
+          QTimer::singleShot( 0, qApp, [ callbackCopy, globalPos ] {
+            callbackCopy( globalPos );
+          } );
+        }
+
+        // Suppress the right-click so external apps do not open their context menu.
+        return 1;
+      }
+    }
+
+    return CallNextHookEx( instance ? instance->hook : nullptr, code, wParam, lParam );
+  }
+
+  HHOOK hook = nullptr;
+  std::function< void( QPoint ) > callback;
+
+  static SutraCtrlRightClickLookupHook * instance;
+};
+
+SutraCtrlRightClickLookupHook * SutraCtrlRightClickLookupHook::instance = nullptr;
+
+SutraCtrlRightClickLookupHook * sutraCtrlRightClickLookupHook()
+{
+  static SutraCtrlRightClickLookupHook * hook = nullptr;
+
+  if ( !hook ) {
+    hook = new SutraCtrlRightClickLookupHook;
+  }
+
+  return hook;
+}
+
+bool registerSutraCtrlRightClickLookup( std::function< void( QPoint ) > callback )
+{
+  SutraCtrlRightClickLookupHook * hook = sutraCtrlRightClickLookupHook();
+  hook->setCallback( std::move( callback ) );
+  return hook->ensureInstalled();
+}
+
+#endif
 
 QString sutraPopupCornerToolsObjectName()
 {
@@ -721,6 +1016,71 @@ QString chooseSmartLookupQuery( const QString & input, const QStringList & detec
 
   return input;
 }
+
+QString chooseCtrlRightClickLookupText( const QString & capturedText, const QString & contextText )
+{
+  const QString captured = normalizeSmartLookupInput( capturedText ).trimmed();
+  const QString context  = normalizeSmartLookupInput( contextText ).trimmed();
+
+  if ( captured.isEmpty() && context.isEmpty() ) {
+    return {};
+  }
+
+  if ( containsCjkText( context ) ) {
+    const QString compactCaptured   = compactCjkText( captured );
+    const QStringList detectedTerms = detectSmartLookupTerms( context );
+
+    QString bestTerm;
+    int bestLength = -1;
+
+    for ( const QString & term : detectedTerms ) {
+      const QString compactTerm = compactCjkText( term );
+
+      if ( compactTerm.isEmpty() ) {
+        continue;
+      }
+
+      if ( !compactCaptured.isEmpty() ) {
+        // If double-click captured only one CJK character, choose the longest
+        // glossary term in the surrounding line that contains that character.
+        if ( compactCaptured.size() <= 2 ) {
+          if ( !compactTerm.contains( compactCaptured ) ) {
+            continue;
+          }
+        }
+        else if ( compactTerm != compactCaptured && !compactTerm.contains( compactCaptured )
+                  && !compactCaptured.contains( compactTerm ) ) {
+          continue;
+        }
+      }
+
+      if ( compactTerm.size() > bestLength ) {
+        bestTerm   = term;
+        bestLength = compactTerm.size();
+      }
+    }
+
+    if ( !bestTerm.isEmpty() ) {
+      return bestTerm;
+    }
+
+    if ( !detectedTerms.isEmpty() ) {
+      return chooseSmartLookupQuery( context, detectedTerms );
+    }
+  }
+
+  if ( !captured.isEmpty() ) {
+    return captured;
+  }
+
+  if ( !context.isEmpty() ) {
+    const QStringList detectedTerms = detectSmartLookupTerms( context );
+    return chooseSmartLookupQuery( context, detectedTerms );
+  }
+
+  return {};
+}
+
 QList< BuddhistGlossaryEntry > glossaryEntriesForTerms( const QString & primaryTerm, const QStringList & detectedTerms )
 {
   QStringList wantedTerms = detectedTerms;
@@ -1292,6 +1652,14 @@ ScanPopup::ScanPopup( QWidget * parent,
 
   sutraPopupLayoutMenu->addSeparator();
 
+  sutraPopupLayoutMenu->addSeparator();
+
+  QAction * sutraCtrlRightClickInfoAction =
+    sutraPopupLayoutMenu->addAction( tr( "Ctrl + Right Click: lookup word under cursor" ) );
+  sutraCtrlRightClickInfoAction->setEnabled( false );
+
+  sutraPopupLayoutMenu->addSeparator();
+
   QAction * sutraPopupRestoreDefaultsAction = sutraPopupLayoutMenu->addAction( tr( "Restore popup defaults" ) );
 
   const auto updateSutraPopupLayoutMenu = [ this,
@@ -1438,6 +1806,71 @@ ScanPopup::ScanPopup( QWidget * parent,
 
   applySutraPopupLayoutMode( this, tabWidget );
   applySutraPopupOpacity( this );
+
+#ifdef Q_OS_WIN
+  {
+    QPointer< ScanPopup > popup( this );
+
+    const bool mouseHookInstalled = registerSutraCtrlRightClickLookup( [ popup ]( const QPoint & globalPos ) {
+      if ( !popup ) {
+        return;
+      }
+
+      QClipboard * clipboard              = QApplication::clipboard();
+      const QString previousClipboardText = clipboard ? clipboard->text( QClipboard::Clipboard ) : QString();
+      const QString contextText           = sutraUiAutomationTextAtPoint( globalPos );
+
+      releaseSutraControlKeys();
+      sendSutraLeftDoubleClickAt( globalPos );
+
+      QTimer::singleShot( 160, popup, [ popup, previousClipboardText, contextText ] {
+        if ( !popup ) {
+          return;
+        }
+
+        QClipboard * clipboard = QApplication::clipboard();
+        if ( !clipboard ) {
+          popup->showStatusBarMessage( QStringLiteral( "Clipboard is not available." ), 4000 );
+          return;
+        }
+
+        clipboard->clear( QClipboard::Clipboard );
+        sendSutraCtrlC();
+
+        QTimer::singleShot( 220, popup, [ popup, previousClipboardText, contextText ] {
+          if ( !popup ) {
+            return;
+          }
+
+          QClipboard * clipboard = QApplication::clipboard();
+          if ( !clipboard ) {
+            return;
+          }
+
+          const QString capturedText = clipboard->text( QClipboard::Clipboard );
+          const QString lookupText   = chooseCtrlRightClickLookupText( capturedText, contextText );
+
+          if ( !lookupText.isEmpty() ) {
+            popup->translateWord( lookupText );
+            popup->showStatusBarMessage( QStringLiteral( "Ctrl + Right Click lookup: %1" ).arg( lookupText.left( 80 ) ),
+                                         5000 );
+          }
+          else {
+            popup->showStatusBarMessage(
+              QStringLiteral( "No text captured. Try Ctrl + Right Click directly on selectable text." ),
+              6000 );
+          }
+
+          clipboard->setText( previousClipboardText, QClipboard::Clipboard );
+        } );
+      } );
+    } );
+
+    if ( mouseHookInstalled ) {
+      qInfo() << "Sutra Ctrl+Right Click lookup hook installed";
+    }
+  }
+#endif
 
   if ( cfg.pinPopupWindow ) {
     Qt::WindowFlags flags = pinnedWindowFlags;
