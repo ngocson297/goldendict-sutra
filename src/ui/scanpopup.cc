@@ -74,13 +74,9 @@ void sutraForcePopupToFront( QWidget * window )
                   0,
                   SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW );
     SetForegroundWindow( hwnd );
-    SetWindowPos( hwnd,
-                  HWND_NOTOPMOST,
-                  0,
-                  0,
-                  0,
-                  0,
-                  SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW );
+    if ( !window->windowFlags().testFlag( Qt::WindowStaysOnTopHint ) ) {
+      SetWindowPos( hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW );
+    }
   }
 #endif
 }
@@ -1860,7 +1856,12 @@ ScanPopup::ScanPopup( QWidget * parent,
 
   sutraPopupLayoutMenu->addSeparator();
 
-  QAction * sutraPopupRestoreDefaultsAction = sutraPopupLayoutMenu->addAction( tr( "Restore popup defaults" ) );
+  
+  QAction * sutraPopupAlwaysOnTopAction = sutraPopupLayoutMenu->addAction(
+    tr( "Always on top" ) );
+  sutraPopupAlwaysOnTopAction->setCheckable( true );
+  sutraPopupAlwaysOnTopAction->setChecked( ui.onTopButton->isChecked() );
+QAction * sutraPopupRestoreDefaultsAction = sutraPopupLayoutMenu->addAction( tr( "Restore popup defaults" ) );
 
   const auto updateSutraPopupLayoutMenu = [ this,
                                             sutraPopupPinAction,
@@ -1929,7 +1930,14 @@ ScanPopup::ScanPopup( QWidget * parent,
     showStatusBarMessage( tr( "Popup layout: fit to results" ), 4000 );
   } );
 
-  connect( sutraPopupRestoreDefaultsAction, &QAction::triggered, this, [ this ] {
+  
+  connect( sutraPopupAlwaysOnTopAction, &QAction::triggered, this, [ this ]( bool checked ) {
+    ui.onTopButton->setChecked( checked );
+    alwaysOnTopClicked( checked );
+    showStatusBarMessage( checked ? tr( "Popup always on top: ON" )
+                                  : tr( "Popup always on top: OFF" ), 4000 );
+  } );
+connect( sutraPopupRestoreDefaultsAction, &QAction::triggered, this, [ this ] {
     resetSutraPopupAppearanceDefaults();
     applySutraPopupOpacity( this );
     refreshSutraCustomTabs( tabWidget, pendingWord, translateBox->translateLine()->text() );
@@ -3238,18 +3246,24 @@ void ScanPopup::openSearch()
 
 void ScanPopup::alwaysOnTopClicked( bool checked )
 {
-  bool wasVisible = isVisible();
-  if ( ui.pinButton->isChecked() ) {
-    Qt::WindowFlags flags = this->windowFlags();
-    if ( checked ) {
-      setWindowFlags( flags | Qt::WindowStaysOnTopHint );
-    }
-    else {
-      setWindowFlags( flags ^ Qt::WindowStaysOnTopHint );
-    }
-    if ( wasVisible ) {
-      show();
-    }
+  const bool wasVisible = isVisible();
+
+  Qt::WindowFlags flags = windowFlags();
+
+  if ( checked ) {
+    flags |= Qt::WindowStaysOnTopHint;
+  }
+  else {
+    flags &= ~Qt::WindowStaysOnTopHint;
+  }
+
+  setWindowFlags( flags );
+  cfg.popupWindowAlwaysOnTop = checked;
+
+  if ( wasVisible ) {
+    show();
+    raise();
+    activateWindow();
   }
 }
 
