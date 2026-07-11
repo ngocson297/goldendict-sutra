@@ -1,6 +1,6 @@
 {
-  "version": 3,
-  "description": "Buddhist glossary terms for GoldenDict-ng Sutra Edition. V3 expands Heart Sutra phrases, core Buddhist doctrine, Mahayana/Bodhisattva terms, names of Buddhas and Bodhisattvas, practice terms, and simplified/traditional variants. Fields: term, han_viet, pinyin, meaning_vi, category, suggested_translation, related.",
+  "version": 4,
+  "description": "Buddhist glossary terms for GoldenDict-ng Sutra Edition. V4 expands Heart Sutra chunks, common Hán-Việt Buddhist vocabulary, core doctrines, Tịnh độ/Thiền/Duy thức terms, scriptures, Buddhas/Bodhisattvas, ceremony/monastic terms, and simplified/traditional variants. Fields: term, han_viet, pinyin, meaning_vi, category, suggested_translation, related.",
   "terms": [
     {
       "term": "摩訶般若波羅蜜多心經",
@@ -3153,6 +3153,4121 @@
       ],
       "related": [
         "六根"
+      ]
+    },
+    {
+      "term": "照見五蘊皆空",
+      "han_viet": "chiếu kiến ngũ uẩn giai không",
+      "pinyin": "zhào jiàn wǔ yùn jiē kōng",
+      "meaning_vi": "Soi thấy năm uẩn đều không có tự tính cố định.",
+      "category": "Bát-nhã Tâm Kinh",
+      "suggested_translation": [
+        "soi thấy năm uẩn đều không"
+      ],
+      "related": [
+        "照見五蘊",
+        "五蘊皆空",
+        "五蘊",
+        "空"
+      ]
+    },
+    {
+      "term": "舍利子是諸法空相",
+      "han_viet": "Xá Lợi Tử thị chư pháp không tướng",
+      "pinyin": "shè lì zǐ shì zhū fǎ kōng xiàng",
+      "meaning_vi": "Này Xá Lợi Tử, các pháp đều mang tướng không.",
+      "category": "Bát-nhã Tâm Kinh",
+      "suggested_translation": [
+        "Xá Lợi Tử, ấy là tướng không của các pháp"
+      ],
+      "related": [
+        "舍利子",
+        "諸法空相",
+        "空相"
+      ]
+    },
+    {
+      "term": "是故空中無色",
+      "han_viet": "thị cố không trung vô sắc",
+      "pinyin": "shì gù kōng zhōng wú sè",
+      "meaning_vi": "Vì vậy trong tánh không không có sắc như một thực thể tự tính.",
+      "category": "Bát-nhã Tâm Kinh",
+      "suggested_translation": [
+        "vì vậy trong không không có sắc"
+      ],
+      "related": [
+        "空",
+        "色"
+      ]
+    },
+    {
+      "term": "無受想行識",
+      "han_viet": "vô thọ tưởng hành thức",
+      "pinyin": "wú shòu xiǎng xíng shí",
+      "meaning_vi": "Không có thọ, tưởng, hành, thức theo nghĩa tự tính cố định.",
+      "category": "Bát-nhã Tâm Kinh",
+      "suggested_translation": [
+        "không thọ tưởng hành thức"
+      ],
+      "related": [
+        "受",
+        "想",
+        "行",
+        "識",
+        "五蘊"
+      ]
+    },
+    {
+      "term": "乃至無老死",
+      "han_viet": "nãi chí vô lão tử",
+      "pinyin": "nǎi zhì wú lǎo sǐ",
+      "meaning_vi": "Cho đến không có già chết như một tự tính cố định.",
+      "category": "Bát-nhã Tâm Kinh",
+      "suggested_translation": [
+        "cho đến không già chết"
+      ],
+      "related": [
+        "老死",
+        "十二因緣"
+      ]
+    },
+    {
+      "term": "得阿耨多羅三藐三菩提",
+      "han_viet": "đắc a-nậu-đa-la tam-miệu tam-bồ-đề",
+      "pinyin": "dé ā nòu duō luó sān miǎo sān pú tí",
+      "meaning_vi": "Chứng đạt Vô thượng Chánh đẳng Chánh giác.",
+      "category": "Bát-nhã Tâm Kinh",
+      "suggested_translation": [
+        "chứng Vô thượng Chánh đẳng Chánh giác"
+      ],
+      "related": [
+        "阿耨多羅三藐三菩提",
+        "菩提"
+      ]
+    },
+    {
+      "term": "故說般若波羅蜜多咒",
+      "han_viet": "cố thuyết Bát-nhã Ba-la-mật-đa chú",
+      "pinyin": "gù shuō bō rě bō luó mì duō zhòu",
+      "meaning_vi": "Vì vậy nói thần chú Bát-nhã Ba-la-mật-đa.",
+      "category": "Bát-nhã Tâm Kinh",
+      "suggested_translation": [
+        "nên nói chú Bát-nhã Ba-la-mật-đa"
+      ],
+      "related": [
+        "般若波羅蜜多",
+        "咒"
+      ]
+    },
+    {
+      "term": "即說咒曰",
+      "han_viet": "tức thuyết chú viết",
+      "pinyin": "jí shuō zhòu yuē",
+      "meaning_vi": "Liền nói thần chú rằng.",
+      "category": "Bát-nhã Tâm Kinh",
+      "suggested_translation": [
+        "liền nói chú rằng"
+      ],
+      "related": [
+        "咒"
+      ]
+    },
+    {
+      "term": "揭諦揭諦波羅揭諦",
+      "han_viet": "yết đế yết đế ba-la yết đế",
+      "pinyin": "jiē dì jiē dì bō luó jiē dì",
+      "meaning_vi": "Một phần thần chú Tâm Kinh: đi qua, đi qua, đi qua bờ bên kia.",
+      "category": "Bát-nhã Tâm Kinh",
+      "suggested_translation": [
+        "gate gate paragate"
+      ],
+      "related": [
+        "揭諦揭諦",
+        "波羅揭諦"
+      ]
+    },
+    {
+      "term": "揭諦揭諦波羅僧揭諦",
+      "han_viet": "yết đế yết đế ba-la-tăng yết đế",
+      "pinyin": "jiē dì jiē dì bō luó sēng jiē dì",
+      "meaning_vi": "Một phần thần chú Tâm Kinh: đi qua, đi qua, cùng đi qua bờ bên kia.",
+      "category": "Bát-nhã Tâm Kinh",
+      "suggested_translation": [
+        "gate gate parasamgate"
+      ],
+      "related": [
+        "揭諦揭諦",
+        "波羅僧揭諦"
+      ]
+    },
+    {
+      "term": "揭諦揭諦波羅揭諦波羅僧揭諦菩提薩婆訶",
+      "han_viet": "yết đế yết đế ba-la yết đế ba-la-tăng yết đế bồ-đề tát-bà-ha",
+      "pinyin": "jiē dì jiē dì bō luó jiē dì bō luó sēng jiē dì pú tí sà pó hē",
+      "meaning_vi": "Toàn câu thần chú kết của Bát-nhã Tâm Kinh.",
+      "category": "Bát-nhã Tâm Kinh",
+      "suggested_translation": [
+        "gate gate paragate parasamgate bodhi svaha"
+      ],
+      "related": [
+        "般若心經",
+        "咒"
+      ]
+    },
+    {
+      "term": "心經",
+      "han_viet": "Tâm Kinh",
+      "pinyin": "xīn jīng",
+      "meaning_vi": "Tên gọi tắt của Bát-nhã Tâm Kinh.",
+      "category": "Kinh điển",
+      "suggested_translation": [
+        "Bát-nhã Tâm Kinh"
+      ],
+      "related": [
+        "般若心經"
+      ]
+    },
+    {
+      "term": "摩訶般若",
+      "han_viet": "Ma-ha Bát-nhã",
+      "pinyin": "mó hē bō rě",
+      "meaning_vi": "Đại trí tuệ Bát-nhã.",
+      "category": "Bát-nhã",
+      "suggested_translation": [
+        "đại trí tuệ Bát-nhã"
+      ],
+      "related": [
+        "般若"
+      ]
+    },
+    {
+      "term": "摩訶",
+      "han_viet": "Ma-ha",
+      "pinyin": "mó hē",
+      "meaning_vi": "Phiên âm từ mahā, nghĩa là lớn, đại.",
+      "category": "Thuật ngữ phiên âm",
+      "suggested_translation": [
+        "đại",
+        "lớn"
+      ],
+      "related": [
+        "大"
+      ]
+    },
+    {
+      "term": "我",
+      "han_viet": "ngã",
+      "pinyin": "wǒ",
+      "meaning_vi": "Tôi, ta, hoặc cái tôi; trong Phật học thường liên hệ đến giáo lý vô ngã và chấp ngã.",
+      "category": "Từ vựng Hán Phật học",
+      "suggested_translation": [
+        "tôi",
+        "ta",
+        "ngã"
+      ],
+      "related": [
+        "無我",
+        "我執"
+      ]
+    },
+    {
+      "term": "吾",
+      "han_viet": "ngô",
+      "pinyin": "wú",
+      "meaning_vi": "Ta, tôi; đại từ nhân xưng trong văn cổ.",
+      "category": "Từ vựng Hán văn",
+      "suggested_translation": [
+        "ta",
+        "tôi"
+      ],
+      "related": [
+        "我"
+      ]
+    },
+    {
+      "term": "汝",
+      "han_viet": "nhữ",
+      "pinyin": "rǔ",
+      "meaning_vi": "Ngươi, ông/bà; đại từ nhân xưng thường gặp trong kinh văn Hán.",
+      "category": "Từ vựng Hán văn",
+      "suggested_translation": [
+        "ngươi",
+        "ông/bà"
+      ],
+      "related": [
+        "我"
+      ]
+    },
+    {
+      "term": "彼",
+      "han_viet": "bỉ",
+      "pinyin": "bǐ",
+      "meaning_vi": "Kia, người kia, bên kia.",
+      "category": "Từ vựng Hán văn",
+      "suggested_translation": [
+        "kia",
+        "người ấy"
+      ],
+      "related": [
+        "此"
+      ]
+    },
+    {
+      "term": "此",
+      "han_viet": "thử",
+      "pinyin": "cǐ",
+      "meaning_vi": "Này, cái này, bên này.",
+      "category": "Từ vựng Hán văn",
+      "suggested_translation": [
+        "này",
+        "cái này"
+      ],
+      "related": [
+        "彼"
+      ]
+    },
+    {
+      "term": "其",
+      "han_viet": "kỳ",
+      "pinyin": "qí",
+      "meaning_vi": "Của nó, của người ấy; đại từ chỉ định hoặc sở hữu trong Hán văn.",
+      "category": "Từ vựng Hán văn",
+      "suggested_translation": [
+        "của ấy",
+        "người ấy"
+      ]
+    },
+    {
+      "term": "所",
+      "han_viet": "sở",
+      "pinyin": "suǒ",
+      "meaning_vi": "Điều được, cái mà; dùng để danh từ hóa động từ trong Hán văn.",
+      "category": "Từ vựng Hán văn",
+      "suggested_translation": [
+        "điều được",
+        "cái mà"
+      ],
+      "related": [
+        "所得"
+      ]
+    },
+    {
+      "term": "故",
+      "han_viet": "cố",
+      "pinyin": "gù",
+      "meaning_vi": "Vì vậy, do đó, nguyên nhân.",
+      "category": "Từ vựng Hán văn",
+      "suggested_translation": [
+        "vì vậy",
+        "do đó"
+      ],
+      "related": [
+        "以無所得故"
+      ]
+    },
+    {
+      "term": "是",
+      "han_viet": "thị",
+      "pinyin": "shì",
+      "meaning_vi": "Là, đúng vậy, này; trong kinh văn thường dùng để xác định hoặc chỉ định.",
+      "category": "Từ vựng Hán văn",
+      "suggested_translation": [
+        "là",
+        "ấy là"
+      ],
+      "related": [
+        "如是"
+      ]
+    },
+    {
+      "term": "非",
+      "han_viet": "phi",
+      "pinyin": "fēi",
+      "meaning_vi": "Không phải, chẳng phải.",
+      "category": "Từ vựng Hán văn",
+      "suggested_translation": [
+        "không phải"
+      ],
+      "related": [
+        "非想非非想處"
+      ]
+    },
+    {
+      "term": "亦",
+      "han_viet": "diệc",
+      "pinyin": "yì",
+      "meaning_vi": "Cũng, cũng lại.",
+      "category": "Từ vựng Hán văn",
+      "suggested_translation": [
+        "cũng"
+      ],
+      "related": [
+        "亦復如是"
+      ]
+    },
+    {
+      "term": "復",
+      "han_viet": "phục",
+      "pinyin": "fù",
+      "meaning_vi": "Lại, trở lại, thêm nữa.",
+      "category": "Từ vựng Hán văn",
+      "suggested_translation": [
+        "lại",
+        "cũng lại"
+      ],
+      "related": [
+        "亦復如是"
+      ]
+    },
+    {
+      "term": "乃至",
+      "han_viet": "nãi chí",
+      "pinyin": "nǎi zhì",
+      "meaning_vi": "Cho đến, thậm chí đến.",
+      "category": "Từ vựng Hán văn",
+      "suggested_translation": [
+        "cho đến"
+      ],
+      "related": [
+        "乃至無意識界"
+      ]
+    },
+    {
+      "term": "一切",
+      "han_viet": "nhất thiết",
+      "pinyin": "yī qiè",
+      "meaning_vi": "Tất cả, toàn bộ.",
+      "category": "Từ vựng Hán Phật học",
+      "suggested_translation": [
+        "tất cả"
+      ],
+      "related": [
+        "一切法",
+        "一切眾生"
+      ]
+    },
+    {
+      "term": "一切法",
+      "han_viet": "nhất thiết pháp",
+      "pinyin": "yī qiè fǎ",
+      "meaning_vi": "Tất cả các pháp, mọi hiện tượng và đối tượng nhận thức.",
+      "category": "Giáo lý căn bản",
+      "suggested_translation": [
+        "mọi pháp",
+        "tất cả pháp"
+      ],
+      "related": [
+        "諸法",
+        "法"
+      ]
+    },
+    {
+      "term": "一切眾生",
+      "han_viet": "nhất thiết chúng sinh",
+      "pinyin": "yī qiè zhòng shēng",
+      "meaning_vi": "Tất cả chúng sinh hữu tình.",
+      "category": "Giáo lý căn bản",
+      "suggested_translation": [
+        "tất cả chúng sinh"
+      ],
+      "related": [
+        "眾生"
+      ]
+    },
+    {
+      "term": "我執",
+      "han_viet": "ngã chấp",
+      "pinyin": "wǒ zhí",
+      "meaning_vi": "Sự chấp giữ vào một cái tôi cố định, độc lập.",
+      "category": "Phiền não",
+      "suggested_translation": [
+        "chấp ngã"
+      ],
+      "related": [
+        "我",
+        "無我"
+      ]
+    },
+    {
+      "term": "法執",
+      "han_viet": "pháp chấp",
+      "pinyin": "fǎ zhí",
+      "meaning_vi": "Sự chấp các pháp là thực thể cố định, độc lập.",
+      "category": "Phiền não",
+      "suggested_translation": [
+        "chấp pháp"
+      ],
+      "related": [
+        "法",
+        "空"
+      ]
+    },
+    {
+      "term": "人我",
+      "han_viet": "nhân ngã",
+      "pinyin": "rén wǒ",
+      "meaning_vi": "Cái tôi của con người; đối tượng của chấp ngã.",
+      "category": "Giáo lý",
+      "suggested_translation": [
+        "cái tôi con người"
+      ],
+      "related": [
+        "我執",
+        "無我"
+      ]
+    },
+    {
+      "term": "法我",
+      "han_viet": "pháp ngã",
+      "pinyin": "fǎ wǒ",
+      "meaning_vi": "Cái ngã được gán cho các pháp; liên hệ đến pháp chấp.",
+      "category": "Giáo lý",
+      "suggested_translation": [
+        "ngã của pháp"
+      ],
+      "related": [
+        "法執",
+        "空"
+      ]
+    },
+    {
+      "term": "二執",
+      "han_viet": "nhị chấp",
+      "pinyin": "èr zhí",
+      "meaning_vi": "Hai loại chấp: ngã chấp và pháp chấp.",
+      "category": "Phiền não",
+      "suggested_translation": [
+        "hai chấp"
+      ],
+      "related": [
+        "我執",
+        "法執"
+      ]
+    },
+    {
+      "term": "二障",
+      "han_viet": "nhị chướng",
+      "pinyin": "èr zhàng",
+      "meaning_vi": "Hai chướng ngại: phiền não chướng và sở tri chướng.",
+      "category": "Phiền não",
+      "suggested_translation": [
+        "hai chướng"
+      ],
+      "related": [
+        "煩惱障",
+        "所知障"
+      ]
+    },
+    {
+      "term": "煩惱障",
+      "han_viet": "phiền não chướng",
+      "pinyin": "fán nǎo zhàng",
+      "meaning_vi": "Chướng ngại do tham, sân, si và các phiền não gây nên.",
+      "category": "Phiền não",
+      "suggested_translation": [
+        "chướng ngại phiền não"
+      ],
+      "related": [
+        "煩惱",
+        "二障"
+      ]
+    },
+    {
+      "term": "所知障",
+      "han_viet": "sở tri chướng",
+      "pinyin": "suǒ zhī zhàng",
+      "meaning_vi": "Chướng ngại do tri kiến chấp trước, cản trở trí tuệ viên mãn.",
+      "category": "Phiền não",
+      "suggested_translation": [
+        "chướng ngại sở tri"
+      ],
+      "related": [
+        "二障",
+        "智慧"
+      ]
+    },
+    {
+      "term": "空性",
+      "han_viet": "không tính",
+      "pinyin": "kōng xìng",
+      "meaning_vi": "Tánh không; bản chất không có tự tính độc lập của các pháp.",
+      "category": "Tánh không",
+      "suggested_translation": [
+        "tánh không"
+      ],
+      "related": [
+        "空",
+        "無自性"
+      ]
+    },
+    {
+      "term": "性空",
+      "han_viet": "tính không",
+      "pinyin": "xìng kōng",
+      "meaning_vi": "Các pháp về bản tính là không, không có tự tính cố định.",
+      "category": "Tánh không",
+      "suggested_translation": [
+        "tính không"
+      ],
+      "related": [
+        "空性",
+        "無自性"
+      ]
+    },
+    {
+      "term": "妙有",
+      "han_viet": "diệu hữu",
+      "pinyin": "miào yǒu",
+      "meaning_vi": "Sự hiện hữu mầu nhiệm của các pháp trong duyên sinh, không trái với tánh không.",
+      "category": "Tánh không",
+      "suggested_translation": [
+        "hữu mầu nhiệm"
+      ],
+      "related": [
+        "真空",
+        "緣起"
+      ]
+    },
+    {
+      "term": "真空",
+      "han_viet": "chân không",
+      "pinyin": "zhēn kōng",
+      "meaning_vi": "Tánh không chân thật, không phải hư vô đoạn diệt.",
+      "category": "Tánh không",
+      "suggested_translation": [
+        "chân không"
+      ],
+      "related": [
+        "妙有",
+        "空"
+      ]
+    },
+    {
+      "term": "真空妙有",
+      "han_viet": "chân không diệu hữu",
+      "pinyin": "zhēn kōng miào yǒu",
+      "meaning_vi": "Cách diễn đạt rằng tánh không và duyên khởi không tách rời nhau.",
+      "category": "Tánh không",
+      "suggested_translation": [
+        "chân không mà diệu hữu"
+      ],
+      "related": [
+        "真空",
+        "妙有",
+        "緣起"
+      ]
+    },
+    {
+      "term": "無住",
+      "han_viet": "vô trụ",
+      "pinyin": "wú zhù",
+      "meaning_vi": "Không bám trụ, không chấp trước vào đối tượng nào.",
+      "category": "Bát-nhã/Kim Cang",
+      "suggested_translation": [
+        "không trụ chấp"
+      ],
+      "related": [
+        "應無所住",
+        "金剛經"
+      ]
+    },
+    {
+      "term": "應無所住",
+      "han_viet": "ưng vô sở trụ",
+      "pinyin": "yīng wú suǒ zhù",
+      "meaning_vi": "Nên không trụ chấp vào đâu; câu nổi tiếng trong Kinh Kim Cang.",
+      "category": "Kim Cang Kinh",
+      "suggested_translation": [
+        "nên không trụ vào đâu"
+      ],
+      "related": [
+        "無住",
+        "金剛經"
+      ]
+    },
+    {
+      "term": "應無所住而生其心",
+      "han_viet": "ưng vô sở trụ nhi sinh kỳ tâm",
+      "pinyin": "yīng wú suǒ zhù ér shēng qí xīn",
+      "meaning_vi": "Nên sinh tâm mà không trụ chấp vào bất cứ đối tượng nào.",
+      "category": "Kim Cang Kinh",
+      "suggested_translation": [
+        "không trụ mà sinh tâm"
+      ],
+      "related": [
+        "無住",
+        "金剛經"
+      ]
+    },
+    {
+      "term": "凡所有相皆是虛妄",
+      "han_viet": "phàm sở hữu tướng giai thị hư vọng",
+      "pinyin": "fán suǒ yǒu xiàng jiē shì xū wàng",
+      "meaning_vi": "Hễ những gì có tướng đều là hư vọng; câu trong Kinh Kim Cang.",
+      "category": "Kim Cang Kinh",
+      "suggested_translation": [
+        "phàm có tướng đều hư vọng"
+      ],
+      "related": [
+        "相",
+        "金剛經"
+      ]
+    },
+    {
+      "term": "若見諸相非相即見如來",
+      "han_viet": "nhược kiến chư tướng phi tướng tức kiến Như Lai",
+      "pinyin": "ruò jiàn zhū xiàng fēi xiàng jí jiàn rú lái",
+      "meaning_vi": "Nếu thấy các tướng chẳng phải tướng thì thấy Như Lai.",
+      "category": "Kim Cang Kinh",
+      "suggested_translation": [
+        "thấy tướng là phi tướng thì thấy Như Lai"
+      ],
+      "related": [
+        "如來",
+        "相",
+        "金剛經"
+      ]
+    },
+    {
+      "term": "無相",
+      "han_viet": "vô tướng",
+      "pinyin": "wú xiàng",
+      "meaning_vi": "Không chấp vào hình tướng cố định.",
+      "category": "Bát-nhã/Kim Cang",
+      "suggested_translation": [
+        "không tướng"
+      ],
+      "related": [
+        "相",
+        "空"
+      ]
+    },
+    {
+      "term": "無願",
+      "han_viet": "vô nguyện",
+      "pinyin": "wú yuàn",
+      "meaning_vi": "Không bám chấp vào mong cầu hữu lậu; một trong ba cửa giải thoát.",
+      "category": "Giải thoát",
+      "suggested_translation": [
+        "không nguyện cầu chấp trước"
+      ],
+      "related": [
+        "三解脫門"
+      ]
+    },
+    {
+      "term": "無作",
+      "han_viet": "vô tác",
+      "pinyin": "wú zuò",
+      "meaning_vi": "Không tạo tác theo chấp ngã; cũng là một cách gọi trong ba cửa giải thoát.",
+      "category": "Giải thoát",
+      "suggested_translation": [
+        "không tạo tác chấp trước"
+      ],
+      "related": [
+        "三解脫門"
+      ]
+    },
+    {
+      "term": "三解脫門",
+      "han_viet": "tam giải thoát môn",
+      "pinyin": "sān jiě tuō mén",
+      "meaning_vi": "Ba cửa giải thoát: không, vô tướng, vô nguyện/vô tác.",
+      "category": "Giải thoát",
+      "suggested_translation": [
+        "ba cửa giải thoát"
+      ],
+      "related": [
+        "空",
+        "無相",
+        "無願"
+      ]
+    },
+    {
+      "term": "無明緣行",
+      "han_viet": "vô minh duyên hành",
+      "pinyin": "wú míng yuán xíng",
+      "meaning_vi": "Do vô minh làm duyên mà hành sinh khởi.",
+      "category": "Thập nhị nhân duyên",
+      "suggested_translation": [
+        "vô minh duyên hành"
+      ],
+      "related": [
+        "無明",
+        "行"
+      ]
+    },
+    {
+      "term": "行緣識",
+      "han_viet": "hành duyên thức",
+      "pinyin": "xíng yuán shí",
+      "meaning_vi": "Do hành làm duyên mà thức sinh khởi.",
+      "category": "Thập nhị nhân duyên",
+      "suggested_translation": [
+        "hành duyên thức"
+      ],
+      "related": [
+        "行",
+        "識"
+      ]
+    },
+    {
+      "term": "識緣名色",
+      "han_viet": "thức duyên danh sắc",
+      "pinyin": "shí yuán míng sè",
+      "meaning_vi": "Do thức làm duyên mà danh sắc sinh khởi.",
+      "category": "Thập nhị nhân duyên",
+      "suggested_translation": [
+        "thức duyên danh sắc"
+      ],
+      "related": [
+        "識",
+        "名色"
+      ]
+    },
+    {
+      "term": "名色緣六入",
+      "han_viet": "danh sắc duyên lục nhập",
+      "pinyin": "míng sè yuán liù rù",
+      "meaning_vi": "Do danh sắc làm duyên mà sáu xứ sinh khởi.",
+      "category": "Thập nhị nhân duyên",
+      "suggested_translation": [
+        "danh sắc duyên lục nhập"
+      ],
+      "related": [
+        "名色",
+        "六入"
+      ]
+    },
+    {
+      "term": "六入緣觸",
+      "han_viet": "lục nhập duyên xúc",
+      "pinyin": "liù rù yuán chù",
+      "meaning_vi": "Do sáu xứ làm duyên mà xúc sinh khởi.",
+      "category": "Thập nhị nhân duyên",
+      "suggested_translation": [
+        "lục nhập duyên xúc"
+      ],
+      "related": [
+        "六入",
+        "觸"
+      ]
+    },
+    {
+      "term": "觸緣受",
+      "han_viet": "xúc duyên thọ",
+      "pinyin": "chù yuán shòu",
+      "meaning_vi": "Do xúc làm duyên mà cảm thọ sinh khởi.",
+      "category": "Thập nhị nhân duyên",
+      "suggested_translation": [
+        "xúc duyên thọ"
+      ],
+      "related": [
+        "觸",
+        "受"
+      ]
+    },
+    {
+      "term": "受緣愛",
+      "han_viet": "thọ duyên ái",
+      "pinyin": "shòu yuán ài",
+      "meaning_vi": "Do cảm thọ làm duyên mà ái sinh khởi.",
+      "category": "Thập nhị nhân duyên",
+      "suggested_translation": [
+        "thọ duyên ái"
+      ],
+      "related": [
+        "受",
+        "愛"
+      ]
+    },
+    {
+      "term": "愛緣取",
+      "han_viet": "ái duyên thủ",
+      "pinyin": "ài yuán qǔ",
+      "meaning_vi": "Do ái làm duyên mà chấp thủ sinh khởi.",
+      "category": "Thập nhị nhân duyên",
+      "suggested_translation": [
+        "ái duyên thủ"
+      ],
+      "related": [
+        "愛",
+        "取"
+      ]
+    },
+    {
+      "term": "取緣有",
+      "han_viet": "thủ duyên hữu",
+      "pinyin": "qǔ yuán yǒu",
+      "meaning_vi": "Do chấp thủ làm duyên mà hữu sinh khởi.",
+      "category": "Thập nhị nhân duyên",
+      "suggested_translation": [
+        "thủ duyên hữu"
+      ],
+      "related": [
+        "取",
+        "有"
+      ]
+    },
+    {
+      "term": "有緣生",
+      "han_viet": "hữu duyên sinh",
+      "pinyin": "yǒu yuán shēng",
+      "meaning_vi": "Do hữu làm duyên mà sinh khởi.",
+      "category": "Thập nhị nhân duyên",
+      "suggested_translation": [
+        "hữu duyên sinh"
+      ],
+      "related": [
+        "有",
+        "生"
+      ]
+    },
+    {
+      "term": "生緣老死",
+      "han_viet": "sinh duyên lão tử",
+      "pinyin": "shēng yuán lǎo sǐ",
+      "meaning_vi": "Do sinh làm duyên mà già chết sinh khởi.",
+      "category": "Thập nhị nhân duyên",
+      "suggested_translation": [
+        "sinh duyên lão tử"
+      ],
+      "related": [
+        "生",
+        "老死"
+      ]
+    },
+    {
+      "term": "名色",
+      "han_viet": "danh sắc",
+      "pinyin": "míng sè",
+      "meaning_vi": "Danh và sắc; thân tâm trong tiến trình duyên khởi.",
+      "category": "Thập nhị nhân duyên",
+      "suggested_translation": [
+        "danh sắc"
+      ],
+      "related": [
+        "識",
+        "六入"
+      ]
+    },
+    {
+      "term": "六入",
+      "han_viet": "lục nhập",
+      "pinyin": "liù rù",
+      "meaning_vi": "Sáu xứ/cửa vào nhận thức: mắt, tai, mũi, lưỡi, thân, ý.",
+      "category": "Thập nhị nhân duyên",
+      "suggested_translation": [
+        "sáu xứ"
+      ],
+      "related": [
+        "六根"
+      ]
+    },
+    {
+      "term": "十波羅蜜",
+      "han_viet": "thập Ba-la-mật",
+      "pinyin": "shí bō luó mì",
+      "meaning_vi": "Mười Ba-la-mật, mở rộng từ sáu Ba-la-mật trong hạnh Bồ-tát.",
+      "category": "Bồ-tát đạo",
+      "suggested_translation": [
+        "mười Ba-la-mật"
+      ],
+      "related": [
+        "六波羅蜜"
+      ]
+    },
+    {
+      "term": "方便波羅蜜",
+      "han_viet": "phương tiện Ba-la-mật",
+      "pinyin": "fāng biàn bō luó mì",
+      "meaning_vi": "Hạnh phương tiện thiện xảo viên mãn.",
+      "category": "Bồ-tát đạo",
+      "suggested_translation": [
+        "phương tiện Ba-la-mật"
+      ],
+      "related": [
+        "方便",
+        "十波羅蜜"
+      ]
+    },
+    {
+      "term": "願波羅蜜",
+      "han_viet": "nguyện Ba-la-mật",
+      "pinyin": "yuàn bō luó mì",
+      "meaning_vi": "Hạnh phát nguyện viên mãn của Bồ-tát.",
+      "category": "Bồ-tát đạo",
+      "suggested_translation": [
+        "nguyện Ba-la-mật"
+      ],
+      "related": [
+        "願",
+        "十波羅蜜"
+      ]
+    },
+    {
+      "term": "力波羅蜜",
+      "han_viet": "lực Ba-la-mật",
+      "pinyin": "lì bō luó mì",
+      "meaning_vi": "Năng lực tu hành viên mãn của Bồ-tát.",
+      "category": "Bồ-tát đạo",
+      "suggested_translation": [
+        "lực Ba-la-mật"
+      ],
+      "related": [
+        "力",
+        "十波羅蜜"
+      ]
+    },
+    {
+      "term": "智波羅蜜",
+      "han_viet": "trí Ba-la-mật",
+      "pinyin": "zhì bō luó mì",
+      "meaning_vi": "Trí tuệ phương tiện viên mãn trong mười Ba-la-mật.",
+      "category": "Bồ-tát đạo",
+      "suggested_translation": [
+        "trí Ba-la-mật"
+      ],
+      "related": [
+        "智",
+        "十波羅蜜"
+      ]
+    },
+    {
+      "term": "四攝法",
+      "han_viet": "tứ nhiếp pháp",
+      "pinyin": "sì shè fǎ",
+      "meaning_vi": "Bốn cách nhiếp hóa chúng sinh: bố thí, ái ngữ, lợi hành, đồng sự.",
+      "category": "Bồ-tát đạo",
+      "suggested_translation": [
+        "bốn pháp nhiếp hóa"
+      ],
+      "related": [
+        "布施",
+        "愛語",
+        "利行",
+        "同事"
+      ]
+    },
+    {
+      "term": "愛語",
+      "han_viet": "ái ngữ",
+      "pinyin": "ài yǔ",
+      "meaning_vi": "Lời nói hòa ái, lợi ích, một trong tứ nhiếp pháp.",
+      "category": "Bồ-tát đạo",
+      "suggested_translation": [
+        "lời nói ái ngữ"
+      ],
+      "related": [
+        "四攝法"
+      ]
+    },
+    {
+      "term": "利行",
+      "han_viet": "lợi hành",
+      "pinyin": "lì xíng",
+      "meaning_vi": "Hành động đem lại lợi ích cho người khác, một trong tứ nhiếp pháp.",
+      "category": "Bồ-tát đạo",
+      "suggested_translation": [
+        "hạnh lợi ích"
+      ],
+      "related": [
+        "四攝法"
+      ]
+    },
+    {
+      "term": "同事",
+      "han_viet": "đồng sự",
+      "pinyin": "tóng shì",
+      "meaning_vi": "Cùng làm, cùng sống, cùng chia sẻ để nhiếp hóa người khác.",
+      "category": "Bồ-tát đạo",
+      "suggested_translation": [
+        "đồng hành cùng người"
+      ],
+      "related": [
+        "四攝法"
+      ]
+    },
+    {
+      "term": "四弘誓願",
+      "han_viet": "tứ hoằng thệ nguyện",
+      "pinyin": "sì hóng shì yuàn",
+      "meaning_vi": "Bốn lời nguyện lớn của Bồ-tát: độ chúng sinh, đoạn phiền não, học pháp môn, thành Phật đạo.",
+      "category": "Bồ-tát đạo",
+      "suggested_translation": [
+        "bốn lời nguyện rộng lớn"
+      ],
+      "related": [
+        "眾生",
+        "煩惱",
+        "法門",
+        "佛道"
+      ]
+    },
+    {
+      "term": "眾生無邊誓願度",
+      "han_viet": "chúng sinh vô biên thệ nguyện độ",
+      "pinyin": "zhòng shēng wú biān shì yuàn dù",
+      "meaning_vi": "Chúng sinh vô biên thệ nguyện độ thoát.",
+      "category": "Bồ-tát đạo",
+      "suggested_translation": [
+        "nguyện độ vô biên chúng sinh"
+      ],
+      "related": [
+        "四弘誓願"
+      ]
+    },
+    {
+      "term": "煩惱無盡誓願斷",
+      "han_viet": "phiền não vô tận thệ nguyện đoạn",
+      "pinyin": "fán nǎo wú jìn shì yuàn duàn",
+      "meaning_vi": "Phiền não vô tận thệ nguyện đoạn trừ.",
+      "category": "Bồ-tát đạo",
+      "suggested_translation": [
+        "nguyện đoạn vô tận phiền não"
+      ],
+      "related": [
+        "四弘誓願"
+      ]
+    },
+    {
+      "term": "法門無量誓願學",
+      "han_viet": "pháp môn vô lượng thệ nguyện học",
+      "pinyin": "fǎ mén wú liàng shì yuàn xué",
+      "meaning_vi": "Pháp môn vô lượng thệ nguyện học hỏi.",
+      "category": "Bồ-tát đạo",
+      "suggested_translation": [
+        "nguyện học vô lượng pháp môn"
+      ],
+      "related": [
+        "四弘誓願",
+        "法門"
+      ]
+    },
+    {
+      "term": "佛道無上誓願成",
+      "han_viet": "Phật đạo vô thượng thệ nguyện thành",
+      "pinyin": "fó dào wú shàng shì yuàn chéng",
+      "meaning_vi": "Phật đạo vô thượng thệ nguyện thành tựu.",
+      "category": "Bồ-tát đạo",
+      "suggested_translation": [
+        "nguyện thành Phật đạo vô thượng"
+      ],
+      "related": [
+        "四弘誓願",
+        "佛道"
+      ]
+    },
+    {
+      "term": "佛道",
+      "han_viet": "Phật đạo",
+      "pinyin": "fó dào",
+      "meaning_vi": "Con đường giác ngộ thành Phật.",
+      "category": "Bồ-tát đạo",
+      "suggested_translation": [
+        "đạo Phật quả"
+      ],
+      "related": [
+        "佛",
+        "菩提"
+      ]
+    },
+    {
+      "term": "三十七道品",
+      "han_viet": "tam thập thất đạo phẩm",
+      "pinyin": "sān shí qī dào pǐn",
+      "meaning_vi": "Ba mươi bảy phẩm trợ đạo, các pháp tu hỗ trợ giác ngộ.",
+      "category": "Tu tập",
+      "suggested_translation": [
+        "37 phẩm trợ đạo"
+      ],
+      "related": [
+        "四念處",
+        "八正道"
+      ]
+    },
+    {
+      "term": "四念處",
+      "han_viet": "tứ niệm xứ",
+      "pinyin": "sì niàn chù",
+      "meaning_vi": "Bốn nền tảng chánh niệm: thân, thọ, tâm, pháp.",
+      "category": "Tu tập",
+      "suggested_translation": [
+        "bốn niệm xứ"
+      ],
+      "related": [
+        "身念處",
+        "受念處",
+        "心念處",
+        "法念處"
+      ]
+    },
+    {
+      "term": "身念處",
+      "han_viet": "thân niệm xứ",
+      "pinyin": "shēn niàn chù",
+      "meaning_vi": "Quán niệm về thân.",
+      "category": "Tứ niệm xứ",
+      "suggested_translation": [
+        "quán thân"
+      ],
+      "related": [
+        "四念處"
+      ]
+    },
+    {
+      "term": "受念處",
+      "han_viet": "thọ niệm xứ",
+      "pinyin": "shòu niàn chù",
+      "meaning_vi": "Quán niệm về cảm thọ.",
+      "category": "Tứ niệm xứ",
+      "suggested_translation": [
+        "quán thọ"
+      ],
+      "related": [
+        "四念處"
+      ]
+    },
+    {
+      "term": "心念處",
+      "han_viet": "tâm niệm xứ",
+      "pinyin": "xīn niàn chù",
+      "meaning_vi": "Quán niệm về tâm.",
+      "category": "Tứ niệm xứ",
+      "suggested_translation": [
+        "quán tâm"
+      ],
+      "related": [
+        "四念處"
+      ]
+    },
+    {
+      "term": "法念處",
+      "han_viet": "pháp niệm xứ",
+      "pinyin": "fǎ niàn chù",
+      "meaning_vi": "Quán niệm về các pháp.",
+      "category": "Tứ niệm xứ",
+      "suggested_translation": [
+        "quán pháp"
+      ],
+      "related": [
+        "四念處"
+      ]
+    },
+    {
+      "term": "四正勤",
+      "han_viet": "tứ chánh cần",
+      "pinyin": "sì zhèng qín",
+      "meaning_vi": "Bốn nỗ lực đúng trong việc đoạn ác và tu thiện.",
+      "category": "Tu tập",
+      "suggested_translation": [
+        "bốn chánh cần"
+      ],
+      "related": [
+        "精進"
+      ]
+    },
+    {
+      "term": "四如意足",
+      "han_viet": "tứ như ý túc",
+      "pinyin": "sì rú yì zú",
+      "meaning_vi": "Bốn nền tảng thành tựu: dục, tinh tấn, tâm, quán.",
+      "category": "Tu tập",
+      "suggested_translation": [
+        "bốn như ý túc"
+      ],
+      "related": [
+        "三十七道品"
+      ]
+    },
+    {
+      "term": "五根",
+      "han_viet": "ngũ căn",
+      "pinyin": "wǔ gēn",
+      "meaning_vi": "Năm căn tu tập: tín, tấn, niệm, định, tuệ.",
+      "category": "Tu tập",
+      "suggested_translation": [
+        "năm căn"
+      ],
+      "related": [
+        "信",
+        "精進",
+        "念",
+        "定",
+        "慧"
+      ]
+    },
+    {
+      "term": "五力",
+      "han_viet": "ngũ lực",
+      "pinyin": "wǔ lì",
+      "meaning_vi": "Năm năng lực tu tập: tín, tấn, niệm, định, tuệ.",
+      "category": "Tu tập",
+      "suggested_translation": [
+        "năm lực"
+      ],
+      "related": [
+        "五根"
+      ]
+    },
+    {
+      "term": "七覺支",
+      "han_viet": "thất giác chi",
+      "pinyin": "qī jué zhī",
+      "meaning_vi": "Bảy yếu tố giác ngộ: niệm, trạch pháp, tinh tấn, hỷ, khinh an, định, xả.",
+      "category": "Tu tập",
+      "suggested_translation": [
+        "bảy giác chi"
+      ],
+      "related": [
+        "念",
+        "擇法",
+        "精進",
+        "喜",
+        "輕安",
+        "定",
+        "捨"
+      ]
+    },
+    {
+      "term": "擇法",
+      "han_viet": "trạch pháp",
+      "pinyin": "zé fǎ",
+      "meaning_vi": "Khả năng phân biệt, chọn lựa pháp đúng bằng trí tuệ.",
+      "category": "Thất giác chi",
+      "suggested_translation": [
+        "chọn pháp"
+      ],
+      "related": [
+        "七覺支",
+        "慧"
+      ]
+    },
+    {
+      "term": "輕安",
+      "han_viet": "khinh an",
+      "pinyin": "qīng ān",
+      "meaning_vi": "Sự nhẹ nhàng, an ổn của thân tâm trong tu tập.",
+      "category": "Thất giác chi",
+      "suggested_translation": [
+        "nhẹ nhàng an ổn"
+      ],
+      "related": [
+        "七覺支"
+      ]
+    },
+    {
+      "term": "念",
+      "han_viet": "niệm",
+      "pinyin": "niàn",
+      "meaning_vi": "Sự ghi nhớ, tỉnh thức, nhận biết liên tục.",
+      "category": "Tu tập",
+      "suggested_translation": [
+        "chánh niệm",
+        "ghi nhớ"
+      ],
+      "related": [
+        "正念"
+      ]
+    },
+    {
+      "term": "信",
+      "han_viet": "tín",
+      "pinyin": "xìn",
+      "meaning_vi": "Niềm tin, lòng tin đúng vào Tam bảo và giáo pháp.",
+      "category": "Tu tập",
+      "suggested_translation": [
+        "niềm tin"
+      ],
+      "related": [
+        "三寶"
+      ]
+    },
+    {
+      "term": "力",
+      "han_viet": "lực",
+      "pinyin": "lì",
+      "meaning_vi": "Năng lực, sức mạnh tu tập hoặc công đức.",
+      "category": "Tu tập",
+      "suggested_translation": [
+        "năng lực"
+      ],
+      "related": [
+        "五力"
+      ]
+    },
+    {
+      "term": "六道",
+      "han_viet": "lục đạo",
+      "pinyin": "liù dào",
+      "meaning_vi": "Sáu đường luân hồi: trời, a-tu-la, người, súc sinh, ngạ quỷ, địa ngục.",
+      "category": "Sinh tử",
+      "suggested_translation": [
+        "sáu đường"
+      ],
+      "related": [
+        "輪迴"
+      ]
+    },
+    {
+      "term": "六趣",
+      "han_viet": "lục thú",
+      "pinyin": "liù qù",
+      "meaning_vi": "Sáu nẻo tái sinh trong luân hồi, đồng nghĩa gần với lục đạo.",
+      "category": "Sinh tử",
+      "suggested_translation": [
+        "sáu nẻo"
+      ],
+      "related": [
+        "六道"
+      ]
+    },
+    {
+      "term": "天",
+      "han_viet": "thiên",
+      "pinyin": "tiān",
+      "meaning_vi": "Cõi trời hoặc chúng sinh cõi trời.",
+      "category": "Lục đạo",
+      "suggested_translation": [
+        "trời",
+        "cõi trời"
+      ],
+      "related": [
+        "六道"
+      ]
+    },
+    {
+      "term": "人",
+      "han_viet": "nhân",
+      "pinyin": "rén",
+      "meaning_vi": "Con người; cõi người trong lục đạo.",
+      "category": "Lục đạo",
+      "suggested_translation": [
+        "người",
+        "cõi người"
+      ],
+      "related": [
+        "六道"
+      ]
+    },
+    {
+      "term": "阿修羅",
+      "han_viet": "A-tu-la",
+      "pinyin": "ā xiū luó",
+      "meaning_vi": "Một loài chúng sinh có phước nhưng còn nhiều tranh đấu, sân hận.",
+      "category": "Lục đạo",
+      "suggested_translation": [
+        "a-tu-la"
+      ],
+      "related": [
+        "六道"
+      ]
+    },
+    {
+      "term": "畜生",
+      "han_viet": "súc sinh",
+      "pinyin": "chù shēng",
+      "meaning_vi": "Cõi loài vật trong sáu đường luân hồi.",
+      "category": "Lục đạo",
+      "suggested_translation": [
+        "loài vật"
+      ],
+      "related": [
+        "六道"
+      ]
+    },
+    {
+      "term": "餓鬼",
+      "han_viet": "ngạ quỷ",
+      "pinyin": "è guǐ",
+      "meaning_vi": "Cõi quỷ đói, biểu tượng cho tham ái và thiếu thốn.",
+      "category": "Lục đạo",
+      "suggested_translation": [
+        "quỷ đói"
+      ],
+      "related": [
+        "六道"
+      ]
+    },
+    {
+      "term": "地獄",
+      "han_viet": "địa ngục",
+      "pinyin": "dì yù",
+      "meaning_vi": "Cảnh giới khổ nặng trong luân hồi.",
+      "category": "Lục đạo",
+      "suggested_translation": [
+        "địa ngục"
+      ],
+      "related": [
+        "六道"
+      ]
+    },
+    {
+      "term": "三界",
+      "han_viet": "tam giới",
+      "pinyin": "sān jiè",
+      "meaning_vi": "Ba cõi: dục giới, sắc giới, vô sắc giới.",
+      "category": "Sinh tử",
+      "suggested_translation": [
+        "ba cõi"
+      ],
+      "related": [
+        "欲界",
+        "色界",
+        "無色界"
+      ]
+    },
+    {
+      "term": "欲界",
+      "han_viet": "dục giới",
+      "pinyin": "yù jiè",
+      "meaning_vi": "Cõi còn bị chi phối mạnh bởi dục vọng.",
+      "category": "Tam giới",
+      "suggested_translation": [
+        "cõi dục"
+      ],
+      "related": [
+        "三界"
+      ]
+    },
+    {
+      "term": "色界",
+      "han_viet": "sắc giới",
+      "pinyin": "sè jiè",
+      "meaning_vi": "Cõi của các tầng thiền sắc giới.",
+      "category": "Tam giới",
+      "suggested_translation": [
+        "cõi sắc"
+      ],
+      "related": [
+        "三界"
+      ]
+    },
+    {
+      "term": "無色界",
+      "han_viet": "vô sắc giới",
+      "pinyin": "wú sè jiè",
+      "meaning_vi": "Cõi của các tầng thiền vô sắc.",
+      "category": "Tam giới",
+      "suggested_translation": [
+        "cõi vô sắc"
+      ],
+      "related": [
+        "三界"
+      ]
+    },
+    {
+      "term": "娑婆世界",
+      "han_viet": "Ta-bà thế giới",
+      "pinyin": "suō pó shì jiè",
+      "meaning_vi": "Thế giới kham nhẫn, nơi chúng sinh chịu nhiều khổ nhưng có thể tu học.",
+      "category": "Thế giới Phật giáo",
+      "suggested_translation": [
+        "cõi Ta-bà"
+      ],
+      "related": [
+        "釋迦牟尼佛"
+      ]
+    },
+    {
+      "term": "西方極樂世界",
+      "han_viet": "Tây phương Cực Lạc thế giới",
+      "pinyin": "xī fāng jí lè shì jiè",
+      "meaning_vi": "Cõi Cực Lạc ở phương Tây của Phật A-di-đà.",
+      "category": "Tịnh độ",
+      "suggested_translation": [
+        "Tây phương Cực Lạc"
+      ],
+      "related": [
+        "極樂世界",
+        "阿彌陀佛"
+      ]
+    },
+    {
+      "term": "兜率天",
+      "han_viet": "Đâu-suất thiên",
+      "pinyin": "dōu shuài tiān",
+      "meaning_vi": "Cõi trời nơi Bồ-tát Di-lặc được tin là đang thuyết pháp.",
+      "category": "Thế giới Phật giáo",
+      "suggested_translation": [
+        "cõi Đâu-suất"
+      ],
+      "related": [
+        "彌勒菩薩"
+      ]
+    },
+    {
+      "term": "藥師琉璃光如來",
+      "han_viet": "Dược Sư Lưu Ly Quang Như Lai",
+      "pinyin": "yào shī liú lí guāng rú lái",
+      "meaning_vi": "Danh hiệu đầy đủ của Phật Dược Sư.",
+      "category": "Danh hiệu Phật",
+      "suggested_translation": [
+        "Phật Dược Sư"
+      ],
+      "related": [
+        "藥師佛"
+      ]
+    },
+    {
+      "term": "大日如來",
+      "han_viet": "Đại Nhật Như Lai",
+      "pinyin": "dà rì rú lái",
+      "meaning_vi": "Danh hiệu của Tỳ-lô-giá-na Phật trong Mật giáo.",
+      "category": "Danh hiệu Phật",
+      "suggested_translation": [
+        "Đại Nhật Như Lai"
+      ],
+      "related": [
+        "毘盧遮那佛"
+      ]
+    },
+    {
+      "term": "盧舍那佛",
+      "han_viet": "Lô-xá-na Phật",
+      "pinyin": "lú shè nà fó",
+      "meaning_vi": "Danh hiệu Phật trong truyền thống Hoa Nghiêm, liên hệ báo thân.",
+      "category": "Danh hiệu Phật",
+      "suggested_translation": [
+        "Lô-xá-na Phật"
+      ],
+      "related": [
+        "毘盧遮那佛",
+        "報身"
+      ]
+    },
+    {
+      "term": "燃燈佛",
+      "han_viet": "Nhiên Đăng Phật",
+      "pinyin": "rán dēng fó",
+      "meaning_vi": "Đức Phật quá khứ thường được nhắc trong kinh điển.",
+      "category": "Danh hiệu Phật",
+      "suggested_translation": [
+        "Phật Nhiên Đăng"
+      ],
+      "related": [
+        "佛"
+      ]
+    },
+    {
+      "term": "彌勒佛",
+      "han_viet": "Di-lặc Phật",
+      "pinyin": "mí lè fó",
+      "meaning_vi": "Đức Phật tương lai theo truyền thống Phật giáo.",
+      "category": "Danh hiệu Phật",
+      "suggested_translation": [
+        "Phật Di-lặc"
+      ],
+      "related": [
+        "彌勒菩薩"
+      ]
+    },
+    {
+      "term": "千手千眼觀世音菩薩",
+      "han_viet": "Thiên thủ thiên nhãn Quán Thế Âm Bồ Tát",
+      "pinyin": "qiān shǒu qiān yǎn guān shì yīn pú sà",
+      "meaning_vi": "Hình tượng Quán Âm nghìn tay nghìn mắt biểu thị đại bi và phương tiện cứu độ.",
+      "category": "Bồ-tát",
+      "suggested_translation": [
+        "Quán Âm nghìn tay nghìn mắt"
+      ],
+      "related": [
+        "觀世音菩薩",
+        "慈悲"
+      ]
+    },
+    {
+      "term": "準提菩薩",
+      "han_viet": "Chuẩn Đề Bồ Tát",
+      "pinyin": "zhǔn tí pú sà",
+      "meaning_vi": "Vị Bồ-tát/Phật mẫu được thờ trong một số pháp tu Mật giáo Đông Á.",
+      "category": "Bồ-tát",
+      "suggested_translation": [
+        "Chuẩn Đề"
+      ],
+      "related": [
+        "咒",
+        "密宗"
+      ]
+    },
+    {
+      "term": "韋馱菩薩",
+      "han_viet": "Vi Đà Bồ Tát",
+      "pinyin": "wéi tuó pú sà",
+      "meaning_vi": "Vị hộ pháp thường được thờ trong chùa Hán truyền.",
+      "category": "Hộ pháp",
+      "suggested_translation": [
+        "Bồ-tát Vi Đà"
+      ],
+      "related": [
+        "護法"
+      ]
+    },
+    {
+      "term": "伽藍菩薩",
+      "han_viet": "Già Lam Bồ Tát",
+      "pinyin": "qié lán pú sà",
+      "meaning_vi": "Vị hộ pháp bảo hộ đạo tràng, chùa viện.",
+      "category": "Hộ pháp",
+      "suggested_translation": [
+        "hộ pháp Già Lam"
+      ],
+      "related": [
+        "護法",
+        "道場"
+      ]
+    },
+    {
+      "term": "護法",
+      "han_viet": "hộ pháp",
+      "pinyin": "hù fǎ",
+      "meaning_vi": "Bảo hộ Phật pháp, người hộ trì giáo pháp hoặc các vị thần hộ pháp.",
+      "category": "Hộ pháp",
+      "suggested_translation": [
+        "bảo hộ Phật pháp"
+      ],
+      "related": [
+        "正法"
+      ]
+    },
+    {
+      "term": "龍天護法",
+      "han_viet": "long thiên hộ pháp",
+      "pinyin": "lóng tiān hù fǎ",
+      "meaning_vi": "Các vị trời, rồng và hộ pháp bảo vệ đạo tràng, giáo pháp.",
+      "category": "Hộ pháp",
+      "suggested_translation": [
+        "long thiên hộ pháp"
+      ],
+      "related": [
+        "護法"
+      ]
+    },
+    {
+      "term": "天龍八部",
+      "han_viet": "thiên long bát bộ",
+      "pinyin": "tiān lóng bā bù",
+      "meaning_vi": "Tám bộ chúng hộ pháp trong kinh điển Đại thừa.",
+      "category": "Hộ pháp",
+      "suggested_translation": [
+        "tám bộ trời rồng"
+      ],
+      "related": [
+        "護法"
+      ]
+    },
+    {
+      "term": "楞嚴經",
+      "han_viet": "Lăng Nghiêm Kinh",
+      "pinyin": "léng yán jīng",
+      "meaning_vi": "Kinh Đại thừa quan trọng về định, tâm và tu chứng.",
+      "category": "Kinh điển",
+      "suggested_translation": [
+        "Kinh Lăng Nghiêm"
+      ],
+      "related": [
+        "咒",
+        "禪定"
+      ]
+    },
+    {
+      "term": "圓覺經",
+      "han_viet": "Viên Giác Kinh",
+      "pinyin": "yuán jué jīng",
+      "meaning_vi": "Kinh Đại thừa nói về giác ngộ viên mãn và tu quán.",
+      "category": "Kinh điển",
+      "suggested_translation": [
+        "Kinh Viên Giác"
+      ],
+      "related": [
+        "覺",
+        "觀照"
+      ]
+    },
+    {
+      "term": "維摩詰經",
+      "han_viet": "Duy Ma Cật Kinh",
+      "pinyin": "wéi mó jié jīng",
+      "meaning_vi": "Kinh Đại thừa nổi tiếng về trí tuệ bất nhị và Bồ-tát hạnh tại gia.",
+      "category": "Kinh điển",
+      "suggested_translation": [
+        "Kinh Duy Ma Cật"
+      ],
+      "related": [
+        "不二",
+        "大乘"
+      ]
+    },
+    {
+      "term": "地藏經",
+      "han_viet": "Địa Tạng Kinh",
+      "pinyin": "dì zàng jīng",
+      "meaning_vi": "Kinh nói về đại nguyện của Bồ-tát Địa Tạng.",
+      "category": "Kinh điển",
+      "suggested_translation": [
+        "Kinh Địa Tạng"
+      ],
+      "related": [
+        "地藏菩薩"
+      ]
+    },
+    {
+      "term": "阿彌陀經",
+      "han_viet": "A-di-đà Kinh",
+      "pinyin": "ā mí tuó jīng",
+      "meaning_vi": "Kinh Tịnh độ nói về cõi Cực Lạc và pháp môn niệm Phật.",
+      "category": "Kinh điển",
+      "suggested_translation": [
+        "Kinh A-di-đà"
+      ],
+      "related": [
+        "阿彌陀佛",
+        "極樂世界"
+      ]
+    },
+    {
+      "term": "無量壽經",
+      "han_viet": "Vô Lượng Thọ Kinh",
+      "pinyin": "wú liàng shòu jīng",
+      "meaning_vi": "Kinh Tịnh độ nói về Phật A-di-đà và các đại nguyện.",
+      "category": "Kinh điển",
+      "suggested_translation": [
+        "Kinh Vô Lượng Thọ"
+      ],
+      "related": [
+        "阿彌陀佛",
+        "淨土"
+      ]
+    },
+    {
+      "term": "觀無量壽經",
+      "han_viet": "Quán Vô Lượng Thọ Kinh",
+      "pinyin": "guān wú liàng shòu jīng",
+      "meaning_vi": "Kinh Tịnh độ trình bày pháp quán tưởng cõi Cực Lạc.",
+      "category": "Kinh điển",
+      "suggested_translation": [
+        "Kinh Quán Vô Lượng Thọ"
+      ],
+      "related": [
+        "阿彌陀佛",
+        "極樂世界"
+      ]
+    },
+    {
+      "term": "大悲咒",
+      "han_viet": "Đại Bi Chú",
+      "pinyin": "dà bēi zhòu",
+      "meaning_vi": "Thần chú Đại Bi gắn với Bồ-tát Quán Thế Âm.",
+      "category": "Nghi lễ/Mật chú",
+      "suggested_translation": [
+        "Chú Đại Bi"
+      ],
+      "related": [
+        "觀世音菩薩",
+        "慈悲"
+      ]
+    },
+    {
+      "term": "往生咒",
+      "han_viet": "Vãng Sinh Chú",
+      "pinyin": "wǎng shēng zhòu",
+      "meaning_vi": "Thần chú thường được trì tụng trong pháp môn Tịnh độ.",
+      "category": "Nghi lễ/Mật chú",
+      "suggested_translation": [
+        "Chú Vãng Sinh"
+      ],
+      "related": [
+        "淨土",
+        "阿彌陀佛"
+      ]
+    },
+    {
+      "term": "十小咒",
+      "han_viet": "thập tiểu chú",
+      "pinyin": "shí xiǎo zhòu",
+      "meaning_vi": "Mười bài chú ngắn thường dùng trong nghi thức tụng niệm Hán truyền.",
+      "category": "Nghi lễ/Mật chú",
+      "suggested_translation": [
+        "mười chú nhỏ"
+      ],
+      "related": [
+        "咒"
+      ]
+    },
+    {
+      "term": "天台宗",
+      "han_viet": "Thiên Thai tông",
+      "pinyin": "tiān tái zōng",
+      "meaning_vi": "Tông phái Phật giáo Đại thừa Đông Á dựa nhiều vào Kinh Pháp Hoa.",
+      "category": "Truyền thống",
+      "suggested_translation": [
+        "tông Thiên Thai"
+      ],
+      "related": [
+        "法華經",
+        "止觀"
+      ]
+    },
+    {
+      "term": "華嚴宗",
+      "han_viet": "Hoa Nghiêm tông",
+      "pinyin": "huá yán zōng",
+      "meaning_vi": "Tông phái Đại thừa dựa trên Kinh Hoa Nghiêm.",
+      "category": "Truyền thống",
+      "suggested_translation": [
+        "tông Hoa Nghiêm"
+      ],
+      "related": [
+        "華嚴經"
+      ]
+    },
+    {
+      "term": "律宗",
+      "han_viet": "Luật tông",
+      "pinyin": "lǜ zōng",
+      "meaning_vi": "Tông phái chú trọng giới luật và Luật tạng.",
+      "category": "Truyền thống",
+      "suggested_translation": [
+        "tông Luật"
+      ],
+      "related": [
+        "律",
+        "戒"
+      ]
+    },
+    {
+      "term": "法相宗",
+      "han_viet": "Pháp Tướng tông",
+      "pinyin": "fǎ xiàng zōng",
+      "meaning_vi": "Tông phái Duy thức học ở Đông Á.",
+      "category": "Truyền thống",
+      "suggested_translation": [
+        "tông Pháp Tướng"
+      ],
+      "related": [
+        "唯識"
+      ]
+    },
+    {
+      "term": "唯識宗",
+      "han_viet": "Duy Thức tông",
+      "pinyin": "wéi shí zōng",
+      "meaning_vi": "Tông phái nhấn mạnh giáo lý duy thức.",
+      "category": "Truyền thống",
+      "suggested_translation": [
+        "tông Duy Thức"
+      ],
+      "related": [
+        "唯識"
+      ]
+    },
+    {
+      "term": "三論宗",
+      "han_viet": "Tam Luận tông",
+      "pinyin": "sān lùn zōng",
+      "meaning_vi": "Tông phái Trung quán Đông Á dựa trên ba bộ luận chính.",
+      "category": "Truyền thống",
+      "suggested_translation": [
+        "tông Tam Luận"
+      ],
+      "related": [
+        "中觀",
+        "空"
+      ]
+    },
+    {
+      "term": "中觀",
+      "han_viet": "Trung quán",
+      "pinyin": "zhōng guān",
+      "meaning_vi": "Hệ tư tưởng nhấn mạnh trung đạo và tánh không.",
+      "category": "Giáo lý Đại thừa",
+      "suggested_translation": [
+        "Trung quán"
+      ],
+      "related": [
+        "中道",
+        "空"
+      ]
+    },
+    {
+      "term": "唯識",
+      "han_viet": "duy thức",
+      "pinyin": "wéi shí",
+      "meaning_vi": "Giáo lý cho rằng kinh nghiệm được nhận biết qua thức, nhấn mạnh chuyển hóa tâm thức.",
+      "category": "Giáo lý Đại thừa",
+      "suggested_translation": [
+        "duy thức"
+      ],
+      "related": [
+        "阿賴耶識"
+      ]
+    },
+    {
+      "term": "八識",
+      "han_viet": "bát thức",
+      "pinyin": "bā shí",
+      "meaning_vi": "Tám thức trong Duy thức học: năm thức giác quan, ý thức, mạt-na thức, a-lại-da thức.",
+      "category": "Duy thức",
+      "suggested_translation": [
+        "tám thức"
+      ],
+      "related": [
+        "阿賴耶識",
+        "末那識"
+      ]
+    },
+    {
+      "term": "阿賴耶識",
+      "han_viet": "a-lại-da thức",
+      "pinyin": "ā lài yē shí",
+      "meaning_vi": "Tàng thức, thức chứa chủng tử nghiệp theo Duy thức học.",
+      "category": "Duy thức",
+      "suggested_translation": [
+        "tàng thức"
+      ],
+      "related": [
+        "八識",
+        "種子"
+      ]
+    },
+    {
+      "term": "末那識",
+      "han_viet": "mạt-na thức",
+      "pinyin": "mò nà shí",
+      "meaning_vi": "Thức chấp ngã vi tế trong Duy thức học.",
+      "category": "Duy thức",
+      "suggested_translation": [
+        "mạt-na thức"
+      ],
+      "related": [
+        "八識",
+        "我執"
+      ]
+    },
+    {
+      "term": "意識",
+      "han_viet": "ý thức",
+      "pinyin": "yì shí",
+      "meaning_vi": "Thức phân biệt của ý căn, một trong sáu thức hoặc tám thức.",
+      "category": "Duy thức",
+      "suggested_translation": [
+        "ý thức"
+      ],
+      "related": [
+        "六識",
+        "八識"
+      ]
+    },
+    {
+      "term": "眼識",
+      "han_viet": "nhãn thức",
+      "pinyin": "yǎn shí",
+      "meaning_vi": "Thức nhận biết qua mắt.",
+      "category": "Lục thức",
+      "suggested_translation": [
+        "thức mắt"
+      ],
+      "related": [
+        "六識",
+        "眼"
+      ]
+    },
+    {
+      "term": "耳識",
+      "han_viet": "nhĩ thức",
+      "pinyin": "ěr shí",
+      "meaning_vi": "Thức nhận biết qua tai.",
+      "category": "Lục thức",
+      "suggested_translation": [
+        "thức tai"
+      ],
+      "related": [
+        "六識",
+        "耳"
+      ]
+    },
+    {
+      "term": "鼻識",
+      "han_viet": "tỵ thức",
+      "pinyin": "bí shí",
+      "meaning_vi": "Thức nhận biết qua mũi.",
+      "category": "Lục thức",
+      "suggested_translation": [
+        "thức mũi"
+      ],
+      "related": [
+        "六識",
+        "鼻"
+      ]
+    },
+    {
+      "term": "舌識",
+      "han_viet": "thiệt thức",
+      "pinyin": "shé shí",
+      "meaning_vi": "Thức nhận biết qua lưỡi.",
+      "category": "Lục thức",
+      "suggested_translation": [
+        "thức lưỡi"
+      ],
+      "related": [
+        "六識",
+        "舌"
+      ]
+    },
+    {
+      "term": "身識",
+      "han_viet": "thân thức",
+      "pinyin": "shēn shí",
+      "meaning_vi": "Thức nhận biết qua thân.",
+      "category": "Lục thức",
+      "suggested_translation": [
+        "thức thân"
+      ],
+      "related": [
+        "六識",
+        "身"
+      ]
+    },
+    {
+      "term": "種子",
+      "han_viet": "chủng tử",
+      "pinyin": "zhǒng zǐ",
+      "meaning_vi": "Hạt giống nghiệp và tập khí được huân tập trong tàng thức.",
+      "category": "Duy thức",
+      "suggested_translation": [
+        "hạt giống nghiệp"
+      ],
+      "related": [
+        "阿賴耶識",
+        "業"
+      ]
+    },
+    {
+      "term": "現行",
+      "han_viet": "hiện hành",
+      "pinyin": "xiàn xíng",
+      "meaning_vi": "Sự biểu hiện hiện tại của chủng tử trong tâm thức và hành động.",
+      "category": "Duy thức",
+      "suggested_translation": [
+        "hiện hành"
+      ],
+      "related": [
+        "種子"
+      ]
+    },
+    {
+      "term": "熏習",
+      "han_viet": "huân tập",
+      "pinyin": "xūn xí",
+      "meaning_vi": "Sự in dấu, tích lũy chủng tử trong tâm thức do hành động và kinh nghiệm.",
+      "category": "Duy thức",
+      "suggested_translation": [
+        "huân tập"
+      ],
+      "related": [
+        "種子"
+      ]
+    },
+    {
+      "term": "轉識成智",
+      "han_viet": "chuyển thức thành trí",
+      "pinyin": "zhuǎn shí chéng zhì",
+      "meaning_vi": "Chuyển hóa các thức mê lầm thành trí tuệ giác ngộ.",
+      "category": "Duy thức",
+      "suggested_translation": [
+        "chuyển thức thành trí"
+      ],
+      "related": [
+        "八識",
+        "智慧"
+      ]
+    },
+    {
+      "term": "本來面目",
+      "han_viet": "bản lai diện mục",
+      "pinyin": "běn lái miàn mù",
+      "meaning_vi": "Mặt mũi xưa nay, chỉ bản tính chân thật trước mọi phân biệt.",
+      "category": "Thiền",
+      "suggested_translation": [
+        "bản mặt xưa nay"
+      ],
+      "related": [
+        "禪",
+        "自性"
+      ]
+    },
+    {
+      "term": "明心見性",
+      "han_viet": "minh tâm kiến tính",
+      "pinyin": "míng xīn jiàn xìng",
+      "meaning_vi": "Sáng tỏ tâm, thấy bản tính.",
+      "category": "Thiền",
+      "suggested_translation": [
+        "thấy tâm thấy tính"
+      ],
+      "related": [
+        "禪",
+        "自性"
+      ]
+    },
+    {
+      "term": "見性成佛",
+      "han_viet": "kiến tính thành Phật",
+      "pinyin": "jiàn xìng chéng fó",
+      "meaning_vi": "Thấy bản tính thì thành Phật theo cách diễn đạt Thiền tông.",
+      "category": "Thiền",
+      "suggested_translation": [
+        "thấy tính thành Phật"
+      ],
+      "related": [
+        "明心見性",
+        "佛"
+      ]
+    },
+    {
+      "term": "不立文字",
+      "han_viet": "bất lập văn tự",
+      "pinyin": "bù lì wén zì",
+      "meaning_vi": "Không đặt nền tảng rốt ráo nơi văn tự; khẩu hiệu Thiền tông.",
+      "category": "Thiền",
+      "suggested_translation": [
+        "không lập văn tự"
+      ],
+      "related": [
+        "禪宗"
+      ]
+    },
+    {
+      "term": "教外別傳",
+      "han_viet": "giáo ngoại biệt truyền",
+      "pinyin": "jiào wài bié chuán",
+      "meaning_vi": "Truyền riêng ngoài giáo điển; khẩu hiệu Thiền tông.",
+      "category": "Thiền",
+      "suggested_translation": [
+        "truyền riêng ngoài giáo"
+      ],
+      "related": [
+        "禪宗"
+      ]
+    },
+    {
+      "term": "直指人心",
+      "han_viet": "trực chỉ nhân tâm",
+      "pinyin": "zhí zhǐ rén xīn",
+      "meaning_vi": "Chỉ thẳng tâm người; khẩu hiệu Thiền tông.",
+      "category": "Thiền",
+      "suggested_translation": [
+        "chỉ thẳng tâm người"
+      ],
+      "related": [
+        "禪宗"
+      ]
+    },
+    {
+      "term": "公案",
+      "han_viet": "công án",
+      "pinyin": "gōng àn",
+      "meaning_vi": "Câu chuyện hoặc vấn đề Thiền dùng để khai mở nhận thức.",
+      "category": "Thiền",
+      "suggested_translation": [
+        "công án"
+      ],
+      "related": [
+        "禪"
+      ]
+    },
+    {
+      "term": "話頭",
+      "han_viet": "thoại đầu",
+      "pinyin": "huà tóu",
+      "meaning_vi": "Đầu mối câu thoại được dùng trong tham thiền.",
+      "category": "Thiền",
+      "suggested_translation": [
+        "thoại đầu"
+      ],
+      "related": [
+        "公案",
+        "參禪"
+      ]
+    },
+    {
+      "term": "參禪",
+      "han_viet": "tham thiền",
+      "pinyin": "cān chán",
+      "meaning_vi": "Thực hành Thiền nhằm trực nhận tâm tính.",
+      "category": "Thiền",
+      "suggested_translation": [
+        "tham thiền"
+      ],
+      "related": [
+        "禪"
+      ]
+    },
+    {
+      "term": "坐禪",
+      "han_viet": "tọa thiền",
+      "pinyin": "zuò chán",
+      "meaning_vi": "Ngồi thiền.",
+      "category": "Thiền",
+      "suggested_translation": [
+        "ngồi thiền"
+      ],
+      "related": [
+        "打坐",
+        "禪"
+      ]
+    },
+    {
+      "term": "禪師",
+      "han_viet": "thiền sư",
+      "pinyin": "chán shī",
+      "meaning_vi": "Vị thầy tu tập và hướng dẫn Thiền.",
+      "category": "Thiền",
+      "suggested_translation": [
+        "thầy Thiền"
+      ],
+      "related": [
+        "禪"
+      ]
+    },
+    {
+      "term": "祖師",
+      "han_viet": "tổ sư",
+      "pinyin": "zǔ shī",
+      "meaning_vi": "Vị thầy khai sáng hoặc truyền thừa quan trọng.",
+      "category": "Thiền/Truyền thừa",
+      "suggested_translation": [
+        "tổ sư"
+      ],
+      "related": [
+        "傳承"
+      ]
+    },
+    {
+      "term": "傳承",
+      "han_viet": "truyền thừa",
+      "pinyin": "chuán chéng",
+      "meaning_vi": "Dòng truyền pháp qua các thế hệ thầy trò.",
+      "category": "Truyền thống",
+      "suggested_translation": [
+        "dòng truyền pháp"
+      ],
+      "related": [
+        "祖師"
+      ]
+    },
+    {
+      "term": "寺",
+      "han_viet": "tự",
+      "pinyin": "sì",
+      "meaning_vi": "Chùa, tự viện.",
+      "category": "Chùa viện",
+      "suggested_translation": [
+        "chùa"
+      ],
+      "related": [
+        "寺院"
+      ]
+    },
+    {
+      "term": "寺院",
+      "han_viet": "tự viện",
+      "pinyin": "sì yuàn",
+      "meaning_vi": "Cơ sở chùa viện nơi tu học và sinh hoạt Phật giáo.",
+      "category": "Chùa viện",
+      "suggested_translation": [
+        "chùa viện"
+      ],
+      "related": [
+        "寺",
+        "道場"
+      ]
+    },
+    {
+      "term": "道場",
+      "han_viet": "đạo tràng",
+      "pinyin": "dào chǎng",
+      "meaning_vi": "Nơi tu học, hành trì hoặc tổ chức pháp hội.",
+      "category": "Chùa viện",
+      "suggested_translation": [
+        "nơi tu học"
+      ],
+      "related": [
+        "法會"
+      ]
+    },
+    {
+      "term": "法會",
+      "han_viet": "pháp hội",
+      "pinyin": "fǎ huì",
+      "meaning_vi": "Buổi lễ hoặc hội chúng nghe pháp, tụng kinh, hành trì.",
+      "category": "Nghi lễ",
+      "suggested_translation": [
+        "hội pháp"
+      ],
+      "related": [
+        "道場",
+        "誦經"
+      ]
+    },
+    {
+      "term": "佛事",
+      "han_viet": "Phật sự",
+      "pinyin": "fó shì",
+      "meaning_vi": "Công việc Phật giáo, nghi lễ hoặc hoạt động hộ trì Tam bảo.",
+      "category": "Nghi lễ",
+      "suggested_translation": [
+        "việc Phật"
+      ],
+      "related": [
+        "法會"
+      ]
+    },
+    {
+      "term": "上香",
+      "han_viet": "thượng hương",
+      "pinyin": "shàng xiāng",
+      "meaning_vi": "Dâng hương trong nghi lễ.",
+      "category": "Nghi lễ",
+      "suggested_translation": [
+        "dâng hương"
+      ],
+      "related": [
+        "香",
+        "供養"
+      ]
+    },
+    {
+      "term": "燒香",
+      "han_viet": "thiêu hương",
+      "pinyin": "shāo xiāng",
+      "meaning_vi": "Đốt hương cúng dường.",
+      "category": "Nghi lễ",
+      "suggested_translation": [
+        "đốt hương"
+      ],
+      "related": [
+        "香",
+        "供養"
+      ]
+    },
+    {
+      "term": "頂禮",
+      "han_viet": "đỉnh lễ",
+      "pinyin": "dǐng lǐ",
+      "meaning_vi": "Lễ lạy cung kính.",
+      "category": "Nghi lễ",
+      "suggested_translation": [
+        "lạy kính"
+      ],
+      "related": [
+        "禮拜"
+      ]
+    },
+    {
+      "term": "三皈依",
+      "han_viet": "tam quy y",
+      "pinyin": "sān guī yī",
+      "meaning_vi": "Quy y Phật, Pháp, Tăng.",
+      "category": "Nghi lễ",
+      "suggested_translation": [
+        "ba quy y"
+      ],
+      "related": [
+        "皈依",
+        "三寶"
+      ]
+    },
+    {
+      "term": "五戒",
+      "han_viet": "ngũ giới",
+      "pinyin": "wǔ jiè",
+      "meaning_vi": "Năm giới căn bản cho cư sĩ.",
+      "category": "Giới luật",
+      "suggested_translation": [
+        "năm giới"
+      ],
+      "related": [
+        "戒"
+      ]
+    },
+    {
+      "term": "十善",
+      "han_viet": "thập thiện",
+      "pinyin": "shí shàn",
+      "meaning_vi": "Mười nghiệp lành về thân, khẩu, ý.",
+      "category": "Giới luật",
+      "suggested_translation": [
+        "mười điều thiện"
+      ],
+      "related": [
+        "戒",
+        "業"
+      ]
+    },
+    {
+      "term": "出家",
+      "han_viet": "xuất gia",
+      "pinyin": "chū jiā",
+      "meaning_vi": "Rời đời sống gia đình để sống đời tu sĩ.",
+      "category": "Tăng đoàn",
+      "suggested_translation": [
+        "đi tu"
+      ],
+      "related": [
+        "僧"
+      ]
+    },
+    {
+      "term": "在家",
+      "han_viet": "tại gia",
+      "pinyin": "zài jiā",
+      "meaning_vi": "Người tu học khi vẫn sống đời gia đình.",
+      "category": "Tăng đoàn",
+      "suggested_translation": [
+        "cư sĩ tại gia"
+      ],
+      "related": [
+        "居士"
+      ]
+    },
+    {
+      "term": "居士",
+      "han_viet": "cư sĩ",
+      "pinyin": "jū shì",
+      "meaning_vi": "Phật tử tại gia thọ trì Tam quy, Ngũ giới hoặc tu học Phật pháp.",
+      "category": "Tăng đoàn",
+      "suggested_translation": [
+        "người Phật tử tại gia"
+      ],
+      "related": [
+        "在家"
+      ]
+    },
+    {
+      "term": "比丘",
+      "han_viet": "Tỳ-kheo",
+      "pinyin": "bǐ qiū",
+      "meaning_vi": "Nam tu sĩ Phật giáo đã thọ giới cụ túc.",
+      "category": "Tăng đoàn",
+      "suggested_translation": [
+        "Tỳ-kheo"
+      ],
+      "related": [
+        "僧"
+      ]
+    },
+    {
+      "term": "比丘尼",
+      "han_viet": "Tỳ-kheo-ni",
+      "pinyin": "bǐ qiū ní",
+      "meaning_vi": "Nữ tu sĩ Phật giáo đã thọ giới cụ túc.",
+      "category": "Tăng đoàn",
+      "suggested_translation": [
+        "Tỳ-kheo-ni"
+      ],
+      "related": [
+        "僧"
+      ]
+    },
+    {
+      "term": "沙彌",
+      "han_viet": "sa-di",
+      "pinyin": "shā mí",
+      "meaning_vi": "Nam tập sự xuất gia thọ giới sa-di.",
+      "category": "Tăng đoàn",
+      "suggested_translation": [
+        "sa-di"
+      ],
+      "related": [
+        "出家"
+      ]
+    },
+    {
+      "term": "沙彌尼",
+      "han_viet": "sa-di-ni",
+      "pinyin": "shā mí ní",
+      "meaning_vi": "Nữ tập sự xuất gia thọ giới sa-di-ni.",
+      "category": "Tăng đoàn",
+      "suggested_translation": [
+        "sa-di-ni"
+      ],
+      "related": [
+        "出家"
+      ]
+    },
+    {
+      "term": "和尚",
+      "han_viet": "hòa thượng",
+      "pinyin": "hé shàng",
+      "meaning_vi": "Vị tăng trưởng thượng, bậc thầy trong Tăng đoàn.",
+      "category": "Tăng đoàn",
+      "suggested_translation": [
+        "hòa thượng"
+      ],
+      "related": [
+        "僧"
+      ]
+    },
+    {
+      "term": "法師",
+      "han_viet": "pháp sư",
+      "pinyin": "fǎ shī",
+      "meaning_vi": "Vị thầy giảng dạy Phật pháp.",
+      "category": "Tăng đoàn",
+      "suggested_translation": [
+        "thầy giảng pháp"
+      ],
+      "related": [
+        "法"
+      ]
+    },
+    {
+      "term": "住持",
+      "han_viet": "trụ trì",
+      "pinyin": "zhù chí",
+      "meaning_vi": "Vị chịu trách nhiệm điều hành một chùa hoặc tự viện.",
+      "category": "Tăng đoàn",
+      "suggested_translation": [
+        "trụ trì"
+      ],
+      "related": [
+        "寺院"
+      ]
+    },
+    {
+      "term": "慚愧",
+      "han_viet": "tàm quý",
+      "pinyin": "cán kuì",
+      "meaning_vi": "Biết hổ thẹn với lỗi lầm và điều bất thiện.",
+      "category": "Đức hạnh",
+      "suggested_translation": [
+        "hổ thẹn lành mạnh"
+      ],
+      "related": [
+        "懺悔"
+      ]
+    },
+    {
+      "term": "放逸",
+      "han_viet": "phóng dật",
+      "pinyin": "fàng yì",
+      "meaning_vi": "Buông lung, thiếu tỉnh thức và kỷ luật tu tập.",
+      "category": "Phiền não",
+      "suggested_translation": [
+        "buông lung"
+      ],
+      "related": [
+        "正念",
+        "精進"
+      ]
+    },
+    {
+      "term": "懈怠",
+      "han_viet": "giải đãi",
+      "pinyin": "xiè dài",
+      "meaning_vi": "Lười biếng, thiếu tinh tấn trong tu tập.",
+      "category": "Phiền não",
+      "suggested_translation": [
+        "lười biếng"
+      ],
+      "related": [
+        "精進"
+      ]
+    },
+    {
+      "term": "昏沉",
+      "han_viet": "hôn trầm",
+      "pinyin": "hūn chén",
+      "meaning_vi": "Trạng thái mờ tối, nặng nề của tâm trong tu tập.",
+      "category": "Phiền não",
+      "suggested_translation": [
+        "hôn trầm"
+      ],
+      "related": [
+        "禪定"
+      ]
+    },
+    {
+      "term": "掉舉",
+      "han_viet": "trạo cử",
+      "pinyin": "diào jǔ",
+      "meaning_vi": "Tâm dao động, phóng dật, khó an định.",
+      "category": "Phiền não",
+      "suggested_translation": [
+        "dao động tâm"
+      ],
+      "related": [
+        "禪定"
+      ]
+    },
+    {
+      "term": "疑",
+      "han_viet": "nghi",
+      "pinyin": "yí",
+      "meaning_vi": "Tâm nghi ngờ, do dự, một chướng ngại trong tu tập.",
+      "category": "Phiền não",
+      "suggested_translation": [
+        "nghi ngờ"
+      ],
+      "related": [
+        "五蓋"
+      ]
+    },
+    {
+      "term": "五蓋",
+      "han_viet": "ngũ cái",
+      "pinyin": "wǔ gài",
+      "meaning_vi": "Năm chướng ngại che lấp tâm: tham dục, sân hận, hôn trầm thụy miên, trạo cử hối quá, nghi.",
+      "category": "Phiền não",
+      "suggested_translation": [
+        "năm triền cái"
+      ],
+      "related": [
+        "貪",
+        "瞋",
+        "昏沉",
+        "掉舉",
+        "疑"
+      ]
+    },
+    {
+      "term": "慈心",
+      "han_viet": "từ tâm",
+      "pinyin": "cí xīn",
+      "meaning_vi": "Tâm mong chúng sinh được an vui.",
+      "category": "Đức hạnh",
+      "suggested_translation": [
+        "tâm từ"
+      ],
+      "related": [
+        "慈",
+        "四無量心"
+      ]
+    },
+    {
+      "term": "悲心",
+      "han_viet": "bi tâm",
+      "pinyin": "bēi xīn",
+      "meaning_vi": "Tâm thương xót và muốn cứu khổ.",
+      "category": "Đức hạnh",
+      "suggested_translation": [
+        "tâm bi"
+      ],
+      "related": [
+        "悲",
+        "慈悲"
+      ]
+    },
+    {
+      "term": "平等心",
+      "han_viet": "bình đẳng tâm",
+      "pinyin": "píng děng xīn",
+      "meaning_vi": "Tâm không thiên lệch, không phân biệt chấp trước.",
+      "category": "Đức hạnh",
+      "suggested_translation": [
+        "tâm bình đẳng"
+      ],
+      "related": [
+        "捨"
+      ]
+    },
+    {
+      "term": "清淨心",
+      "han_viet": "thanh tịnh tâm",
+      "pinyin": "qīng jìng xīn",
+      "meaning_vi": "Tâm trong sạch, không bị phiền não chi phối.",
+      "category": "Tu tập",
+      "suggested_translation": [
+        "tâm thanh tịnh"
+      ],
+      "related": [
+        "清淨",
+        "心"
+      ]
+    },
+    {
+      "term": "清淨",
+      "han_viet": "thanh tịnh",
+      "pinyin": "qīng jìng",
+      "meaning_vi": "Trong sạch, không nhiễm ô.",
+      "category": "Tu tập",
+      "suggested_translation": [
+        "trong sạch"
+      ],
+      "related": [
+        "不垢不淨"
+      ]
+    },
+    {
+      "term": "因緣",
+      "han_viet": "nhân duyên",
+      "pinyin": "yīn yuán",
+      "meaning_vi": "Nhân và duyên làm điều kiện cho các pháp sinh khởi.",
+      "category": "Duyên khởi",
+      "suggested_translation": [
+        "nguyên nhân và điều kiện"
+      ],
+      "related": [
+        "緣起"
+      ]
+    },
+    {
+      "term": "業力",
+      "han_viet": "nghiệp lực",
+      "pinyin": "yè lì",
+      "meaning_vi": "Sức mạnh chi phối của nghiệp đã tạo.",
+      "category": "Nghiệp",
+      "suggested_translation": [
+        "sức nghiệp"
+      ],
+      "related": [
+        "業",
+        "業報"
+      ]
+    },
+    {
+      "term": "宿業",
+      "han_viet": "túc nghiệp",
+      "pinyin": "sù yè",
+      "meaning_vi": "Nghiệp đã tạo từ quá khứ.",
+      "category": "Nghiệp",
+      "suggested_translation": [
+        "nghiệp quá khứ"
+      ],
+      "related": [
+        "業"
+      ]
+    },
+    {
+      "term": "惡業",
+      "han_viet": "ác nghiệp",
+      "pinyin": "è yè",
+      "meaning_vi": "Nghiệp bất thiện đưa đến quả khổ.",
+      "category": "Nghiệp",
+      "suggested_translation": [
+        "nghiệp xấu"
+      ],
+      "related": [
+        "業",
+        "十善"
+      ]
+    },
+    {
+      "term": "善業",
+      "han_viet": "thiện nghiệp",
+      "pinyin": "shàn yè",
+      "meaning_vi": "Nghiệp lành đưa đến quả an vui.",
+      "category": "Nghiệp",
+      "suggested_translation": [
+        "nghiệp lành"
+      ],
+      "related": [
+        "業",
+        "十善"
+      ]
+    },
+    {
+      "term": "福德",
+      "han_viet": "phước đức",
+      "pinyin": "fú dé",
+      "meaning_vi": "Phước lành tích lũy từ thiện hạnh và cúng dường.",
+      "category": "Tu tập",
+      "suggested_translation": [
+        "phước đức"
+      ],
+      "related": [
+        "功德"
+      ]
+    },
+    {
+      "term": "智慧資糧",
+      "han_viet": "trí tuệ tư lương",
+      "pinyin": "zhì huì zī liáng",
+      "meaning_vi": "Tư lương trí tuệ cần tích lũy trên đường Bồ-tát.",
+      "category": "Bồ-tát đạo",
+      "suggested_translation": [
+        "tư lương trí tuệ"
+      ],
+      "related": [
+        "智慧"
+      ]
+    },
+    {
+      "term": "福德資糧",
+      "han_viet": "phước đức tư lương",
+      "pinyin": "fú dé zī liáng",
+      "meaning_vi": "Tư lương phước đức cần tích lũy trên đường Bồ-tát.",
+      "category": "Bồ-tát đạo",
+      "suggested_translation": [
+        "tư lương phước đức"
+      ],
+      "related": [
+        "福德"
+      ]
+    },
+    {
+      "term": "二資糧",
+      "han_viet": "nhị tư lương",
+      "pinyin": "èr zī liáng",
+      "meaning_vi": "Hai tư lương: phước đức và trí tuệ.",
+      "category": "Bồ-tát đạo",
+      "suggested_translation": [
+        "hai tư lương"
+      ],
+      "related": [
+        "福德資糧",
+        "智慧資糧"
+      ]
+    },
+    {
+      "term": "佛性",
+      "han_viet": "Phật tính",
+      "pinyin": "fó xìng",
+      "meaning_vi": "Khả năng giác ngộ, bản tính có thể thành Phật.",
+      "category": "Giáo lý Đại thừa",
+      "suggested_translation": [
+        "tính Phật"
+      ],
+      "related": [
+        "如來藏"
+      ]
+    },
+    {
+      "term": "如來藏",
+      "han_viet": "Như Lai tạng",
+      "pinyin": "rú lái zàng",
+      "meaning_vi": "Tạng Như Lai, giáo lý về khả năng giác ngộ nơi chúng sinh.",
+      "category": "Giáo lý Đại thừa",
+      "suggested_translation": [
+        "tạng Như Lai"
+      ],
+      "related": [
+        "佛性"
+      ]
+    },
+    {
+      "term": "一真法界",
+      "han_viet": "nhất chân pháp giới",
+      "pinyin": "yī zhēn fǎ jiè",
+      "meaning_vi": "Pháp giới chân thật duy nhất trong cách diễn đạt Hoa Nghiêm.",
+      "category": "Giáo lý Đại thừa",
+      "suggested_translation": [
+        "một pháp giới chân thật"
+      ],
+      "related": [
+        "法界",
+        "華嚴經"
+      ]
+    },
+    {
+      "term": "事事無礙",
+      "han_viet": "sự sự vô ngại",
+      "pinyin": "shì shì wú ài",
+      "meaning_vi": "Các sự vật dung thông không ngăn ngại trong giáo lý Hoa Nghiêm.",
+      "category": "Hoa Nghiêm",
+      "suggested_translation": [
+        "mọi sự dung thông"
+      ],
+      "related": [
+        "華嚴經",
+        "法界"
+      ]
+    },
+    {
+      "term": "理事無礙",
+      "han_viet": "lý sự vô ngại",
+      "pinyin": "lǐ shì wú ài",
+      "meaning_vi": "Lý và sự dung thông không ngăn ngại.",
+      "category": "Hoa Nghiêm",
+      "suggested_translation": [
+        "lý sự dung thông"
+      ],
+      "related": [
+        "華嚴經",
+        "法界"
+      ]
+    },
+    {
+      "term": "不二法門",
+      "han_viet": "bất nhị pháp môn",
+      "pinyin": "bù èr fǎ mén",
+      "meaning_vi": "Pháp môn không hai, vượt ngoài đối đãi phân biệt.",
+      "category": "Đại thừa",
+      "suggested_translation": [
+        "pháp môn bất nhị"
+      ],
+      "related": [
+        "不二",
+        "維摩詰經"
+      ]
+    },
+    {
+      "term": "不二",
+      "han_viet": "bất nhị",
+      "pinyin": "bù èr",
+      "meaning_vi": "Không hai, vượt qua phân biệt nhị nguyên.",
+      "category": "Đại thừa",
+      "suggested_translation": [
+        "không hai"
+      ],
+      "related": [
+        "中道"
+      ]
+    },
+    {
+      "term": "實相",
+      "han_viet": "thật tướng",
+      "pinyin": "shí xiàng",
+      "meaning_vi": "Tướng chân thật của các pháp.",
+      "category": "Giáo lý Đại thừa",
+      "suggested_translation": [
+        "thực tướng"
+      ],
+      "related": [
+        "諸法實相"
+      ]
+    },
+    {
+      "term": "諸法實相",
+      "han_viet": "chư pháp thật tướng",
+      "pinyin": "zhū fǎ shí xiàng",
+      "meaning_vi": "Thực tướng của các pháp, cách diễn đạt quan trọng trong Đại thừa.",
+      "category": "Giáo lý Đại thừa",
+      "suggested_translation": [
+        "thực tướng các pháp"
+      ],
+      "related": [
+        "實相",
+        "諸法"
+      ]
+    },
+    {
+      "term": "法性",
+      "han_viet": "pháp tính",
+      "pinyin": "fǎ xìng",
+      "meaning_vi": "Bản tính của các pháp, chân như/tánh không tùy ngữ cảnh.",
+      "category": "Giáo lý Đại thừa",
+      "suggested_translation": [
+        "tính của pháp"
+      ],
+      "related": [
+        "真如",
+        "空性"
+      ]
+    },
+    {
+      "term": "真如",
+      "han_viet": "chân như",
+      "pinyin": "zhēn rú",
+      "meaning_vi": "Thực tại như thật, không bị vọng tưởng biến đổi.",
+      "category": "Giáo lý Đại thừa",
+      "suggested_translation": [
+        "như thật chân thực"
+      ],
+      "related": [
+        "如實",
+        "法性"
+      ]
+    },
+    {
+      "term": "覺",
+      "han_viet": "giác",
+      "pinyin": "jué",
+      "meaning_vi": "Sự tỉnh thức, giác ngộ.",
+      "category": "Giác ngộ",
+      "suggested_translation": [
+        "tỉnh thức"
+      ],
+      "related": [
+        "菩提"
+      ]
+    },
+    {
+      "term": "覺悟",
+      "han_viet": "giác ngộ",
+      "pinyin": "jué wù",
+      "meaning_vi": "Sự tỉnh thức và thấy rõ chân lý.",
+      "category": "Giác ngộ",
+      "suggested_translation": [
+        "thức tỉnh"
+      ],
+      "related": [
+        "菩提"
+      ]
+    },
+    {
+      "term": "迷",
+      "han_viet": "mê",
+      "pinyin": "mí",
+      "meaning_vi": "Mê lầm, không thấy rõ sự thật.",
+      "category": "Phiền não",
+      "suggested_translation": [
+        "mê lầm"
+      ],
+      "related": [
+        "悟"
+      ]
+    },
+    {
+      "term": "悟",
+      "han_viet": "ngộ",
+      "pinyin": "wù",
+      "meaning_vi": "Hiểu ra, thức tỉnh, nhận ra chân lý.",
+      "category": "Giác ngộ",
+      "suggested_translation": [
+        "thức ngộ"
+      ],
+      "related": [
+        "覺悟"
+      ]
+    },
+    {
+      "term": "迷悟",
+      "han_viet": "mê ngộ",
+      "pinyin": "mí wù",
+      "meaning_vi": "Mê lầm và giác ngộ.",
+      "category": "Giáo lý",
+      "suggested_translation": [
+        "mê và ngộ"
+      ],
+      "related": [
+        "迷",
+        "悟"
+      ]
+    },
+    {
+      "term": "出離心",
+      "han_viet": "xuất ly tâm",
+      "pinyin": "chū lí xīn",
+      "meaning_vi": "Tâm muốn thoát khỏi sinh tử và khổ đau luân hồi.",
+      "category": "Tu tập",
+      "suggested_translation": [
+        "tâm xuất ly"
+      ],
+      "related": [
+        "生死",
+        "解脫"
+      ]
+    },
+    {
+      "term": "厭離",
+      "han_viet": "yểm ly",
+      "pinyin": "yàn lí",
+      "meaning_vi": "Nhàm chán, lìa bỏ sinh tử và các pháp bất thiện.",
+      "category": "Tu tập",
+      "suggested_translation": [
+        "nhàm lìa"
+      ],
+      "related": [
+        "出離心"
+      ]
+    },
+    {
+      "term": "發願",
+      "han_viet": "phát nguyện",
+      "pinyin": "fā yuàn",
+      "meaning_vi": "Khởi lời nguyện tu tập hoặc cứu độ.",
+      "category": "Tu tập",
+      "suggested_translation": [
+        "phát lời nguyện"
+      ],
+      "related": [
+        "願"
+      ]
+    },
+    {
+      "term": "祈願",
+      "han_viet": "kỳ nguyện",
+      "pinyin": "qí yuàn",
+      "meaning_vi": "Cầu nguyện, phát lời mong cầu lành.",
+      "category": "Nghi lễ",
+      "suggested_translation": [
+        "cầu nguyện"
+      ],
+      "related": [
+        "願"
+      ]
+    },
+    {
+      "term": "祈禱",
+      "han_viet": "kỳ đảo",
+      "pinyin": "qí dǎo",
+      "meaning_vi": "Cầu nguyện trong nghi lễ.",
+      "category": "Nghi lễ",
+      "suggested_translation": [
+        "cầu nguyện"
+      ],
+      "related": [
+        "祈願"
+      ]
+    },
+    {
+      "term": "菩提萨埵",
+      "han_viet": "Bồ-đề Tát-đỏa",
+      "pinyin": "pú tí sà duǒ",
+      "meaning_vi": "Giản thể của 菩提薩埵, phiên âm đầy đủ của Bồ-tát.",
+      "category": "Biến thể giản thể",
+      "suggested_translation": [
+        "Bồ-tát"
+      ],
+      "related": [
+        "菩提薩埵"
+      ]
+    },
+    {
+      "term": "般若心经",
+      "han_viet": "Bát-nhã Tâm Kinh",
+      "pinyin": "bō rě xīn jīng",
+      "meaning_vi": "Giản thể của 般若心經.",
+      "category": "Biến thể giản thể",
+      "suggested_translation": [
+        "Bát-nhã Tâm Kinh"
+      ],
+      "related": [
+        "般若心經"
+      ]
+    },
+    {
+      "term": "摩诃般若波罗蜜多心经",
+      "han_viet": "Ma-ha Bát-nhã Ba-la-mật-đa Tâm Kinh",
+      "pinyin": "mó hē bō rě bō luó mì duō xīn jīng",
+      "meaning_vi": "Giản thể của 摩訶般若波羅蜜多心經.",
+      "category": "Biến thể giản thể",
+      "suggested_translation": [
+        "Đại Bát-nhã Ba-la-mật-đa Tâm Kinh"
+      ],
+      "related": [
+        "摩訶般若波羅蜜多心經"
+      ]
+    },
+    {
+      "term": "阿弥陀经",
+      "han_viet": "A-di-đà Kinh",
+      "pinyin": "ā mí tuó jīng",
+      "meaning_vi": "Giản thể của 阿彌陀經.",
+      "category": "Biến thể giản thể",
+      "suggested_translation": [
+        "Kinh A-di-đà"
+      ],
+      "related": [
+        "阿彌陀經"
+      ]
+    },
+    {
+      "term": "无量寿经",
+      "han_viet": "Vô Lượng Thọ Kinh",
+      "pinyin": "wú liàng shòu jīng",
+      "meaning_vi": "Giản thể của 無量壽經.",
+      "category": "Biến thể giản thể",
+      "suggested_translation": [
+        "Kinh Vô Lượng Thọ"
+      ],
+      "related": [
+        "無量壽經"
+      ]
+    },
+    {
+      "term": "药师佛",
+      "han_viet": "Dược Sư Phật",
+      "pinyin": "yào shī fó",
+      "meaning_vi": "Giản thể của 藥師佛.",
+      "category": "Biến thể giản thể",
+      "suggested_translation": [
+        "Phật Dược Sư"
+      ],
+      "related": [
+        "藥師佛"
+      ]
+    },
+    {
+      "term": "地藏菩萨",
+      "han_viet": "Địa Tạng Bồ Tát",
+      "pinyin": "dì zàng pú sà",
+      "meaning_vi": "Giản thể của 地藏菩薩.",
+      "category": "Biến thể giản thể",
+      "suggested_translation": [
+        "Bồ-tát Địa Tạng"
+      ],
+      "related": [
+        "地藏菩薩"
+      ]
+    },
+    {
+      "term": "文殊师利菩萨",
+      "han_viet": "Văn-thù-sư-lợi Bồ Tát",
+      "pinyin": "wén shū shī lì pú sà",
+      "meaning_vi": "Giản thể của 文殊師利菩薩.",
+      "category": "Biến thể giản thể",
+      "suggested_translation": [
+        "Bồ-tát Văn Thù"
+      ],
+      "related": [
+        "文殊師利菩薩"
+      ]
+    },
+    {
+      "term": "普贤菩萨",
+      "han_viet": "Phổ Hiền Bồ Tát",
+      "pinyin": "pǔ xián pú sà",
+      "meaning_vi": "Giản thể của 普賢菩薩.",
+      "category": "Biến thể giản thể",
+      "suggested_translation": [
+        "Bồ-tát Phổ Hiền"
+      ],
+      "related": [
+        "普賢菩薩"
+      ]
+    },
+    {
+      "term": "弥勒菩萨",
+      "han_viet": "Di-lặc Bồ Tát",
+      "pinyin": "mí lè pú sà",
+      "meaning_vi": "Giản thể của 彌勒菩薩.",
+      "category": "Biến thể giản thể",
+      "suggested_translation": [
+        "Bồ-tát Di-lặc"
+      ],
+      "related": [
+        "彌勒菩薩"
+      ]
+    },
+    {
+      "term": "大势至菩萨",
+      "han_viet": "Đại Thế Chí Bồ Tát",
+      "pinyin": "dà shì zhì pú sà",
+      "meaning_vi": "Giản thể của 大勢至菩薩.",
+      "category": "Biến thể giản thể",
+      "suggested_translation": [
+        "Bồ-tát Đại Thế Chí"
+      ],
+      "related": [
+        "大勢至菩薩"
+      ]
+    },
+    {
+      "term": "极乐世界",
+      "han_viet": "Cực Lạc thế giới",
+      "pinyin": "jí lè shì jiè",
+      "meaning_vi": "Giản thể của 極樂世界.",
+      "category": "Biến thể giản thể",
+      "suggested_translation": [
+        "Tây phương Cực Lạc"
+      ],
+      "related": [
+        "極樂世界"
+      ]
+    },
+    {
+      "term": "净土",
+      "han_viet": "Tịnh độ",
+      "pinyin": "jìng tǔ",
+      "meaning_vi": "Giản thể của 淨土.",
+      "category": "Biến thể giản thể",
+      "suggested_translation": [
+        "cõi thanh tịnh"
+      ],
+      "related": [
+        "淨土"
+      ]
+    },
+    {
+      "term": "禅",
+      "han_viet": "thiền",
+      "pinyin": "chán",
+      "meaning_vi": "Giản thể của 禪.",
+      "category": "Biến thể giản thể",
+      "suggested_translation": [
+        "thiền"
+      ],
+      "related": [
+        "禪"
+      ]
+    },
+    {
+      "term": "禅定",
+      "han_viet": "thiền định",
+      "pinyin": "chán dìng",
+      "meaning_vi": "Giản thể của 禪定.",
+      "category": "Biến thể giản thể",
+      "suggested_translation": [
+        "thiền định"
+      ],
+      "related": [
+        "禪定"
+      ]
+    },
+    {
+      "term": "众生",
+      "han_viet": "chúng sinh",
+      "pinyin": "zhòng shēng",
+      "meaning_vi": "Giản thể của 眾生.",
+      "category": "Biến thể giản thể",
+      "suggested_translation": [
+        "hữu tình"
+      ],
+      "related": [
+        "眾生"
+      ]
+    },
+    {
+      "term": "轮回",
+      "han_viet": "luân hồi",
+      "pinyin": "lún huí",
+      "meaning_vi": "Giản thể của 輪迴.",
+      "category": "Biến thể giản thể",
+      "suggested_translation": [
+        "sinh tử luân hồi"
+      ],
+      "related": [
+        "輪迴"
+      ]
+    },
+    {
+      "term": "烦恼",
+      "han_viet": "phiền não",
+      "pinyin": "fán nǎo",
+      "meaning_vi": "Giản thể của 煩惱.",
+      "category": "Biến thể giản thể",
+      "suggested_translation": [
+        "não phiền"
+      ],
+      "related": [
+        "煩惱"
+      ]
+    },
+    {
+      "term": "业",
+      "han_viet": "nghiệp",
+      "pinyin": "yè",
+      "meaning_vi": "Giản thể của 業.",
+      "category": "Biến thể giản thể",
+      "suggested_translation": [
+        "karma"
+      ],
+      "related": [
+        "業"
+      ]
+    },
+    {
+      "term": "识",
+      "han_viet": "thức",
+      "pinyin": "shí",
+      "meaning_vi": "Giản thể của 識.",
+      "category": "Biến thể giản thể",
+      "suggested_translation": [
+        "nhận thức"
+      ],
+      "related": [
+        "識"
+      ]
+    },
+    {
+      "term": "经",
+      "han_viet": "kinh",
+      "pinyin": "jīng",
+      "meaning_vi": "Giản thể của 經.",
+      "category": "Biến thể giản thể",
+      "suggested_translation": [
+        "kinh văn"
+      ],
+      "related": [
+        "經"
+      ]
+    },
+    {
+      "term": "论",
+      "han_viet": "luận",
+      "pinyin": "lùn",
+      "meaning_vi": "Giản thể của 論.",
+      "category": "Biến thể giản thể",
+      "suggested_translation": [
+        "luận tạng"
+      ],
+      "related": [
+        "論"
+      ]
+    },
+    {
+      "term": "声",
+      "han_viet": "thanh",
+      "pinyin": "shēng",
+      "meaning_vi": "Giản thể của 聲.",
+      "category": "Biến thể giản thể",
+      "suggested_translation": [
+        "âm thanh"
+      ],
+      "related": [
+        "聲"
+      ]
+    },
+    {
+      "term": "触",
+      "han_viet": "xúc",
+      "pinyin": "chù",
+      "meaning_vi": "Giản thể của 觸.",
+      "category": "Biến thể giản thể",
+      "suggested_translation": [
+        "sự tiếp xúc"
+      ],
+      "related": [
+        "觸"
+      ]
+    },
+    {
+      "term": "觉",
+      "han_viet": "giác",
+      "pinyin": "jué",
+      "meaning_vi": "Giản thể của 覺.",
+      "category": "Biến thể giản thể",
+      "suggested_translation": [
+        "tỉnh thức"
+      ],
+      "related": [
+        "覺"
+      ]
+    },
+    {
+      "term": "愿",
+      "han_viet": "nguyện",
+      "pinyin": "yuàn",
+      "meaning_vi": "Giản thể của 願.",
+      "category": "Biến thể giản thể",
+      "suggested_translation": [
+        "lời nguyện"
+      ],
+      "related": [
+        "願"
+      ]
+    },
+    {
+      "term": "相",
+      "han_viet": "tướng",
+      "pinyin": "xiàng",
+      "meaning_vi": "Hình tướng, dấu hiệu, biểu hiện của pháp.",
+      "category": "Giáo lý",
+      "suggested_translation": [
+        "hình tướng"
+      ],
+      "related": [
+        "無相",
+        "空相"
+      ]
+    },
+    {
+      "term": "名",
+      "han_viet": "danh",
+      "pinyin": "míng",
+      "meaning_vi": "Tên gọi, phần tâm lý trong danh sắc; cũng chỉ khái niệm.",
+      "category": "Giáo lý",
+      "suggested_translation": [
+        "tên gọi"
+      ],
+      "related": [
+        "名色"
+      ]
+    },
+    {
+      "term": "願力",
+      "han_viet": "nguyện lực",
+      "pinyin": "yuàn lì",
+      "meaning_vi": "Sức mạnh của lời nguyện.",
+      "category": "Bồ-tát đạo",
+      "suggested_translation": [
+        "sức nguyện"
+      ],
+      "related": [
+        "願",
+        "大願"
+      ]
+    },
+    {
+      "term": "神通",
+      "han_viet": "thần thông",
+      "pinyin": "shén tōng",
+      "meaning_vi": "Năng lực siêu thường được nói đến trong kinh điển.",
+      "category": "Tu chứng",
+      "suggested_translation": [
+        "năng lực thần thông"
+      ],
+      "related": [
+        "目犍連"
+      ]
+    },
+    {
+      "term": "慈航",
+      "han_viet": "từ hàng",
+      "pinyin": "cí háng",
+      "meaning_vi": "Hình ảnh thuyền từ bi cứu độ chúng sinh.",
+      "category": "Biểu tượng Phật giáo",
+      "suggested_translation": [
+        "thuyền từ"
+      ],
+      "related": [
+        "慈悲",
+        "度"
+      ]
+    },
+    {
+      "term": "普度",
+      "han_viet": "phổ độ",
+      "pinyin": "pǔ dù",
+      "meaning_vi": "Cứu độ rộng khắp chúng sinh.",
+      "category": "Bồ-tát đạo",
+      "suggested_translation": [
+        "cứu độ rộng khắp"
+      ],
+      "related": [
+        "度",
+        "眾生"
+      ]
+    },
+    {
+      "term": "度",
+      "han_viet": "độ",
+      "pinyin": "dù",
+      "meaning_vi": "Đưa qua, cứu độ, vượt qua bờ khổ.",
+      "category": "Tu tập",
+      "suggested_translation": [
+        "cứu độ",
+        "vượt qua"
+      ],
+      "related": [
+        "度一切苦厄"
+      ]
+    },
+    {
+      "term": "願行",
+      "han_viet": "nguyện hạnh",
+      "pinyin": "yuàn xíng",
+      "meaning_vi": "Lời nguyện và sự thực hành đi kèm.",
+      "category": "Bồ-tát đạo",
+      "suggested_translation": [
+        "nguyện và hạnh"
+      ],
+      "related": [
+        "願",
+        "行願"
+      ]
+    },
+    {
+      "term": "行者",
+      "han_viet": "hành giả",
+      "pinyin": "xíng zhě",
+      "meaning_vi": "Người thực hành pháp môn tu tập.",
+      "category": "Tu tập",
+      "suggested_translation": [
+        "người tu hành"
+      ],
+      "related": [
+        "修行"
+      ]
+    },
+    {
+      "term": "修行",
+      "han_viet": "tu hành",
+      "pinyin": "xiū xíng",
+      "meaning_vi": "Thực hành giáo pháp để chuyển hóa thân tâm.",
+      "category": "Tu tập",
+      "suggested_translation": [
+        "tu tập"
+      ],
+      "related": [
+        "法門"
+      ]
+    },
+    {
+      "term": "修道",
+      "han_viet": "tu đạo",
+      "pinyin": "xiū dào",
+      "meaning_vi": "Thực hành con đường đạo.",
+      "category": "Tu tập",
+      "suggested_translation": [
+        "tu con đường đạo"
+      ],
+      "related": [
+        "道",
+        "修行"
+      ]
+    },
+    {
+      "term": "聞思修",
+      "han_viet": "văn tư tu",
+      "pinyin": "wén sī xiū",
+      "meaning_vi": "Ba bước học đạo: nghe học, suy tư, thực hành.",
+      "category": "Tu tập",
+      "suggested_translation": [
+        "nghe, suy nghĩ, tu tập"
+      ],
+      "related": [
+        "修行"
+      ]
+    },
+    {
+      "term": "聞法",
+      "han_viet": "văn pháp",
+      "pinyin": "wén fǎ",
+      "meaning_vi": "Nghe giáo pháp.",
+      "category": "Tu tập",
+      "suggested_translation": [
+        "nghe pháp"
+      ],
+      "related": [
+        "法"
+      ]
+    },
+    {
+      "term": "說法",
+      "han_viet": "thuyết pháp",
+      "pinyin": "shuō fǎ",
+      "meaning_vi": "Giảng nói giáo pháp.",
+      "category": "Tu tập",
+      "suggested_translation": [
+        "giảng pháp"
+      ],
+      "related": [
+        "法師"
+      ]
+    },
+    {
+      "term": "聽經",
+      "han_viet": "thính kinh",
+      "pinyin": "tīng jīng",
+      "meaning_vi": "Nghe kinh, nghe giảng kinh.",
+      "category": "Tu tập",
+      "suggested_translation": [
+        "nghe kinh"
+      ],
+      "related": [
+        "經"
+      ]
+    },
+    {
+      "term": "讀經",
+      "han_viet": "độc kinh",
+      "pinyin": "dú jīng",
+      "meaning_vi": "Đọc kinh văn.",
+      "category": "Tu tập",
+      "suggested_translation": [
+        "đọc kinh"
+      ],
+      "related": [
+        "經",
+        "誦經"
+      ]
+    },
+    {
+      "term": "持名",
+      "han_viet": "trì danh",
+      "pinyin": "chí míng",
+      "meaning_vi": "Nắm giữ/xưng niệm danh hiệu Phật.",
+      "category": "Tịnh độ",
+      "suggested_translation": [
+        "niệm danh hiệu"
+      ],
+      "related": [
+        "念佛",
+        "阿彌陀佛"
+      ]
+    },
+    {
+      "term": "稱名",
+      "han_viet": "xưng danh",
+      "pinyin": "chēng míng",
+      "meaning_vi": "Xưng niệm danh hiệu Phật.",
+      "category": "Tịnh độ",
+      "suggested_translation": [
+        "xưng danh hiệu"
+      ],
+      "related": [
+        "念佛"
+      ]
+    },
+    {
+      "term": "信願行",
+      "han_viet": "tín nguyện hạnh",
+      "pinyin": "xìn yuàn xíng",
+      "meaning_vi": "Ba yếu tố căn bản của pháp môn Tịnh độ: tin, nguyện, hành.",
+      "category": "Tịnh độ",
+      "suggested_translation": [
+        "tin, nguyện, hành"
+      ],
+      "related": [
+        "淨土",
+        "念佛"
+      ]
+    },
+    {
+      "term": "往生",
+      "han_viet": "vãng sinh",
+      "pinyin": "wǎng shēng",
+      "meaning_vi": "Sinh về cõi Tịnh độ sau khi mạng chung.",
+      "category": "Tịnh độ",
+      "suggested_translation": [
+        "sinh về Tịnh độ"
+      ],
+      "related": [
+        "極樂世界",
+        "阿彌陀佛"
+      ]
+    },
+    {
+      "term": "蓮邦",
+      "han_viet": "liên bang",
+      "pinyin": "lián bāng",
+      "meaning_vi": "Cõi sen, cách gọi văn chương của Tịnh độ.",
+      "category": "Tịnh độ",
+      "suggested_translation": [
+        "cõi sen"
+      ],
+      "related": [
+        "淨土"
+      ]
+    },
+    {
+      "term": "蓮池",
+      "han_viet": "liên trì",
+      "pinyin": "lián chí",
+      "meaning_vi": "Ao sen, hình ảnh quen thuộc trong Tịnh độ.",
+      "category": "Tịnh độ",
+      "suggested_translation": [
+        "ao sen"
+      ],
+      "related": [
+        "極樂世界"
+      ]
+    },
+    {
+      "term": "九品蓮臺",
+      "han_viet": "cửu phẩm liên đài",
+      "pinyin": "jiǔ pǐn lián tái",
+      "meaning_vi": "Chín phẩm đài sen trong giáo lý Tịnh độ.",
+      "category": "Tịnh độ",
+      "suggested_translation": [
+        "chín phẩm sen"
+      ],
+      "related": [
+        "往生",
+        "極樂世界"
+      ]
+    },
+    {
+      "term": "三昧",
+      "han_viet": "tam-muội",
+      "pinyin": "sān mèi",
+      "meaning_vi": "Định sâu, trạng thái tập trung tâm viên mãn.",
+      "category": "Thiền định",
+      "suggested_translation": [
+        "định",
+        "samadhi"
+      ],
+      "related": [
+        "定",
+        "禪定"
+      ]
+    },
+    {
+      "term": "念佛三昧",
+      "han_viet": "niệm Phật tam-muội",
+      "pinyin": "niàn fó sān mèi",
+      "meaning_vi": "Định sâu do thực hành niệm Phật.",
+      "category": "Tịnh độ",
+      "suggested_translation": [
+        "định niệm Phật"
+      ],
+      "related": [
+        "念佛",
+        "三昧"
+      ]
+    },
+    {
+      "term": "首楞嚴三昧",
+      "han_viet": "Thủ Lăng Nghiêm tam-muội",
+      "pinyin": "shǒu léng yán sān mèi",
+      "meaning_vi": "Tam-muội Lăng Nghiêm, định lực được nêu trong kinh điển Đại thừa.",
+      "category": "Thiền định",
+      "suggested_translation": [
+        "Lăng Nghiêm tam-muội"
+      ],
+      "related": [
+        "楞嚴經",
+        "三昧"
+      ]
+    },
+    {
+      "term": "十號",
+      "han_viet": "thập hiệu",
+      "pinyin": "shí hào",
+      "meaning_vi": "Mười danh hiệu của Phật.",
+      "category": "Danh hiệu Phật",
+      "suggested_translation": [
+        "mười hiệu Phật"
+      ],
+      "related": [
+        "如來",
+        "應供",
+        "正遍知"
+      ]
+    },
+    {
+      "term": "應供",
+      "han_viet": "Ứng Cúng",
+      "pinyin": "yìng gòng",
+      "meaning_vi": "Một trong mười danh hiệu Phật, bậc xứng đáng được cúng dường.",
+      "category": "Danh hiệu Phật",
+      "suggested_translation": [
+        "bậc đáng cúng dường"
+      ],
+      "related": [
+        "十號"
+      ]
+    },
+    {
+      "term": "正遍知",
+      "han_viet": "Chánh Biến Tri",
+      "pinyin": "zhèng biàn zhī",
+      "meaning_vi": "Một trong mười danh hiệu Phật, bậc biết đúng và khắp.",
+      "category": "Danh hiệu Phật",
+      "suggested_translation": [
+        "biết đúng khắp"
+      ],
+      "related": [
+        "十號"
+      ]
+    },
+    {
+      "term": "明行足",
+      "han_viet": "Minh Hạnh Túc",
+      "pinyin": "míng xíng zú",
+      "meaning_vi": "Một trong mười danh hiệu Phật, đầy đủ trí sáng và hạnh lành.",
+      "category": "Danh hiệu Phật",
+      "suggested_translation": [
+        "đủ minh và hạnh"
+      ],
+      "related": [
+        "十號"
+      ]
+    },
+    {
+      "term": "善逝",
+      "han_viet": "Thiện Thệ",
+      "pinyin": "shàn shì",
+      "meaning_vi": "Một trong mười danh hiệu Phật, bậc khéo đi đến giải thoát.",
+      "category": "Danh hiệu Phật",
+      "suggested_translation": [
+        "khéo đi qua"
+      ],
+      "related": [
+        "十號"
+      ]
+    },
+    {
+      "term": "世間解",
+      "han_viet": "Thế Gian Giải",
+      "pinyin": "shì jiān jiě",
+      "meaning_vi": "Một trong mười danh hiệu Phật, bậc hiểu rõ thế gian.",
+      "category": "Danh hiệu Phật",
+      "suggested_translation": [
+        "hiểu rõ thế gian"
+      ],
+      "related": [
+        "十號"
+      ]
+    },
+    {
+      "term": "無上士",
+      "han_viet": "Vô Thượng Sĩ",
+      "pinyin": "wú shàng shì",
+      "meaning_vi": "Một trong mười danh hiệu Phật, bậc tối thượng.",
+      "category": "Danh hiệu Phật",
+      "suggested_translation": [
+        "bậc không ai hơn"
+      ],
+      "related": [
+        "十號"
+      ]
+    },
+    {
+      "term": "調御丈夫",
+      "han_viet": "Điều Ngự Trượng Phu",
+      "pinyin": "tiáo yù zhàng fū",
+      "meaning_vi": "Một trong mười danh hiệu Phật, bậc điều phục và dẫn dắt chúng sinh.",
+      "category": "Danh hiệu Phật",
+      "suggested_translation": [
+        "bậc điều ngự"
+      ],
+      "related": [
+        "十號"
+      ]
+    },
+    {
+      "term": "天人師",
+      "han_viet": "Thiên Nhân Sư",
+      "pinyin": "tiān rén shī",
+      "meaning_vi": "Một trong mười danh hiệu Phật, thầy của trời và người.",
+      "category": "Danh hiệu Phật",
+      "suggested_translation": [
+        "thầy trời người"
+      ],
+      "related": [
+        "十號"
+      ]
+    },
+    {
+      "term": "佛世尊",
+      "han_viet": "Phật Thế Tôn",
+      "pinyin": "fó shì zūn",
+      "meaning_vi": "Danh hiệu kết hợp chỉ Đức Phật, bậc giác ngộ được thế gian tôn quý.",
+      "category": "Danh hiệu Phật",
+      "suggested_translation": [
+        "Đức Phật Thế Tôn"
+      ],
+      "related": [
+        "佛",
+        "世尊"
+      ]
+    },
+    {
+      "term": "十地",
+      "han_viet": "thập địa",
+      "pinyin": "shí dì",
+      "meaning_vi": "Mười địa vị tu chứng của Bồ-tát.",
+      "category": "Bồ-tát đạo",
+      "suggested_translation": [
+        "mười địa Bồ-tát"
+      ],
+      "related": [
+        "菩薩"
+      ]
+    },
+    {
+      "term": "歡喜地",
+      "han_viet": "Hoan Hỷ địa",
+      "pinyin": "huān xǐ dì",
+      "meaning_vi": "Địa thứ nhất trong mười địa Bồ-tát.",
+      "category": "Thập địa",
+      "suggested_translation": [
+        "địa Hoan Hỷ"
+      ],
+      "related": [
+        "十地"
+      ]
+    },
+    {
+      "term": "離垢地",
+      "han_viet": "Ly Cấu địa",
+      "pinyin": "lí gòu dì",
+      "meaning_vi": "Địa thứ hai trong mười địa Bồ-tát.",
+      "category": "Thập địa",
+      "suggested_translation": [
+        "địa Ly Cấu"
+      ],
+      "related": [
+        "十地"
+      ]
+    },
+    {
+      "term": "發光地",
+      "han_viet": "Phát Quang địa",
+      "pinyin": "fā guāng dì",
+      "meaning_vi": "Địa thứ ba trong mười địa Bồ-tát.",
+      "category": "Thập địa",
+      "suggested_translation": [
+        "địa Phát Quang"
+      ],
+      "related": [
+        "十地"
+      ]
+    },
+    {
+      "term": "焰慧地",
+      "han_viet": "Diệm Tuệ địa",
+      "pinyin": "yàn huì dì",
+      "meaning_vi": "Địa thứ tư trong mười địa Bồ-tát.",
+      "category": "Thập địa",
+      "suggested_translation": [
+        "địa Diệm Tuệ"
+      ],
+      "related": [
+        "十地"
+      ]
+    },
+    {
+      "term": "難勝地",
+      "han_viet": "Nan Thắng địa",
+      "pinyin": "nán shèng dì",
+      "meaning_vi": "Địa thứ năm trong mười địa Bồ-tát.",
+      "category": "Thập địa",
+      "suggested_translation": [
+        "địa Nan Thắng"
+      ],
+      "related": [
+        "十地"
+      ]
+    },
+    {
+      "term": "現前地",
+      "han_viet": "Hiện Tiền địa",
+      "pinyin": "xiàn qián dì",
+      "meaning_vi": "Địa thứ sáu trong mười địa Bồ-tát.",
+      "category": "Thập địa",
+      "suggested_translation": [
+        "địa Hiện Tiền"
+      ],
+      "related": [
+        "十地"
+      ]
+    },
+    {
+      "term": "遠行地",
+      "han_viet": "Viễn Hành địa",
+      "pinyin": "yuǎn xíng dì",
+      "meaning_vi": "Địa thứ bảy trong mười địa Bồ-tát.",
+      "category": "Thập địa",
+      "suggested_translation": [
+        "địa Viễn Hành"
+      ],
+      "related": [
+        "十地"
+      ]
+    },
+    {
+      "term": "不動地",
+      "han_viet": "Bất Động địa",
+      "pinyin": "bù dòng dì",
+      "meaning_vi": "Địa thứ tám trong mười địa Bồ-tát.",
+      "category": "Thập địa",
+      "suggested_translation": [
+        "địa Bất Động"
+      ],
+      "related": [
+        "十地"
+      ]
+    },
+    {
+      "term": "善慧地",
+      "han_viet": "Thiện Tuệ địa",
+      "pinyin": "shàn huì dì",
+      "meaning_vi": "Địa thứ chín trong mười địa Bồ-tát.",
+      "category": "Thập địa",
+      "suggested_translation": [
+        "địa Thiện Tuệ"
+      ],
+      "related": [
+        "十地"
+      ]
+    },
+    {
+      "term": "法雲地",
+      "han_viet": "Pháp Vân địa",
+      "pinyin": "fǎ yún dì",
+      "meaning_vi": "Địa thứ mười trong mười địa Bồ-tát.",
+      "category": "Thập địa",
+      "suggested_translation": [
+        "địa Pháp Vân"
+      ],
+      "related": [
+        "十地"
       ]
     }
   ]

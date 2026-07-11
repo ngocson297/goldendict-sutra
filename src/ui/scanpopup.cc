@@ -1,3 +1,6 @@
+#include <QScreen>
+#include <QStatusBar>
+
 /* This file is (c) 2008-2012 Konstantin Isakov <ikm@goldendict.org>
  * Part of GoldenDict. Licensed under GPLv3 or later, see the LICENSE file */
 #include <QRegularExpression>
@@ -99,7 +102,76 @@ constexpr int sutraPopupFitMinHeight        = 320;
 constexpr int sutraPopupFitMaxWidthPercent  = 80;
 constexpr int sutraPopupFitMaxHeightPercent = 82;
 
+
+QString sutraPopupLayoutModeSettingsKeyFocusBaseV2()
+;
+
 QString sutraPopupLayoutModeSettingsKey()
+{
+  QString base = sutraPopupLayoutModeSettingsKeyFocusBaseV2(  );
+
+  // sutraGlossaryUiPolishV4
+  // Keep the UI mostly inline because QTextBrowser supports a limited CSS subset on Windows.
+
+  base.replace( QStringLiteral( "NGH&#296;A TI&#7870;NG VI&#7878;T" ),
+                QStringLiteral( "<div style='margin:16px 0 8px 0;font-size:12px;font-weight:800;letter-spacing:1px;color:#64748b;'>NGH&#296;A TI&#7870;NG VI&#7878;T</div>" ) );
+  base.replace( QStringLiteral( "NGHÄ¨A TIáº¾NG VIá»†T" ),
+                QStringLiteral( "<div style='margin:16px 0 8px 0;font-size:12px;font-weight:800;letter-spacing:1px;color:#64748b;'>NGH&#296;A TI&#7870;NG VI&#7878;T</div>" ) );
+
+  base.replace( QStringLiteral( "PINYIN" ),
+                QStringLiteral( "<div style='margin:12px 0 5px 0;font-size:12px;font-weight:800;letter-spacing:1px;color:#64748b;'>PINYIN</div>" ) );
+
+  base.replace( QStringLiteral( "G&#7906;I &#221; D&#7882;CH" ),
+                QStringLiteral( "<div style='margin:12px 0 6px 0;font-size:12px;font-weight:800;letter-spacing:1px;color:#64748b;'>G&#7906;I &#221; D&#7882;CH</div>" ) );
+  base.replace( QStringLiteral( "Gá»¢I Ã Dá»ŠCH" ),
+                QStringLiteral( "<div style='margin:12px 0 6px 0;font-size:12px;font-weight:800;letter-spacing:1px;color:#64748b;'>G&#7906;I &#221; D&#7882;CH</div>" ) );
+
+  base.replace( QStringLiteral( "LI&#202;N QUAN" ),
+                QStringLiteral( "<div style='margin:12px 0 6px 0;font-size:12px;font-weight:800;letter-spacing:1px;color:#64748b;'>LI&#202;N QUAN</div>" ) );
+  base.replace( QStringLiteral( "LIÃŠN QUAN" ),
+                QStringLiteral( "<div style='margin:12px 0 6px 0;font-size:12px;font-weight:800;letter-spacing:1px;color:#64748b;'>LI&#202;N QUAN</div>" ) );
+
+  base.replace( QStringLiteral( "class='chip'" ),
+                QStringLiteral( "style='display:inline-block;margin:4px 7px 4px 0;padding:4px 9px;border-radius:12px;background:#f8fafc;border:1px solid #e2e8f0;color:#334155;font-weight:700;'" ) );
+  base.replace( QStringLiteral( "class=\"chip\"" ),
+                QStringLiteral( "style=\"display:inline-block;margin:4px 7px 4px 0;padding:4px 9px;border-radius:12px;background:#f8fafc;border:1px solid #e2e8f0;color:#334155;font-weight:700;\"" ) );
+
+  base.replace( QStringLiteral( "class='badge'" ),
+                QStringLiteral( "style='display:inline-block;margin:6px 0 12px 0;padding:5px 9px;border-radius:10px;background:#ecfdf5;border:1px solid #bbf7d0;color:#047857;font-weight:800;'" ) );
+  base.replace( QStringLiteral( "class=\"badge\"" ),
+                QStringLiteral( "style=\"display:inline-block;margin:6px 0 12px 0;padding:5px 9px;border-radius:10px;background:#ecfdf5;border:1px solid #bbf7d0;color:#047857;font-weight:800;\"" ) );
+
+  base.replace( QStringLiteral( "<a " ),
+                QStringLiteral( "<a style='display:inline-block;margin:4px 7px 4px 0;padding:4px 9px;border-radius:12px;background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;text-decoration:none;font-weight:700;' " ) );
+
+  const QString primaryOpen = QStringLiteral(
+    "<div style='box-sizing:border-box;margin:10px 8px 18px 0;padding:22px 26px 24px 26px;"
+    "background:#ffffff;border:1px solid #dbeafe;border-left:6px solid #0f766e;'>"
+    "<div style='font-size:12px;font-weight:800;letter-spacing:1px;color:#0f766e;margin:0 0 12px 0;'>"
+    "K&#7870;T QU&#7842; CH&#205;NH</div>" );
+
+  const QString relatedOpen = QStringLiteral(
+    "<div style='box-sizing:border-box;margin:8px 8px 12px 0;padding:14px 16px;"
+    "background:#fffdf8;border:1px solid #fed7aa;border-left:4px solid #f97316;'>" );
+
+  const QString close = QStringLiteral( "</div>" );
+
+  if ( true ) {
+    base.replace( QStringLiteral( "<h1" ), QStringLiteral( "<h1 style='font-size:34px;line-height:1.18;margin:0 0 8px 0;color:#020617;font-weight:800;'" ) );
+    base.replace( QStringLiteral( "<h2" ), QStringLiteral( "<h2 style='font-size:34px;line-height:1.18;margin:0 0 8px 0;color:#020617;font-weight:800;'" ) );
+    base.replace( QStringLiteral( "<h3" ), QStringLiteral( "<h3 style='font-size:34px;line-height:1.18;margin:0 0 8px 0;color:#020617;font-weight:800;'" ) );
+
+    return primaryOpen + base + close;
+  }
+
+  base.replace( QStringLiteral( "<h1" ), QStringLiteral( "<h1 style='font-size:23px;line-height:1.2;margin:0 0 4px 0;color:#7c2d12;font-weight:750;'" ) );
+  base.replace( QStringLiteral( "<h2" ), QStringLiteral( "<h2 style='font-size:23px;line-height:1.2;margin:0 0 4px 0;color:#7c2d12;font-weight:750;'" ) );
+  base.replace( QStringLiteral( "<h3" ), QStringLiteral( "<h3 style='font-size:23px;line-height:1.2;margin:0 0 4px 0;color:#7c2d12;font-weight:750;'" ) );
+
+  return relatedOpen + base + close;
+}
+
+QString sutraPopupLayoutModeSettingsKeyFocusBaseV2()
 {
   return QStringLiteral( "SutraEdition/PopupLayoutMode" );
 }
@@ -1364,7 +1436,197 @@ QString glossaryEntryHtml( const BuddhistGlossaryEntry & entry )
   return sutraGlossaryCardHtmlV5( entry, false );
 }
 
+
+static QString sutraPolishGlossaryFinalUxV6( QString html )
+{
+  // sutraGlossaryFinalUxV6
+  // Final UI polish is applied to the full generated HTML, not only to small card fragments.
+  // This is more reliable because the QTextBrowser rich text engine supports a limited CSS subset.
+
+  html.replace( QStringLiteral( "Ph&#7853;t h&#7885;c / Buddhist Glossary" ),
+                QStringLiteral( "Gi&#7843;i ngh&#297;a Ph&#7853;t h&#7885;c" ) );
+  html.replace( QStringLiteral( "Pháº­t há»c / Buddhist Glossary" ),
+                QStringLiteral( "Gi&#7843;i ngh&#297;a Ph&#7853;t h&#7885;c" ) );
+  html.replace( QStringLiteral( "Buddhist Glossary" ),
+                QStringLiteral( "Gi&#7843;i ngh&#297;a Ph&#7853;t h&#7885;c" ) );
+
+  html.replace( QStringLiteral( "<h1>Gi&#7843;i ngh&#297;a Ph&#7853;t h&#7885;c</h1>" ),
+                QStringLiteral( "<div style='margin:6px 0 4px 0;padding:0 0 4px 0;font-size:28px;line-height:1.25;font-weight:800;color:#0f172a;'>Gi&#7843;i ngh&#297;a Ph&#7853;t h&#7885;c</div>" ) );
+  html.replace( QStringLiteral( "<h1>Giáº£i nghÄ©a Pháº­t há»c</h1>" ),
+                QStringLiteral( "<div style='margin:6px 0 4px 0;padding:0 0 4px 0;font-size:28px;line-height:1.25;font-weight:800;color:#0f172a;'>Gi&#7843;i ngh&#297;a Ph&#7853;t h&#7885;c</div>" ) );
+
+  html.replace( QStringLiteral( "K&#7871;t qu&#7843; nh&#7853;n di&#7879;n t&#7915; buddhist_terms.json, &#432;u ti&#234;n c&#7909;m thu&#7853;t ng&#7919; ch&#237;nh tr&#432;&#7899;c r&#7891;i m&#7899;i &#273;&#7871;n t&#7915; li&#234;n quan." ),
+                QStringLiteral( "K&#7871;t qu&#7843; t&#7915; d&#7919; li&#7879;u thu&#7853;t ng&#7919; Ph&#7853;t h&#7885;c, &#432;u ti&#234;n c&#7909;m t&#7915; ch&#237;nh tr&#432;&#7899;c r&#7891;i &#273;&#7871;n t&#7915; li&#234;n quan." ) );
+
+  html.replace( QStringLiteral( "<p>K&#7871;t qu&#7843; t&#7915; d&#7919; li&#7879;u thu&#7853;t ng&#7919; Ph&#7853;t h&#7885;c, &#432;u ti&#234;n c&#7909;m t&#7915; ch&#237;nh tr&#432;&#7899;c r&#7891;i &#273;&#7871;n t&#7915; li&#234;n quan.</p>" ),
+                QStringLiteral( "<div style='margin:4px 0 16px 0;padding:10px 12px;background:#f8fafc;border-left:4px solid #38bdf8;color:#475569;font-size:14px;line-height:1.55;'>K&#7871;t qu&#7843; t&#7915; d&#7919; li&#7879;u thu&#7853;t ng&#7919; Ph&#7853;t h&#7885;c, &#432;u ti&#234;n c&#7909;m t&#7915; ch&#237;nh tr&#432;&#7899;c r&#7891;i &#273;&#7871;n t&#7915; li&#234;n quan.</div>" ) );
+
+  html.replace( QStringLiteral( "<h2>K&#7871;t qu&#7843; ch&#237;nh</h2>" ),
+                QStringLiteral( "<div style='margin:14px 0 10px 0;font-size:16px;line-height:1.2;font-weight:800;color:#0f766e;letter-spacing:.3px;'>K&#7871;t qu&#7843; ch&#237;nh</div><div style='margin:0 8px 18px 0;padding:18px 20px 20px 20px;background:#ffffff;border:1px solid #dbeafe;border-left:6px solid #0f766e;'>" ) );
+  html.replace( QStringLiteral( "<h2>Káº¿t quáº£ chÃ­nh</h2>" ),
+                QStringLiteral( "<div style='margin:14px 0 10px 0;font-size:16px;line-height:1.2;font-weight:800;color:#0f766e;letter-spacing:.3px;'>K&#7871;t qu&#7843; ch&#237;nh</div><div style='margin:0 8px 18px 0;padding:18px 20px 20px 20px;background:#ffffff;border:1px solid #dbeafe;border-left:6px solid #0f766e;'>" ) );
+
+  html.replace( QStringLiteral( "<h2>T&#7915; li&#234;n quan</h2>" ),
+                QStringLiteral( "</div><div style='margin:18px 0 10px 0;font-size:16px;line-height:1.2;font-weight:800;color:#7c2d12;letter-spacing:.3px;'>T&#7915; li&#234;n quan</div><div style='margin:0 8px 14px 0;padding:14px 16px;background:#fffdf8;border:1px solid #fed7aa;border-left:4px solid #f97316;'>" ) );
+  html.replace( QStringLiteral( "<h2>Tá»« liÃªn quan</h2>" ),
+                QStringLiteral( "</div><div style='margin:18px 0 10px 0;font-size:16px;line-height:1.2;font-weight:800;color:#7c2d12;letter-spacing:.3px;'>T&#7915; li&#234;n quan</div><div style='margin:0 8px 14px 0;padding:14px 16px;background:#fffdf8;border:1px solid #fed7aa;border-left:4px solid #f97316;'>" ) );
+
+  html.replace( QStringLiteral( "<b>PINYIN</b>" ),
+                QStringLiteral( "<div style='margin:14px 0 5px 0;font-size:12px;line-height:1.1;font-weight:800;letter-spacing:1px;color:#64748b;'>PINYIN</div>" ) );
+  html.replace( QStringLiteral( "<strong>PINYIN</strong>" ),
+                QStringLiteral( "<div style='margin:14px 0 5px 0;font-size:12px;line-height:1.1;font-weight:800;letter-spacing:1px;color:#64748b;'>PINYIN</div>" ) );
+
+  html.replace( QStringLiteral( "<b>NGH&#296;A TI&#7870;NG VI&#7878;T</b>" ),
+                QStringLiteral( "<div style='margin:14px 0 7px 0;font-size:12px;line-height:1.1;font-weight:800;letter-spacing:1px;color:#64748b;'>NGH&#296;A TI&#7870;NG VI&#7878;T</div>" ) );
+  html.replace( QStringLiteral( "<b>NGHÄ¨A TIáº¾NG VIá»†T</b>" ),
+                QStringLiteral( "<div style='margin:14px 0 7px 0;font-size:12px;line-height:1.1;font-weight:800;letter-spacing:1px;color:#64748b;'>NGH&#296;A TI&#7870;NG VI&#7878;T</div>" ) );
+
+  html.replace( QStringLiteral( "<b>G&#7906;I &#221; D&#7882;CH</b>" ),
+                QStringLiteral( "<div style='margin:14px 0 6px 0;font-size:12px;line-height:1.1;font-weight:800;letter-spacing:1px;color:#64748b;'>G&#7906;I &#221; D&#7882;CH</div>" ) );
+  html.replace( QStringLiteral( "<b>Gá»¢I Ã Dá»ŠCH</b>" ),
+                QStringLiteral( "<div style='margin:14px 0 6px 0;font-size:12px;line-height:1.1;font-weight:800;letter-spacing:1px;color:#64748b;'>G&#7906;I &#221; D&#7882;CH</div>" ) );
+
+  html.replace( QStringLiteral( "<b>LI&#202;N QUAN</b>" ),
+                QStringLiteral( "<div style='margin:14px 0 6px 0;font-size:12px;line-height:1.1;font-weight:800;letter-spacing:1px;color:#64748b;'>LI&#202;N QUAN</div>" ) );
+  html.replace( QStringLiteral( "<b>LIÃŠN QUAN</b>" ),
+                QStringLiteral( "<div style='margin:14px 0 6px 0;font-size:12px;line-height:1.1;font-weight:800;letter-spacing:1px;color:#64748b;'>LI&#202;N QUAN</div>" ) );
+
+  html.replace( QStringLiteral( "<h1>" ),
+                QStringLiteral( "<h1 style='font-size:32px;line-height:1.15;margin:4px 0 8px 0;color:#020617;font-weight:800;'>" ) );
+  html.replace( QStringLiteral( "<h2>" ),
+                QStringLiteral( "<h2 style='font-size:23px;line-height:1.2;margin:10px 0 5px 0;color:#0f172a;font-weight:800;'>" ) );
+  html.replace( QStringLiteral( "<h3>" ),
+                QStringLiteral( "<h3 style='font-size:21px;line-height:1.2;margin:10px 0 5px 0;color:#0f172a;font-weight:800;'>" ) );
+
+  html.replace( QStringLiteral( "<a " ),
+                QStringLiteral( "<a style='display:inline-block;margin:4px 7px 4px 0;padding:4px 9px;background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;text-decoration:none;font-weight:700;' " ) );
+
+  html.prepend( QStringLiteral( "<div style='padding:10px 12px 18px 12px;background:#f7f9fc;color:#0f172a;font-size:16px;line-height:1.55;'>" ) );
+  html.append( QStringLiteral( "</div></div>" ) );
+
+  return html;
+}
+
+QString glossaryHtmlFinalUxBaseV6( const QString & primaryTerm, const QStringList & detectedTerms )
+;
+
+
+static QString sutraPolishGlossaryFinalUxV9( QString html )
+{
+  // sutraGlossaryUiFinalV9
+  // Final UI/UX polish for the Buddhist explanation tab.
+  // This runs on final generated HTML, so it fixes the real rendered output.
+
+  if ( html.contains( QStringLiteral( "data-sutra-v9" ) ) ) {
+    return html;
+  }
+
+  html.remove( QRegularExpression( QStringLiteral( R"GD(<style[\s\S]*?</style>)GD" ) ) );
+
+  const QString outerOpen = QStringLiteral(
+    "<div data-sutra-v9='1' style='padding:12px 14px 20px 14px;background:#f7f9fc;color:#0f172a;font-size:16px;line-height:1.55;'>" );
+
+  const QString titleBlock = QStringLiteral(
+    "<div style='margin:2px 0 6px 0;font-size:29px;line-height:1.22;font-weight:800;color:#0f172a;'>"
+    "Gi&#7843;i ngh&#297;a Ph&#7853;t h&#7885;c</div>" );
+
+  const QString subtitleBlock = QStringLiteral(
+    "<div style='margin:4px 0 16px 0;padding:10px 12px;background:#eef6ff;border-left:4px solid #38bdf8;"
+    "color:#475569;font-size:14px;line-height:1.55;'>"
+    "K&#7871;t qu&#7843; t&#7915; d&#7919; li&#7879;u thu&#7853;t ng&#7919; Ph&#7853;t h&#7885;c, "
+    "&#432;u ti&#234;n c&#7909;m t&#7915; ch&#237;nh tr&#432;&#7899;c r&#7891;i &#273;&#7871;n t&#7915; li&#234;n quan.</div>" );
+
+  const QString primaryOpen = QStringLiteral(
+    "<div style='margin:14px 0 10px 0;font-size:16px;line-height:1.2;font-weight:800;color:#0f766e;letter-spacing:.3px;'>"
+    "K&#7871;t qu&#7843; ch&#237;nh</div>"
+    "<div data-sutra-v9-primary='1' style='margin:0 8px 18px 0;padding:18px 20px 20px 20px;"
+    "background:#ffffff;border:1px solid #dbeafe;border-left:6px solid #0f766e;'>" );
+
+  const QString relatedOpen = QStringLiteral(
+    "</div>"
+    "<div style='margin:18px 0 10px 0;font-size:16px;line-height:1.2;font-weight:800;color:#7c2d12;letter-spacing:.3px;'>"
+    "T&#7915; li&#234;n quan</div>"
+    "<div data-sutra-v9-related='1' style='margin:0 8px 14px 0;padding:14px 16px;"
+    "background:#fffdf8;border:1px solid #fed7aa;border-left:4px solid #f97316;'>" );
+
+  const QString pinyinLabel = QStringLiteral(
+    "<div style='margin:14px 0 5px 0;font-size:12px;line-height:1.1;font-weight:800;letter-spacing:1px;color:#64748b;'>PINYIN</div>" );
+
+  const QString meaningLabel = QStringLiteral(
+    "<div style='margin:14px 0 7px 0;font-size:12px;line-height:1.1;font-weight:800;letter-spacing:1px;color:#64748b;'>NGH&#296;A TI&#7870;NG VI&#7878;T</div>" );
+
+  const QString suggestionLabel = QStringLiteral(
+    "<div style='margin:14px 0 6px 0;font-size:12px;line-height:1.1;font-weight:800;letter-spacing:1px;color:#64748b;'>G&#7906;I &#221; D&#7882;CH</div>" );
+
+  const QString relatedLabel = QStringLiteral(
+    "<div style='margin:14px 0 6px 0;font-size:12px;line-height:1.1;font-weight:800;letter-spacing:1px;color:#64748b;'>LI&#202;N QUAN</div>" );
+
+  // Header/title/subtitle. Match both raw Vietnamese and entity versions.
+  html.replace( QRegularExpression( QStringLiteral( R"GD(<h1[^>]*>[\s\S]*?</h1>)GD" ) ),
+                titleBlock );
+  html.replace( QString::fromUtf8( "Giáº£i nghÄ©a Pháº­t há»c" ), titleBlock );
+  html.replace( QStringLiteral( "Gi&#7843;i ngh&#297;a Ph&#7853;t h&#7885;c" ), titleBlock );
+  html.replace( QString::fromUtf8( "Pháº­t há»c / Buddhist Glossary" ), titleBlock );
+  html.replace( QStringLiteral( "Ph&#7853;t h&#7885;c / Buddhist Glossary" ), titleBlock );
+  html.replace( QStringLiteral( "Buddhist Glossary" ), titleBlock );
+
+  html.replace( QRegularExpression( QStringLiteral( R"GD(<p[^>]*>[^<]*buddhist_terms\.json[^<]*</p>)GD" ) ),
+                subtitleBlock );
+  html.replace( QRegularExpression( QStringLiteral( R"GD(<div[^>]*>[^<]*buddhist_terms\.json[^<]*</div>)GD" ) ),
+                subtitleBlock );
+  html.replace( QRegularExpression( QStringLiteral( R"GD([^\n<]*buddhist_terms\.json[^\n<]*)GD" ) ),
+                subtitleBlock );
+
+  // Main sections. Plain text replacement is important because the current source may already have stripped/styled tags.
+  html.replace( QString::fromUtf8( "Káº¿t quáº£ chÃ­nh" ), primaryOpen );
+  html.replace( QStringLiteral( "K&#7871;t qu&#7843; ch&#237;nh" ), primaryOpen );
+  html.replace( QString::fromUtf8( "Tá»« liÃªn quan" ), relatedOpen );
+  html.replace( QStringLiteral( "T&#7915; li&#234;n quan" ), relatedOpen );
+
+  // Labels. These fix bugs like "PinyinguÄn..." by forcing the label to a separate block.
+  html.replace( QStringLiteral( "PINYIN" ), pinyinLabel, Qt::CaseInsensitive );
+  html.replace( QString::fromUtf8( "Pinyin" ), pinyinLabel, Qt::CaseInsensitive );
+
+  html.replace( QString::fromUtf8( "NghÄ©a tiáº¿ng Viá»‡t" ), meaningLabel, Qt::CaseInsensitive );
+  html.replace( QStringLiteral( "NGH&#296;A TI&#7870;NG VI&#7878;T" ), meaningLabel, Qt::CaseInsensitive );
+
+  html.replace( QString::fromUtf8( "Gá»£i Ã½ dá»‹ch" ), suggestionLabel, Qt::CaseInsensitive );
+  html.replace( QStringLiteral( "G&#7906;I &#221; D&#7882;CH" ), suggestionLabel, Qt::CaseInsensitive );
+
+  html.replace( QString::fromUtf8( "LiÃªn quan" ), relatedLabel, Qt::CaseInsensitive );
+  html.replace( QStringLiteral( "LI&#202;N QUAN" ), relatedLabel, Qt::CaseInsensitive );
+
+  // Improve entry headings and related chips/links.
+  html.replace( QRegularExpression( QStringLiteral( R"GD(<h1[^>]*>)GD" ) ),
+                QStringLiteral( "<h1 style='font-size:32px;line-height:1.15;margin:4px 0 8px 0;color:#020617;font-weight:800;'>" ) );
+  html.replace( QRegularExpression( QStringLiteral( R"GD(<h2[^>]*>)GD" ) ),
+                QStringLiteral( "<h2 style='font-size:23px;line-height:1.2;margin:10px 0 5px 0;color:#0f172a;font-weight:800;'>" ) );
+  html.replace( QRegularExpression( QStringLiteral( R"GD(<h3[^>]*>)GD" ) ),
+                QStringLiteral( "<h3 style='font-size:21px;line-height:1.2;margin:10px 0 5px 0;color:#0f172a;font-weight:800;'>" ) );
+  html.replace( QRegularExpression( QStringLiteral( R"GD(<a\s+)GD" ) ),
+                QStringLiteral( "<a style='display:inline-block;margin:4px 7px 4px 0;padding:4px 9px;background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;text-decoration:none;font-weight:700;' " ) );
+
+  const bool hasPrimaryCard = html.contains( QStringLiteral( "data-sutra-v9-primary" ) );
+  const bool hasRelatedCard = html.contains( QStringLiteral( "data-sutra-v9-related" ) );
+
+  html.prepend( outerOpen );
+
+  if ( hasPrimaryCard || hasRelatedCard ) {
+    html.append( QStringLiteral( "</div>" ) );
+  }
+
+  html.append( QStringLiteral( "</div>" ) );
+
+  return html;
+}
+
+
 QString glossaryHtml( const QString & primaryTerm, const QStringList & detectedTerms )
+
+{
+  return sutraPolishGlossaryFinalUxV9( glossaryHtmlFinalUxBaseV6( primaryTerm, detectedTerms ) );
+}
+QString glossaryHtmlFinalUxBaseV6( const QString & primaryTerm, const QStringList & detectedTerms )
 {
   const QList< BuddhistGlossaryEntry > entries = glossaryEntriesForTerms( primaryTerm, detectedTerms );
   const int fontSize                           = loadSutraPopupFontSize();
@@ -1415,8 +1677,8 @@ QString glossaryHtml( const QString & primaryTerm, const QStringList & detectedT
 
   html += QStringLiteral(
     "<div class='hero'>"
-    "<div class='hero-title'>Ph&#7853;t h&#7885;c / Buddhist Glossary</div>"
-    "<p class='hero-subtitle'>K&#7871;t qu&#7843; nh&#7853;n di&#7879;n t&#7915; buddhist_terms.json, &#432;u ti&#234;n c&#7909;m thu&#7853;t ng&#7919; ch&#237;nh tr&#432;&#7899;c r&#7891;i m&#7899;i &#273;&#7871;n t&#7915; li&#234;n quan.</p>"
+    "<div class='hero-title'>Gi&#7843;i ngh&#297;a Ph&#7853;t h&#7885;c</div>"
+    "<p class='hero-subtitle'>K&#7871;t qu&#7843; t&#7915; d&#7919; li&#7879;u thu&#7853;t ng&#7919; Ph&#7853;t h&#7885;c, &#432;u ti&#234;n c&#7909;m t&#7915; ch&#237;nh tr&#432;&#7899;c r&#7891;i &#273;&#7871;n t&#7915; li&#234;n quan.</p>"
     "</div>" );
 
   if ( entries.isEmpty() ) {
@@ -1519,7 +1781,7 @@ void updateBuddhistGlossaryTab( QTabWidget * tabs, const QString & primaryTerm, 
     browser = new QTextBrowser( tabs );
     browser->setObjectName( QStringLiteral( "buddhistGlossaryBrowser" ) );
     browser->setOpenExternalLinks( true );
-    tabs->addTab( browser, QStringLiteral( "Phật học" ) );
+    tabs->addTab( browser, QString::fromUtf8( "\x47" "\x69" "\xe1" "\xba" "\xa3" "\x69" "\x20" "\x6e" "\x67" "\x68" "\xc4" "\xa9" "\x61" ) ); // sutraGlossaryUiFinalV9 tab title // sutraForceGlossaryTabTitleV8
   }
 
   browser->setHtml( glossaryHtml( primaryTerm, detectedTerms ) );
@@ -1678,6 +1940,102 @@ void updateWebReferenceTab( QTabWidget * tabs, const QString & primaryTerm, cons
   applySutraPopupTextBrowserFont( browser );
 }
 
+
+static bool sutraPopupIsFitToResultsMode( QWidget * popup )
+{
+  if ( !popup ) {
+    return false;
+  }
+
+  QStatusBar * status = popup->findChild< QStatusBar * >();
+
+  if ( !status ) {
+    return false;
+  }
+
+  const QString message = status->currentMessage();
+
+  return message.contains( QStringLiteral( "fit to results" ), Qt::CaseInsensitive )
+      || ( message.contains( QStringLiteral( "fit" ), Qt::CaseInsensitive )
+        && message.contains( QStringLiteral( "result" ), Qt::CaseInsensitive ) );
+}
+
+static void sutraApplyFitToResultsPopup( QWidget * popup, QTabWidget * tabs )
+{
+  if ( !popup || !tabs || !sutraPopupIsFitToResultsMode( popup ) ) {
+    return;
+  }
+
+  QWidget * currentWidget = tabs->currentWidget();
+
+  int contentWidth = 660;
+  int contentHeight = 320;
+
+  QTextBrowser * browser = currentWidget ? currentWidget->findChild< QTextBrowser * >() : nullptr;
+
+  if ( !browser ) {
+    browser = qobject_cast< QTextBrowser * >( currentWidget );
+  }
+
+  if ( browser && browser->document() ) {
+    QTextDocument * document = browser->document();
+
+    const qreal previousTextWidth = document->textWidth();
+    const int preferredTextWidth = 720;
+
+    document->setTextWidth( preferredTextWidth );
+    document->adjustSize();
+
+    const QSizeF documentSize = document->size();
+
+    contentWidth = qBound( 420, static_cast< int >( document->idealWidth() ) + 40, 780 );
+    contentHeight = qBound( 180, static_cast< int >( documentSize.height() ) + 40, 560 );
+
+    if ( previousTextWidth > 0 ) {
+      document->setTextWidth( previousTextWidth );
+    }
+  }
+  else if ( currentWidget ) {
+    const QSize hint = currentWidget->sizeHint();
+
+    if ( hint.isValid() ) {
+      contentWidth = qBound( 420, hint.width() + 40, 780 );
+      contentHeight = qBound( 180, hint.height() + 40, 560 );
+    }
+  }
+
+  const QRect available = popup->screen()
+                            ? popup->screen()->availableGeometry()
+                            : QApplication::primaryScreen()->availableGeometry();
+
+  const int chromeWidth = 80;
+  const int chromeHeight = 170;
+
+  const int targetWidth = qBound( 520, contentWidth + chromeWidth, qMin( 920, available.width() - 60 ) );
+  const int targetHeight = qBound( 300, contentHeight + chromeHeight, qMin( 760, available.height() - 60 ) );
+
+  popup->resize( targetWidth, targetHeight );
+
+  QPoint position = popup->pos();
+
+  if ( position.x() + targetWidth > available.right() - 12 ) {
+    position.setX( available.right() - targetWidth - 12 );
+  }
+
+  if ( position.y() + targetHeight > available.bottom() - 12 ) {
+    position.setY( available.bottom() - targetHeight - 12 );
+  }
+
+  if ( position.x() < available.left() + 12 ) {
+    position.setX( available.left() + 12 );
+  }
+
+  if ( position.y() < available.top() + 12 ) {
+    position.setY( available.top() + 12 );
+  }
+
+  popup->move( position );
+}
 void refreshSutraCustomTabs( QTabWidget * tabs, const QString & primaryTerm, const QString & currentInputText )
 {
   QString lookupText = normalizeSmartLookupInput( Folding::unescapeWildcardSymbols( currentInputText ) );
@@ -1715,6 +2073,27 @@ static const Qt::WindowFlags defaultUnpinnedWindowFlags = Qt::Tool | Qt::Framele
 
 static const Qt::WindowFlags pinnedWindowFlags = Qt::Window;
 
+
+static void sutraRestorePopupFromMinimized( QWidget * popup )
+{
+  if ( !popup ) {
+    return;
+  }
+
+  const Qt::WindowStates states = popup->windowState();
+
+  if ( states.testFlag( Qt::WindowMinimized ) ) {
+    popup->setWindowState( ( states & ~Qt::WindowMinimized ) | Qt::WindowActive );
+    popup->showNormal();
+  }
+  else {
+    popup->setWindowState( states | Qt::WindowActive );
+    popup->show();
+  }
+
+  popup->raise();
+  popup->activateWindow();
+}
 ScanPopup::ScanPopup( QWidget * parent,
                       Config::Class & cfg_,
                       ArticleNetworkAccessManager & articleNetMgr,
@@ -1956,6 +2335,9 @@ ScanPopup::ScanPopup( QWidget * parent,
       saveSutraPopupFontSize( fontSize );
       applyZoomFactor();
       refreshSutraCustomTabs( tabWidget, pendingWord, translateBox->translateLine()->text() );
+  QTimer::singleShot( 0, this, [ this ] {
+    sutraApplyFitToResultsPopup( this, tabWidget );
+  } );
       applySutraPopupFontSizeToTabs( tabWidget );
       if ( loadSutraPopupLayoutMode() == SutraPopupLayoutMode::FitToResults ) {
         fitSutraPopupToResults( this, tabWidget );
@@ -2090,6 +2472,9 @@ ScanPopup::ScanPopup( QWidget * parent,
     resetSutraPopupAppearanceDefaults();
     applySutraPopupOpacity( this );
     refreshSutraCustomTabs( tabWidget, pendingWord, translateBox->translateLine()->text() );
+  QTimer::singleShot( 0, this, [ this ] {
+    sutraApplyFitToResultsPopup( this, tabWidget );
+  } );
       applySutraPopupFontSizeToTabs( tabWidget );
     applySutraPopupLayoutMode( this, tabWidget );
     showStatusBarMessage( tr( "Popup defaults restored: Auto layout, 14 px, 100% opacity, Ctrl + Right Click" ), 5000 );
@@ -2625,6 +3010,10 @@ void ScanPopup::engagePopup( bool forcePopup, bool giveFocus )
 
     ui.pinButton->setChecked( true );
     ui.onTopButton->setVisible( true );
+  sutraRestorePopupFromMinimized( this );
+  QTimer::singleShot( 0, this, [ this ] {
+    sutraApplyFitToResultsPopup( this, tabWidget );
+  } );
 
     Qt::WindowFlags flags = pinnedWindowFlags;
     if ( ui.onTopButton->isChecked() ) {
