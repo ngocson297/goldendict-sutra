@@ -1230,11 +1230,23 @@ QStringList detectSmartLookupTerms( const QString & input )
     return lhs.length > rhs.length;
   } );
 
+  // Passage mode: keep only the longest non-overlapping glossary chunk at
+  // each position. This prevents a long sutra sentence from collapsing to
+  // the first short term and also removes nested duplicates such as
+  // "般若", "般若波羅蜜多" inside a longer matching phrase.
   QStringList terms;
+  int coveredUntil = -1;
+
   for ( const Match & match : matches ) {
+    if ( match.position < coveredUntil ) {
+      continue;
+    }
+
     if ( !terms.contains( match.term ) ) {
       terms << match.term;
     }
+
+    coveredUntil = match.position + match.length;
   }
 
   return terms;
@@ -1796,6 +1808,149 @@ QString glossaryHtmlStableV16( const QString & primaryTerm, const QStringList & 
 
   if ( !primaryFound ) {
     primaryEntry = entries.first();
+  }
+
+  // When the captured text contains several consecutive glossary phrases,
+  // render the whole passage instead of showing only the first term as the
+  // main result and reducing the remaining phrases to related chips.
+  if ( entries.size() > 1 ) {
+    html += QStringLiteral(
+      "<div style='margin:2px 0 10px 0;padding:9px 12px;background:#ecfdf5;"
+      "border-left:5px solid #0f766e;font-size:%1px;font-weight:800;letter-spacing:.5px;color:#0f766e;'>"
+      "PH&#194;N T&#205;CH &#272;O&#7840;N KINH</div>" )
+              .arg( sectionSize );
+
+    QStringList combinedTranslations;
+    QStringList passageTerms;
+
+    for ( int i = 0; i < entries.size(); ++i ) {
+      const BuddhistGlossaryEntry & entry = entries.at( i );
+      passageTerms << entry.term;
+
+      QString preferredTranslation;
+      if ( !entry.suggestedTranslations.isEmpty() ) {
+        preferredTranslation = entry.suggestedTranslations.first().trimmed();
+      }
+      if ( preferredTranslation.isEmpty() ) {
+        preferredTranslation = entry.meaningVi.trimmed();
+      }
+      if ( preferredTranslation.isEmpty() ) {
+        preferredTranslation = entry.hanViet.trimmed();
+      }
+
+      if ( !preferredTranslation.isEmpty() && !combinedTranslations.contains( preferredTranslation ) ) {
+        combinedTranslations << preferredTranslation;
+      }
+
+      html += QStringLiteral(
+        "<div style='margin:0 0 10px 0;padding:13px 15px;background:#ffffff;"
+        "border:1px solid #cbd5e1;border-left:5px solid #0f766e;border-radius:8px;'>"
+        "<div style='font-size:%1px;font-weight:800;color:#64748b;letter-spacing:.5px;'>"
+        "&#272;O&#7840;N %2</div>"
+        "<div style='margin-top:4px;font-size:%3px;line-height:1.2;font-weight:800;color:#020617;'>%4</div>" )
+                .arg( labelSize )
+                .arg( i + 1 )
+                .arg( qMax( 21, fontSize + 6 ) )
+                .arg( htmlEscape( entry.term ) );
+
+      if ( !entry.hanViet.isEmpty() ) {
+        html += QStringLiteral(
+          "<div style='margin-top:5px;font-size:%1px;font-weight:750;color:#0f766e;'>%2</div>" )
+                  .arg( hanVietSize )
+                  .arg( htmlEscape( entry.hanViet ) );
+      }
+
+      if ( !entry.pinyin.isEmpty() ) {
+        html += QStringLiteral(
+          "<div style='margin-top:5px;color:#64748b;font-style:italic;'>%1</div>" )
+                  .arg( htmlEscape( entry.pinyin ) );
+      }
+
+      if ( !preferredTranslation.isEmpty() ) {
+        html += QStringLiteral(
+          "<div style='margin-top:9px;padding:9px 11px;background:#f1f5f9;border-radius:6px;"
+          "color:#111827;'>%1</div>" )
+                  .arg( htmlEscape( preferredTranslation ) );
+      }
+
+      html += QStringLiteral( "</div>" );
+    }
+
+    if ( !combinedTranslations.isEmpty() ) {
+      QString combinedText = combinedTranslations.join( QStringLiteral( ", " ) ).trimmed();
+      if ( !combinedText.endsWith( QLatin1Char( '.' ) )
+        && !combinedText.endsWith( QChar( 0x3002 ) )
+        && !combinedText.endsWith( QLatin1Char( '!' ) )
+        && !combinedText.endsWith( QLatin1Char( '?' ) ) ) {
+        combinedText += QLatin1Char( '.' );
+      }
+
+      html += QStringLiteral(
+        "<div style='margin:14px 0 8px 0;padding:9px 12px;background:#eff6ff;"
+        "border-left:5px solid #2563eb;font-size:%1px;font-weight:800;letter-spacing:.5px;color:#1d4ed8;'>"
+        "B&#7842;N D&#7882;CH G&#7906;I &#221;</div>"
+        "<div style='margin:0 0 14px 0;padding:13px 15px;background:#ffffff;border:1px solid #bfdbfe;"
+        "border-left:5px solid #3b82f6;border-radius:8px;color:#0f172a;font-size:%2px;font-weight:650;'>%3</div>" )
+                .arg( sectionSize )
+                .arg( qMax( 17, fontSize + 1 ) )
+                .arg( htmlEscape( combinedText ) );
+    }
+
+    QStringList passageRelated;
+    const auto appendPassageRelated = [&]( const QString & value ) {
+      const QString trimmed = value.trimmed();
+      const QString normalized = normalizeSmartLookupInput( trimmed );
+      if ( trimmed.isEmpty() || normalized.isEmpty() ) {
+        return;
+      }
+
+      for ( const QString & term : passageTerms ) {
+        if ( normalizeSmartLookupInput( term ) == normalized ) {
+          return;
+        }
+      }
+
+      for ( const QString & existing : passageRelated ) {
+        if ( normalizeSmartLookupInput( existing ) == normalized ) {
+          return;
+        }
+      }
+
+      passageRelated << trimmed;
+    };
+
+    for ( const BuddhistGlossaryEntry & entry : entries ) {
+      for ( const QString & related : entry.related ) {
+        appendPassageRelated( related );
+      }
+    }
+
+    if ( !passageRelated.isEmpty() ) {
+      QStringList relatedChips;
+      for ( const QString & related : passageRelated ) {
+        const QString chip = sutraGlossaryChipHtmlV16( related, true );
+        if ( !chip.isEmpty() ) {
+          relatedChips << chip;
+        }
+      }
+
+      html += QStringLiteral(
+        "<div style='margin:4px 0 10px 0;padding:9px 12px;background:#fff7ed;"
+        "border-left:5px solid #c2410c;font-size:%1px;font-weight:800;letter-spacing:.5px;color:#9a3412;'>"
+        "LI&#202;N QUAN</div>"
+        "<div style='margin:0 0 14px 0;padding:11px 13px;background:#ffffff;border:1px solid #fed7aa;"
+        "border-left:4px solid #f97316;border-radius:8px;'>%2</div>" )
+                .arg( sectionSize )
+                .arg( relatedChips.join( QString() ) );
+    }
+
+    html += QStringLiteral(
+      "<div style='margin-top:12px;color:#94a3b8;font-size:%1px;'>"
+      "Ngu&#7891;n d&#7919; li&#7879;u: buddhist_terms.json</div>" )
+              .arg( labelSize );
+
+    html += QStringLiteral( "</body></html>" );
+    return html;
   }
 
   html += QStringLiteral(

@@ -710,20 +710,147 @@ QString sutraStartupTextFromBstr( BSTR text )
   return result;
 }
 
+bool sutraStartupIsCjkPhraseSeparator( const QChar & ch )
+{
+  switch ( ch.unicode() ) {
+    case 0x002C: // ,
+    case 0x002E: // .
+    case 0x003A: // :
+    case 0x003B: // ;
+    case 0x003F: // ?
+    case 0x0021: // !
+    case 0x3001: // IDEOGRAPHIC COMMA
+    case 0x3002: // IDEOGRAPHIC FULL STOP
+    case 0xFF01: // FULLWIDTH EXCLAMATION MARK
+    case 0xFF0C: // FULLWIDTH COMMA
+    case 0xFF0E: // FULLWIDTH FULL STOP
+    case 0xFF1A: // FULLWIDTH COLON
+    case 0xFF1B: // FULLWIDTH SEMICOLON
+    case 0xFF1F: // FULLWIDTH QUESTION MARK
+      return true;
+    default:
+      return ch == QLatin1Char( '\r' ) || ch == QLatin1Char( '\n' );
+  }
+}
+
 QString sutraStartupTextFromUiAutomationRange( IUIAutomationTextRange * range )
 {
   if ( !range ) {
     return {};
   }
 
-  range->ExpandToEnclosingUnit( TextUnit_Line );
-
-  BSTR text = nullptr;
-  if ( FAILED( range->GetText( 600, &text ) ) ) {
+  // Keep the point range unchanged. Derive the enclosing line and the text
+  // from the line start to the clicked point so a CJK clause under the mouse
+  // can be selected instead of always returning the first term in the line.
+  IUIAutomationTextRange * lineRange = nullptr;
+  if ( FAILED( range->Clone( &lineRange ) ) || !lineRange ) {
     return {};
   }
 
-  return sutraStartupTextFromBstr( text ).trimmed();
+  lineRange->ExpandToEnclosingUnit( TextUnit_Line );
+
+  BSTR lineBstr = nullptr;
+  if ( FAILED( lineRange->GetText( 600, &lineBstr ) ) ) {
+    lineRange->Release();
+    return {};
+  }
+
+  const QString lineText = sutraStartupTextFromBstr( lineBstr );
+  int clickOffset        = -1;
+
+  IUIAutomationTextRange * prefixRange = nullptr;
+  if ( SUCCEEDED( lineRange->Clone( &prefixRange ) ) && prefixRange ) {
+    if ( SUCCEEDED( prefixRange->MoveEndpointByRange( TextPatternRangeEndpoint_End,
+                                                      range,
+                                                      TextPatternRangeEndpoint_Start ) ) ) {
+      BSTR prefixBstr = nullptr;
+      if ( SUCCEEDED( prefixRange->GetText( 600, &prefixBstr ) ) ) {
+        clickOffset = sutraStartupTextFromBstr( prefixBstr ).size();
+      }
+    }
+
+    prefixRange->Release();
+  }
+
+  lineRange->Release();
+
+  if ( clickOffset >= 0 && !lineText.isEmpty() ) {
+    clickOffset = qBound( 0, clickOffset, lineText.size() );
+
+    int anchor = clickOffset;
+    if ( anchor >= lineText.size() ) {
+      anchor = lineText.size() - 1;
+    }
+
+    if ( anchor >= 0 && sutraStartupIsCjkPhraseSeparator( lineText.at( anchor ) ) ) {
+      int right = anchor + 1;
+      while ( right < lineText.size()
+              && ( sutraStartupIsCjkPhraseSeparator( lineText.at( right ) ) || lineText.at( right ).isSpace() ) ) {
+        ++right;
+      }
+
+      int left = anchor - 1;
+      while ( left >= 0
+              && ( sutraStartupIsCjkPhraseSeparator( lineText.at( left ) ) || lineText.at( left ).isSpace() ) ) {
+        --left;
+      }
+
+      if ( right < lineText.size() ) {
+        anchor = right;
+      }
+      else if ( left >= 0 ) {
+        anchor = left;
+      }
+    }
+
+    if ( anchor >= 0 ) {
+      int start = anchor;
+      while ( start > 0 && !sutraStartupIsCjkPhraseSeparator( lineText.at( start - 1 ) ) ) {
+        --start;
+      }
+
+      int end = anchor + 1;
+      while ( end < lineText.size() && !sutraStartupIsCjkPhraseSeparator( lineText.at( end ) ) ) {
+        ++end;
+      }
+
+      const QString clause = lineText.mid( start, end - start ).trimmed();
+
+      bool clauseHasCjk = false;
+      for ( const QChar & ch : clause ) {
+        if ( sutraStartupIsCjkChar( ch ) ) {
+          clauseHasCjk = true;
+          break;
+        }
+      }
+
+      if ( clauseHasCjk && !clause.isEmpty() && clause.size() <= 80 ) {
+        return clause;
+      }
+    }
+  }
+
+  // Some controls expose a useful word boundary even when punctuation-based
+  // extraction is unavailable.
+  IUIAutomationTextRange * wordRange = nullptr;
+  if ( SUCCEEDED( range->Clone( &wordRange ) ) && wordRange ) {
+    wordRange->ExpandToEnclosingUnit( TextUnit_Word );
+
+    BSTR wordBstr = nullptr;
+    if ( SUCCEEDED( wordRange->GetText( 120, &wordBstr ) ) ) {
+      const QString wordText = sutraStartupTextFromBstr( wordBstr ).trimmed();
+      wordRange->Release();
+
+      if ( !wordText.isEmpty() && wordText.size() <= 80 ) {
+        return wordText;
+      }
+    }
+    else {
+      wordRange->Release();
+    }
+  }
+
+  return lineText.trimmed();
 }
 
 QString sutraStartupUiAutomationTextAtPoint( const QPoint & globalPos )
