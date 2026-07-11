@@ -19,12 +19,12 @@
 #include <QPointer>
 #include <functional>
 #ifdef Q_OS_WIN
+#include <windows.h>
+#include <oleauto.h>
   #ifndef NOMINMAX
     #define NOMINMAX
   #endif
-  #include <windows.h>
   #include <UIAutomationClient.h>
-  #include <oleauto.h>
   #pragma comment( lib, "uiautomationcore.lib" )
   #pragma comment( lib, "oleaut32.lib" )
 #endif
@@ -49,6 +49,41 @@ using std::pair;
 
 namespace {
 
+
+void sutraForcePopupToFront( QWidget * window )
+{
+  if ( !window ) {
+    return;
+  }
+
+  window->show();
+  window->raise();
+  window->activateWindow();
+
+#ifdef Q_OS_WIN
+  HWND hwnd = reinterpret_cast< HWND >( window->winId() );
+
+  if ( hwnd ) {
+    // Toggle topmost briefly so the popup is brought above the source app,
+    // but do not keep it permanently Always-on-top.
+    SetWindowPos( hwnd,
+                  HWND_TOPMOST,
+                  0,
+                  0,
+                  0,
+                  0,
+                  SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW );
+    SetForegroundWindow( hwnd );
+    SetWindowPos( hwnd,
+                  HWND_NOTOPMOST,
+                  0,
+                  0,
+                  0,
+                  0,
+                  SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW );
+  }
+#endif
+}
 constexpr qsizetype smartLookupMaxChars = 300;
 constexpr bool smartLookupAutoPinPopup  = true;
 
@@ -122,6 +157,50 @@ void saveSutraPopupOpacityPercent( int opacityPercent )
                      qBound( sutraPopupMinOpacityPercent, opacityPercent, sutraPopupMaxOpacityPercent ) );
 }
 
+
+enum class SutraMouseLookupMode {
+  Disabled       = 0,
+  CtrlRightClick = 1,
+  CtrlLeftClick  = 2,
+  AltRightClick  = 3
+};
+
+QString sutraMouseLookupModeSettingsKey()
+{
+  return QStringLiteral( "SutraEdition/MouseLookupMode" );
+}
+
+constexpr int sutraMouseLookupDefaultMode = static_cast< int >( SutraMouseLookupMode::CtrlRightClick );
+
+SutraMouseLookupMode loadSutraMouseLookupMode()
+{
+  QSettings settings;
+  const int value =
+    qBound( 0, settings.value( sutraMouseLookupModeSettingsKey(), sutraMouseLookupDefaultMode ).toInt(), 3 );
+  return static_cast< SutraMouseLookupMode >( value );
+}
+
+void saveSutraMouseLookupMode( SutraMouseLookupMode mode )
+{
+  QSettings settings;
+  settings.setValue( sutraMouseLookupModeSettingsKey(), static_cast< int >( mode ) );
+}
+
+QString sutraMouseLookupModeLabel( SutraMouseLookupMode mode )
+{
+  switch ( mode ) {
+    case SutraMouseLookupMode::Disabled:
+      return QStringLiteral( "Disabled" );
+    case SutraMouseLookupMode::CtrlLeftClick:
+      return QStringLiteral( "Ctrl + Left Click" );
+    case SutraMouseLookupMode::AltRightClick:
+      return QStringLiteral( "Alt + Right Click" );
+    case SutraMouseLookupMode::CtrlRightClick:
+    default:
+      return QStringLiteral( "Ctrl + Right Click" );
+  }
+}
+
 void resetSutraPopupAppearanceDefaults()
 {
   QSettings settings;
@@ -129,6 +208,7 @@ void resetSutraPopupAppearanceDefaults()
   settings.remove( sutraPopupFixedGeometrySettingsKey() );
   settings.setValue( sutraPopupFontSizeSettingsKey(), sutraPopupDefaultFontSize );
   settings.setValue( sutraPopupOpacitySettingsKey(), sutraPopupDefaultOpacityPercent );
+  settings.setValue( sutraMouseLookupModeSettingsKey(), sutraMouseLookupDefaultMode );
 }
 
 void applySutraPopupOpacity( QWidget * popup )
@@ -142,6 +222,8 @@ void applySutraPopupOpacity( QWidget * popup )
 
 #ifdef Q_OS_WIN
 
+#include <windows.h>
+#include <oleauto.h>
 void sendSutraVirtualKey( WORD virtualKey, bool down )
 {
   INPUT input  = {};
@@ -160,6 +242,14 @@ void releaseSutraControlKeys()
   sendSutraVirtualKey( VK_CONTROL, false );
   sendSutraVirtualKey( VK_LCONTROL, false );
   sendSutraVirtualKey( VK_RCONTROL, false );
+}
+
+
+void releaseSutraAltKeys()
+{
+  sendSutraVirtualKey( VK_MENU, false );
+  sendSutraVirtualKey( VK_LMENU, false );
+  sendSutraVirtualKey( VK_RMENU, false );
 }
 
 void sendSutraCtrlC()
@@ -335,6 +425,9 @@ public:
 
   bool ensureInstalled()
   {
+    // Disabled here because startup hook in main.cc owns mouse lookup from app launch.
+    return false;
+
     if ( hook ) {
       return true;
     }
@@ -343,7 +436,7 @@ public:
     hook = SetWindowsHookExW( WH_MOUSE_LL, &SutraCtrlRightClickLookupHook::mouseProc, GetModuleHandleW( nullptr ), 0 );
 
     if ( !hook ) {
-      qWarning() << "Unable to install Sutra Ctrl+Right Click lookup hook. Error:" << GetLastError();
+      qWarning() << "Unable to install Sutra mouse lookup hook. Error:" << GetLastError();
       return false;
     }
 
@@ -369,14 +462,48 @@ private:
       || ( GetAsyncKeyState( VK_RCONTROL ) & 0x8000 );
   }
 
+  static bool isAltPressed()
+  {
+    return ( GetAsyncKeyState( VK_MENU ) & 0x8000 ) || ( GetAsyncKeyState( VK_LMENU ) & 0x8000 )
+      || ( GetAsyncKeyState( VK_RMENU ) & 0x8000 );
+  }
+
+  static bool isMouseLookupDownEvent( SutraMouseLookupMode mode, WPARAM wParam )
+  {
+    switch ( mode ) {
+      case SutraMouseLookupMode::CtrlLeftClick:
+        return wParam == WM_LBUTTONDOWN;
+      case SutraMouseLookupMode::AltRightClick:
+      case SutraMouseLookupMode::CtrlRightClick:
+        return wParam == WM_RBUTTONDOWN;
+      case SutraMouseLookupMode::Disabled:
+      default:
+        return false;
+    }
+  }
+
+  static bool shouldHandleMouseLookupEvent( SutraMouseLookupMode mode, WPARAM wParam )
+  {
+    switch ( mode ) {
+      case SutraMouseLookupMode::CtrlRightClick:
+        return isControlPressed() && ( wParam == WM_RBUTTONDOWN || wParam == WM_RBUTTONUP );
+      case SutraMouseLookupMode::CtrlLeftClick:
+        return isControlPressed() && ( wParam == WM_LBUTTONDOWN || wParam == WM_LBUTTONUP );
+      case SutraMouseLookupMode::AltRightClick:
+        return isAltPressed() && ( wParam == WM_RBUTTONDOWN || wParam == WM_RBUTTONUP );
+      case SutraMouseLookupMode::Disabled:
+      default:
+        return false;
+    }
+  }
+
   static LRESULT CALLBACK mouseProc( int code, WPARAM wParam, LPARAM lParam )
   {
-    if ( code == HC_ACTION && instance && isControlPressed() ) {
-      const bool isRightDown = wParam == WM_RBUTTONDOWN;
-      const bool isRightUp   = wParam == WM_RBUTTONUP;
+    if ( code == HC_ACTION && instance ) {
+      const SutraMouseLookupMode mode = loadSutraMouseLookupMode();
 
-      if ( isRightDown || isRightUp ) {
-        if ( isRightDown && instance->callback ) {
+      if ( shouldHandleMouseLookupEvent( mode, wParam ) ) {
+        if ( isMouseLookupDownEvent( mode, wParam ) && instance->callback ) {
           const MSLLHOOKSTRUCT * mouseInfo = reinterpret_cast< const MSLLHOOKSTRUCT * >( lParam );
           const QPoint globalPos( mouseInfo->pt.x, mouseInfo->pt.y );
           const auto callbackCopy = instance->callback;
@@ -386,7 +513,7 @@ private:
           } );
         }
 
-        // Suppress the right-click so external apps do not open their context menu.
+        // Suppress the configured click so external apps do not open their own menu or selection action.
         return 1;
       }
     }
@@ -1654,9 +1781,33 @@ ScanPopup::ScanPopup( QWidget * parent,
 
   sutraPopupLayoutMenu->addSeparator();
 
-  QAction * sutraCtrlRightClickInfoAction =
-    sutraPopupLayoutMenu->addAction( tr( "Ctrl + Right Click: lookup word under cursor" ) );
-  sutraCtrlRightClickInfoAction->setEnabled( false );
+  QMenu * sutraMouseLookupMenu         = sutraPopupLayoutMenu->addMenu( tr( "Mouse lookup" ) );
+  QActionGroup * sutraMouseLookupGroup = new QActionGroup( sutraMouseLookupMenu );
+  QList< QAction * > sutraMouseLookupActions;
+
+  auto addSutraMouseLookupAction = [ & ]( const QString & label, SutraMouseLookupMode mode ) {
+    QAction * action = sutraMouseLookupMenu->addAction( label );
+    action->setCheckable( true );
+    action->setData( static_cast< int >( mode ) );
+    sutraMouseLookupGroup->addAction( action );
+    sutraMouseLookupActions << action;
+
+    connect( action, &QAction::triggered, this, [ this, mode ] {
+      saveSutraMouseLookupMode( mode );
+      showStatusBarMessage( tr( "Mouse lookup: %1" ).arg( sutraMouseLookupModeLabel( mode ) ), 5000 );
+    } );
+
+    return action;
+  };
+
+  addSutraMouseLookupAction( tr( "Disabled" ), SutraMouseLookupMode::Disabled );
+  addSutraMouseLookupAction( tr( "Ctrl + Right Click" ), SutraMouseLookupMode::CtrlRightClick );
+  addSutraMouseLookupAction( tr( "Ctrl + Left Click" ), SutraMouseLookupMode::CtrlLeftClick );
+  addSutraMouseLookupAction( tr( "Alt + Right Click" ), SutraMouseLookupMode::AltRightClick );
+
+  QAction * sutraMouseLookupInfoAction = sutraPopupLayoutMenu->addAction(
+    tr( "Current mouse lookup: %1" ).arg( sutraMouseLookupModeLabel( loadSutraMouseLookupMode() ) ) );
+  sutraMouseLookupInfoAction->setEnabled( false );
 
   sutraPopupLayoutMenu->addSeparator();
 
@@ -1668,7 +1819,9 @@ ScanPopup::ScanPopup( QWidget * parent,
                                             sutraPopupFixedAction,
                                             sutraPopupFitAction,
                                             sutraPopupFontSizeActions,
-                                            sutraPopupTransparencyActions ] {
+                                            sutraPopupTransparencyActions,
+                                            sutraMouseLookupActions,
+                                            sutraMouseLookupInfoAction ] {
     sutraPopupPinAction->setChecked( ui.pinButton->isChecked() );
 
     const int currentFontSize = loadSutraPopupFontSize();
@@ -1680,6 +1833,14 @@ ScanPopup::ScanPopup( QWidget * parent,
     for ( QAction * opacityAction : sutraPopupTransparencyActions ) {
       opacityAction->setChecked( opacityAction->data().toInt() == currentOpacityPercent );
     }
+
+    const SutraMouseLookupMode currentMouseLookupMode = loadSutraMouseLookupMode();
+    for ( QAction * mouseLookupAction : sutraMouseLookupActions ) {
+      mouseLookupAction->setChecked( mouseLookupAction->data().toInt()
+                                     == static_cast< int >( currentMouseLookupMode ) );
+    }
+    sutraMouseLookupInfoAction->setText(
+      tr( "Current mouse lookup: %1" ).arg( sutraMouseLookupModeLabel( currentMouseLookupMode ) ) );
 
     switch ( loadSutraPopupLayoutMode() ) {
       case SutraPopupLayoutMode::Fixed:
@@ -1724,7 +1885,7 @@ ScanPopup::ScanPopup( QWidget * parent,
     applySutraPopupOpacity( this );
     refreshSutraCustomTabs( tabWidget, pendingWord, translateBox->translateLine()->text() );
     applySutraPopupLayoutMode( this, tabWidget );
-    showStatusBarMessage( tr( "Popup defaults restored: Auto layout, 14 px, 100% opacity" ), 5000 );
+    showStatusBarMessage( tr( "Popup defaults restored: Auto layout, 14 px, 100% opacity, Ctrl + Right Click" ), 5000 );
   } );
 
   if ( QToolButton * pinToolButton = qobject_cast< QToolButton * >( ui.pinButton ) ) {
@@ -1808,6 +1969,8 @@ ScanPopup::ScanPopup( QWidget * parent,
   applySutraPopupOpacity( this );
 
 #ifdef Q_OS_WIN
+#include <windows.h>
+#include <oleauto.h>
   {
     QPointer< ScanPopup > popup( this );
 
@@ -1821,6 +1984,7 @@ ScanPopup::ScanPopup( QWidget * parent,
       const QString contextText           = sutraUiAutomationTextAtPoint( globalPos );
 
       releaseSutraControlKeys();
+      releaseSutraAltKeys();
       sendSutraLeftDoubleClickAt( globalPos );
 
       QTimer::singleShot( 160, popup, [ popup, previousClipboardText, contextText ] {
@@ -1867,7 +2031,7 @@ ScanPopup::ScanPopup( QWidget * parent,
     } );
 
     if ( mouseHookInstalled ) {
-      qInfo() << "Sutra Ctrl+Right Click lookup hook installed";
+      qInfo() << "Sutra mouse lookup hook installed";
     }
   }
 #endif
@@ -2195,6 +2359,7 @@ void ScanPopup::translateWord( const QString & word )
 #endif
 
   engagePopup( false, true );
+  sutraForcePopupToFront( this );
   updateBuddhistGlossaryTab( tabWidget, pendingWord, smartTerms );
   updateWebReferenceTab( tabWidget, pendingWord, smartTerms );
 
@@ -2236,6 +2401,7 @@ void ScanPopup::showEngagePopup()
 #endif
 
   engagePopup( forcePopup );
+  sutraForcePopupToFront( this );
   updateBuddhistGlossaryTab( tabWidget, pendingWord, smartTerms );
   updateWebReferenceTab( tabWidget, pendingWord, smartTerms );
 
@@ -2330,8 +2496,7 @@ void ScanPopup::engagePopup( bool forcePopup, bool giveFocus )
     show();
 
     if ( giveFocus ) {
-      activateWindow();
-      raise();
+      sutraForcePopupToFront( this );
     }
 
     if ( !ui.pinButton->isChecked() ) {
@@ -2347,8 +2512,7 @@ void ScanPopup::engagePopup( bool forcePopup, bool giveFocus )
     // Pinned-down window isn't always on top, so we need to raise it
     show();
     if ( cfg.preferences.raiseWindowOnSearch ) {
-      activateWindow();
-      raise();
+      sutraForcePopupToFront( this );
     }
   }
 
