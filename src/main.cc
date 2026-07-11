@@ -428,6 +428,265 @@ bool sutraStartupIsTooShortCjkLookupText( const QString & text )
 
   return false;
 }
+bool sutraStartupHasLatinLetter( const QString & text )
+{
+  for ( const QChar & ch : text ) {
+    if ( ch.isLetter() && ch.unicode() < 0x024F ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+QString sutraStartupNormalizeVietnameseLookupText( const QString & text )
+{
+  const QString decomposed = text.toCaseFolded().normalized( QString::NormalizationForm_D );
+
+  QString normalized;
+  normalized.reserve( decomposed.size() );
+
+  bool lastWasSpace = true;
+
+  for ( const QChar & ch : decomposed ) {
+    const QChar::Category category = ch.category();
+
+    if ( category == QChar::Mark_NonSpacing
+      || category == QChar::Mark_SpacingCombining
+      || category == QChar::Mark_Enclosing ) {
+      continue;
+    }
+
+    QString piece;
+
+    if ( ch == QChar( 0x0111 ) || ch == QChar( 0x0110 ) ) {
+      piece = QStringLiteral( "d" );
+    }
+    else if ( ch.isLetterOrNumber() ) {
+      piece = QString( ch );
+    }
+    else if ( ch.isSpace() || ch == QLatin1Char( '-' ) || ch == QLatin1Char( '_' ) || ch == QChar( 0x2013 ) || ch == QChar( 0x2014 ) ) {
+      piece = QStringLiteral( " " );
+    }
+    else {
+      piece = QStringLiteral( " " );
+    }
+
+    if ( piece == QStringLiteral( " " ) ) {
+      if ( !lastWasSpace ) {
+        normalized += QLatin1Char( ' ' );
+      }
+
+      lastWasSpace = true;
+    }
+    else {
+      normalized += piece;
+      lastWasSpace = false;
+    }
+  }
+
+  return normalized.trimmed();
+}
+
+bool sutraStartupIsSingleLatinWord( const QString & text )
+{
+  const QString trimmed = text.trimmed();
+
+  if ( trimmed.isEmpty() || trimmed.size() > 32 ) {
+    return false;
+  }
+
+  if ( trimmed.contains( QRegularExpression( QStringLiteral( "\\s" ) ) ) ) {
+    return false;
+  }
+
+  return sutraStartupHasLatinLetter( trimmed );
+}
+
+bool sutraStartupShouldUseLineFallbackForPhrase( const QString & text )
+{
+  return sutraStartupIsTooShortCjkLookupText( text )
+      || sutraStartupIsSingleLatinWord( text );
+}
+
+QStringList sutraStartupVietnameseBuddhistPhrases()
+{
+  return QStringList{
+    QStringLiteral( "A Di ÄÃ  Pháº­t" ),
+    QStringLiteral( "BÃ¡t chÃ¡nh Ä‘áº¡o" ),
+    QStringLiteral( "BÃ¡t-nhÃ£ Ba-la-máº­t-Ä‘a" ),
+    QStringLiteral( "BÃ¡t-nhÃ£ Ba-la-máº­t" ),
+    QStringLiteral( "Bá»“ Äá» Äáº¡t Ma" ),
+    QStringLiteral( "Bá»“ Ä‘á» tÃ¢m" ),
+    QStringLiteral( "Bá»“ TÃ¡t" ),
+    QStringLiteral( "Bá»‘ thÃ­" ),
+    QStringLiteral( "ChÃ¡nh Ä‘á»‹nh" ),
+    QStringLiteral( "ChÃ¡nh kiáº¿n" ),
+    QStringLiteral( "ChÃ¡nh máº¡ng" ),
+    QStringLiteral( "ChÃ¡nh ngá»¯" ),
+    QStringLiteral( "ChÃ¡nh nghiá»‡p" ),
+    QStringLiteral( "ChÃ¡nh niá»‡m" ),
+    QStringLiteral( "ChÃ¡nh tinh táº¥n" ),
+    QStringLiteral( "ChÃ¡nh tÆ° duy" ),
+    QStringLiteral( "ChÃ¢n nhÆ°" ),
+    QStringLiteral( "ChÃºng sinh" ),
+    QStringLiteral( "Diá»‡u Ä‘áº¿" ),
+    QStringLiteral( "DuyÃªn khá»Ÿi" ),
+    QStringLiteral( "GiÃ¡c ngá»™" ),
+    QStringLiteral( "Giá»›i Ä‘á»‹nh tuá»‡" ),
+    QStringLiteral( "Há»¯u tÃ¬nh" ),
+    QStringLiteral( "Khá»• Ä‘áº¿" ),
+    QStringLiteral( "KhÃ´ng tá»©c thá»‹ sáº¯c" ),
+    QStringLiteral( "Lá»¥c Ä‘á»™" ),
+    QStringLiteral( "LuÃ¢n há»“i" ),
+    QStringLiteral( "Niáº¿t bÃ n" ),
+    QStringLiteral( "NgÅ© uáº©n" ),
+    QStringLiteral( "PhÃ¡p thÃ¢n" ),
+    QStringLiteral( "Pháº­t phÃ¡p" ),
+    QStringLiteral( "Pháº­t tÃ¡nh" ),
+    QStringLiteral( "Pháº­t tÃ­nh" ),
+    QStringLiteral( "QuÃ¡n Tháº¿ Ã‚m" ),
+    QStringLiteral( "QuÃ¡n Tháº¿ Ã‚m Bá»“ TÃ¡t" ),
+    QStringLiteral( "QuÃ¡n Tá»± Táº¡i" ),
+    QStringLiteral( "QuÃ¡n Tá»± Táº¡i Bá»“ TÃ¡t" ),
+    QStringLiteral( "Sáº¯c tá»©c thá»‹ khÃ´ng" ),
+    QStringLiteral( "Tam báº£o" ),
+    QStringLiteral( "Tam Ä‘á»™c" ),
+    QStringLiteral( "Tam há»c" ),
+    QStringLiteral( "TÃ¡nh khÃ´ng" ),
+    QStringLiteral( "TÃ¢m vÃ´ quÃ¡i ngáº¡i" ),
+    QStringLiteral( "Thiá»n Ä‘á»‹nh" ),
+    QStringLiteral( "Tá»© diá»‡u Ä‘áº¿" ),
+    QStringLiteral( "Tá»© niá»‡m xá»©" ),
+    QStringLiteral( "Tá»© thÃ¡nh Ä‘áº¿" ),
+    QStringLiteral( "Tá»« bi" ),
+    QStringLiteral( "VÃ´ minh" ),
+    QStringLiteral( "VÃ´ ngÃ£" ),
+    QStringLiteral( "VÃ´ thÆ°á»ng" ),
+    QStringLiteral( "VÃ´ thÆ°á»£ng chÃ¡nh Ä‘áº³ng chÃ¡nh giÃ¡c" )
+  };
+}
+
+QString sutraStartupVietnameseWindowAroundAnchor( const QString & lineText, const QString & anchorText )
+{
+  const QString anchor = sutraStartupNormalizeVietnameseLookupText( anchorText );
+
+  if ( anchor.isEmpty() ) {
+    return {};
+  }
+
+  QString simplifiedLine = lineText;
+  simplifiedLine.replace( QRegularExpression( QStringLiteral( "[\\r\\n\\t]+" ) ), QStringLiteral( " " ) );
+  simplifiedLine.replace( QRegularExpression( QStringLiteral( "[,.;:!?()\\[\\]{}<>\"â€œâ€'â€˜â€™]+" ) ), QStringLiteral( " " ) );
+
+#if QT_VERSION >= QT_VERSION_CHECK( 5, 14, 0 )
+  const QStringList words = simplifiedLine.split( QRegularExpression( QStringLiteral( "\\s+" ) ), Qt::SkipEmptyParts );
+#else
+  const QStringList words = simplifiedLine.split( QRegularExpression( QStringLiteral( "\\s+" ) ), QString::SkipEmptyParts );
+#endif
+
+  if ( words.isEmpty() ) {
+    return {};
+  }
+
+  int anchorIndex = -1;
+
+  for ( int i = 0; i < words.size(); ++i ) {
+    if ( sutraStartupNormalizeVietnameseLookupText( words.at( i ) ) == anchor ) {
+      anchorIndex = i;
+      break;
+    }
+  }
+
+  if ( anchorIndex < 0 ) {
+    return {};
+  }
+
+  // Prefer common Vietnamese compounds: previous + current, current + next, then 3-word windows.
+  QStringList candidates;
+
+  if ( anchorIndex > 0 ) {
+    candidates << QStringList{ words.at( anchorIndex - 1 ), words.at( anchorIndex ) }.join( QLatin1Char( ' ' ) );
+  }
+
+  if ( anchorIndex + 1 < words.size() ) {
+    candidates << QStringList{ words.at( anchorIndex ), words.at( anchorIndex + 1 ) }.join( QLatin1Char( ' ' ) );
+  }
+
+  if ( anchorIndex > 0 && anchorIndex + 1 < words.size() ) {
+    candidates << QStringList{ words.at( anchorIndex - 1 ), words.at( anchorIndex ), words.at( anchorIndex + 1 ) }.join( QLatin1Char( ' ' ) );
+  }
+
+  if ( anchorIndex + 2 < words.size() ) {
+    candidates << QStringList{ words.at( anchorIndex ), words.at( anchorIndex + 1 ), words.at( anchorIndex + 2 ) }.join( QLatin1Char( ' ' ) );
+  }
+
+  if ( anchorIndex > 1 ) {
+    candidates << QStringList{ words.at( anchorIndex - 2 ), words.at( anchorIndex - 1 ), words.at( anchorIndex ) }.join( QLatin1Char( ' ' ) );
+  }
+
+  for ( const QString & candidate : candidates ) {
+    if ( candidate.trimmed().size() >= anchorText.trimmed().size() ) {
+      return candidate.trimmed();
+    }
+  }
+
+  return words.at( anchorIndex ).trimmed();
+}
+
+QString sutraStartupBestVietnamesePhraseFromLine( const QString & lineText, const QString & anchorText )
+{
+  const QString normalizedLine   = sutraStartupNormalizeVietnameseLookupText( lineText );
+  const QString normalizedAnchor = sutraStartupNormalizeVietnameseLookupText( anchorText );
+
+  if ( normalizedLine.isEmpty() ) {
+    return {};
+  }
+
+  QString bestPhrase;
+  int bestScore = -1;
+
+  for ( const QString & phrase : sutraStartupVietnameseBuddhistPhrases() ) {
+    const QString normalizedPhrase = sutraStartupNormalizeVietnameseLookupText( phrase );
+
+    if ( normalizedPhrase.isEmpty() || !normalizedLine.contains( normalizedPhrase ) ) {
+      continue;
+    }
+
+    if ( !normalizedAnchor.isEmpty() && !normalizedPhrase.contains( normalizedAnchor ) ) {
+      continue;
+    }
+
+    if ( normalizedPhrase.size() > bestScore ) {
+      bestScore = normalizedPhrase.size();
+      bestPhrase = phrase;
+    }
+  }
+
+  if ( !bestPhrase.isEmpty() ) {
+    return bestPhrase;
+  }
+
+  if ( sutraStartupIsSingleLatinWord( anchorText ) ) {
+    const QString windowPhrase = sutraStartupVietnameseWindowAroundAnchor( lineText, anchorText );
+
+    if ( !windowPhrase.isEmpty() ) {
+      return windowPhrase;
+    }
+  }
+
+  return lineText.trimmed();
+}
+
+QString sutraStartupBestLineLookupText( const QString & lineText, const QString & anchorText )
+{
+  if ( sutraStartupHasLatinLetter( lineText ) || sutraStartupHasLatinLetter( anchorText ) ) {
+    return sutraStartupBestVietnamesePhraseFromLine( lineText, anchorText );
+  }
+
+  return lineText.trimmed();
+}
+
 
 QString sutraStartupTextFromBstr( BSTR text )
 {
@@ -714,8 +973,9 @@ private:
 
     const QString contextText = sutraStartupUiAutomationTextAtPoint( globalPos );
 
-    if ( !contextText.trimmed().isEmpty() ) {
-      openLookup( contextText );
+    if ( !contextText.trimmed().isEmpty()
+      && !sutraStartupShouldUseLineFallbackForPhrase( contextText ) ) {
+      openLookup( sutraStartupBestLineLookupText( contextText, QString() ) );
       lookupInProgress = false;
       return;
     }
@@ -754,7 +1014,7 @@ private:
 
         const QString capturedText = clipboard->text( QClipboard::Clipboard );
 
-        if ( !sutraStartupIsTooShortCjkLookupText( capturedText ) ) {
+        if ( !sutraStartupShouldUseLineFallbackForPhrase( capturedText ) ) {
           if ( !capturedText.trimmed().isEmpty() ) {
             openLookup( capturedText );
           }
@@ -788,7 +1048,7 @@ private:
             const QString lineText = clipboard->text( QClipboard::Clipboard ).trimmed();
 
             if ( !lineText.isEmpty() && lineText != capturedText.trimmed() ) {
-              openLookup( lineText );
+              openLookup( sutraStartupBestLineLookupText( lineText, capturedText ) );
             }
             else if ( !capturedText.trimmed().isEmpty() ) {
               openLookup( capturedText );
@@ -1096,6 +1356,8 @@ int main( int argc, char ** argv )
 #include <windows.h>
 #include <oleauto.h>
 #include <uiautomation.h>
+#include <QRegularExpression>
+#include <QStringList>
   SutraStartupMouseLookupHook sutraStartupMouseLookupHook( &app );
   sutraStartupMouseLookupHook.ensureInstalled();
 #endif
