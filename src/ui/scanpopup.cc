@@ -1727,6 +1727,207 @@ QString glossaryHtmlFinalUxBaseV6( const QString & primaryTerm, const QStringLis
   return html;
 }
 
+
+// sutraGlossaryStableUiV16
+// Single-pass HTML renderer for the glossary tab.
+// Keep this renderer self-contained so later UI polishing does not duplicate labels/sections.
+QString sutraGlossaryChipHtmlV16( const QString & text, bool relatedStyle )
+{
+  const QString trimmed = text.trimmed();
+  if ( trimmed.isEmpty() ) {
+    return {};
+  }
+
+  const QString style = relatedStyle
+                          ? QStringLiteral( "display:inline-block;margin:4px 7px 4px 0;padding:5px 10px;"
+                                            "background:#fff7ed;border:1px solid #fdba74;border-radius:999px;"
+                                            "color:#9a3412;font-weight:700;" )
+                          : QStringLiteral( "display:inline-block;margin:4px 7px 4px 0;padding:5px 10px;"
+                                            "background:#eff6ff;border:1px solid #bfdbfe;border-radius:999px;"
+                                            "color:#1d4ed8;font-weight:700;" );
+
+  return QStringLiteral( "<span style='%1'>%2</span>" ).arg( style, htmlEscape( trimmed ) );
+}
+
+QString glossaryHtmlStableV16( const QString & primaryTerm, const QStringList & detectedTerms )
+{
+  const QList< BuddhistGlossaryEntry > entries = glossaryEntriesForTerms( primaryTerm, detectedTerms );
+  const int fontSize                           = loadSutraPopupFontSize();
+  const int termSize                           = qMax( 25, fontSize + 10 );
+  const int hanVietSize                        = qMax( 17, fontSize + 2 );
+  const int labelSize                          = qMax( 11, fontSize - 3 );
+  const int sectionSize                        = qMax( 15, fontSize );
+
+  QString html;
+  html += QStringLiteral( "<html><head><meta charset='utf-8'></head>"
+                          "<body style='margin:0;padding:12px 14px 20px 14px;background:#f8fafc;"
+                          "color:#0f172a;font-family:Segoe UI,Arial,sans-serif;font-size:%1px;line-height:1.55;'>" )
+            .arg( fontSize );
+
+  if ( entries.isEmpty() ) {
+    html += QStringLiteral(
+      "<div style='margin:2px 0 10px 0;padding:9px 12px;background:#f1f5f9;"
+      "border-left:5px solid #64748b;font-size:%1px;font-weight:800;letter-spacing:.4px;color:#334155;'>"
+      "K&#7870;T QU&#7842; TRA C&#7912;U</div>"
+      "<div style='padding:16px;background:#ffffff;border:1px dashed #cbd5e1;border-radius:8px;'>"
+      "<div style='font-size:%2px;font-weight:800;color:#0f172a;margin-bottom:6px;'>"
+      "Ch&#432;a c&#243; thu&#7853;t ng&#7919; ph&#249; h&#7907;p</div>"
+      "<div style='color:#475569;'>Kh&#244;ng t&#236;m th&#7845;y m&#7909;c Ph&#7853;t h&#7885;c n&#7897;i b&#7897; cho: "
+      "<b>%3</b></div></div>" )
+              .arg( sectionSize )
+              .arg( qMax( 18, fontSize + 2 ) )
+              .arg( htmlEscape( primaryTerm ) );
+
+    html += QStringLiteral( "</body></html>" );
+    return html;
+  }
+
+  const QString normalizedPrimary = normalizeSmartLookupInput( primaryTerm );
+  BuddhistGlossaryEntry primaryEntry;
+  bool primaryFound = false;
+
+  for ( const BuddhistGlossaryEntry & entry : entries ) {
+    if ( normalizeSmartLookupInput( entry.term ) == normalizedPrimary ) {
+      primaryEntry = entry;
+      primaryFound = true;
+      break;
+    }
+  }
+
+  if ( !primaryFound ) {
+    primaryEntry = entries.first();
+  }
+
+  html += QStringLiteral(
+    "<div style='margin:2px 0 10px 0;padding:9px 12px;background:#ecfdf5;"
+    "border-left:5px solid #0f766e;font-size:%1px;font-weight:800;letter-spacing:.5px;color:#0f766e;'>"
+    "K&#7870;T QU&#7842; CH&#205;NH</div>" )
+            .arg( sectionSize );
+
+  html += QStringLiteral(
+    "<div style='margin:0 0 16px 0;padding:15px 17px 17px 17px;background:#ffffff;"
+    "border:1px solid #cbd5e1;border-left:6px solid #0f766e;border-radius:8px;'>" );
+
+  html += QStringLiteral( "<div style='font-size:%1px;line-height:1.18;font-weight:800;color:#020617;'>%2</div>" )
+            .arg( termSize )
+            .arg( htmlEscape( primaryEntry.term ) );
+
+  if ( !primaryEntry.hanViet.isEmpty() ) {
+    html += QStringLiteral( "<div style='margin-top:5px;font-size:%1px;font-weight:700;color:#0f766e;'>%2</div>" )
+              .arg( hanVietSize )
+              .arg( htmlEscape( primaryEntry.hanViet ) );
+  }
+
+  if ( !primaryEntry.category.isEmpty() ) {
+    html += QStringLiteral(
+      "<div style='margin-top:8px;'><span style='display:inline-block;padding:3px 9px;"
+      "background:#f0fdf4;border:1px solid #bbf7d0;border-radius:999px;color:#047857;"
+      "font-size:%1px;font-weight:700;'>%2</span></div>" )
+              .arg( labelSize )
+              .arg( htmlEscape( primaryEntry.category ) );
+  }
+
+  if ( !primaryEntry.pinyin.isEmpty() ) {
+    html += QStringLiteral(
+      "<div style='margin-top:14px;padding-top:10px;border-top:1px solid #e2e8f0;'>"
+      "<div style='font-size:%1px;font-weight:800;letter-spacing:1px;color:#64748b;'>PINYIN</div>"
+      "<div style='margin-top:4px;color:#0f172a;'>%2</div></div>" )
+              .arg( labelSize )
+              .arg( htmlEscape( primaryEntry.pinyin ) );
+  }
+
+  if ( !primaryEntry.meaningVi.isEmpty() ) {
+    html += QStringLiteral(
+      "<div style='margin-top:13px;padding:11px 12px;background:#f1f5f9;border:1px solid #e2e8f0;"
+      "border-radius:7px;'>"
+      "<div style='font-size:%1px;font-weight:800;letter-spacing:1px;color:#475569;'>"
+      "NGH&#296;A TI&#7870;NG VI&#7878;T</div>"
+      "<div style='margin-top:6px;color:#111827;'>%2</div></div>" )
+              .arg( labelSize )
+              .arg( htmlEscape( primaryEntry.meaningVi ) );
+  }
+
+  if ( !primaryEntry.suggestedTranslations.isEmpty() ) {
+    QStringList suggestionChips;
+    for ( const QString & suggestion : primaryEntry.suggestedTranslations ) {
+      const QString chip = sutraGlossaryChipHtmlV16( suggestion, false );
+      if ( !chip.isEmpty() ) {
+        suggestionChips << chip;
+      }
+    }
+
+    if ( !suggestionChips.isEmpty() ) {
+      html += QStringLiteral(
+        "<div style='margin-top:13px;'>"
+        "<div style='font-size:%1px;font-weight:800;letter-spacing:1px;color:#475569;'>"
+        "G&#7906;I &#221; D&#7882;CH</div>"
+        "<div style='margin-top:5px;'>%2</div></div>" )
+                .arg( labelSize )
+                .arg( suggestionChips.join( QString() ) );
+    }
+  }
+
+  html += QStringLiteral( "</div>" );
+
+  // Build one related-term list from both JSON relations and detected glossary entries.
+  // The same relation is rendered only once, and related entries stay compact instead of
+  // repeating the full PINYIN / MEANING / SUGGESTION section set.
+  QStringList relatedTerms;
+  const QString normalizedPrimaryEntry = normalizeSmartLookupInput( primaryEntry.term );
+
+  const auto appendRelatedTerm = [&]( const QString & value ) {
+    const QString trimmed = value.trimmed();
+    const QString normalized = normalizeSmartLookupInput( trimmed );
+
+    if ( trimmed.isEmpty() || normalized.isEmpty() || normalized == normalizedPrimaryEntry ) {
+      return;
+    }
+
+    for ( const QString & existing : relatedTerms ) {
+      if ( normalizeSmartLookupInput( existing ) == normalized ) {
+        return;
+      }
+    }
+
+    relatedTerms << trimmed;
+  };
+
+  for ( const QString & related : primaryEntry.related ) {
+    appendRelatedTerm( related );
+  }
+
+  for ( const BuddhistGlossaryEntry & entry : entries ) {
+    appendRelatedTerm( entry.term );
+  }
+
+  if ( !relatedTerms.isEmpty() ) {
+    QStringList relatedChips;
+    for ( const QString & related : relatedTerms ) {
+      const QString chip = sutraGlossaryChipHtmlV16( related, true );
+      if ( !chip.isEmpty() ) {
+        relatedChips << chip;
+      }
+    }
+
+    html += QStringLiteral(
+      "<div style='margin:4px 0 10px 0;padding:9px 12px;background:#fff7ed;"
+      "border-left:5px solid #c2410c;font-size:%1px;font-weight:800;letter-spacing:.5px;color:#9a3412;'>"
+      "LI&#202;N QUAN</div>"
+      "<div style='margin:0 0 14px 0;padding:11px 13px;background:#ffffff;border:1px solid #fed7aa;"
+      "border-left:4px solid #f97316;border-radius:8px;'>%2</div>" )
+              .arg( sectionSize )
+              .arg( relatedChips.join( QString() ) );
+  }
+
+  html += QStringLiteral(
+    "<div style='margin-top:12px;color:#94a3b8;font-size:%1px;'>"
+    "Ngu&#7891;n d&#7919; li&#7879;u: buddhist_terms.json</div>" )
+            .arg( labelSize );
+
+  html += QStringLiteral( "</body></html>" );
+  return html;
+}
+
 QTextBrowser * findBuddhistGlossaryBrowser( QTabWidget * tabs )
 {
   if ( !tabs ) {
@@ -1963,7 +2164,7 @@ void updateBuddhistGlossaryTab( QTabWidget * tabs, const QString & primaryTerm, 
     tabs->addTab( browser, QString::fromUtf8( "\x47" "\x69" "\xe1" "\xba" "\xa3" "\x69" "\x20" "\x6e" "\x67" "\x68" "\xc4" "\xa9" "\x61" ) ); // sutraForceGlossaryTabTitleV8
   }
 
-  browser->setHtml( sutraSafeGlossaryUiV13( glossaryHtml( primaryTerm, detectedTerms ) ) );
+  browser->setHtml( glossaryHtmlStableV16( primaryTerm, detectedTerms ) );
   applySutraPopupTextBrowserFont( browser );
 }
 
