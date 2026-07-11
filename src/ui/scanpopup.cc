@@ -74,9 +74,13 @@ void sutraForcePopupToFront( QWidget * window )
                   0,
                   SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW );
     SetForegroundWindow( hwnd );
-    if ( !window->windowFlags().testFlag( Qt::WindowStaysOnTopHint ) ) {
-      SetWindowPos( hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW );
-    }
+    SetWindowPos( hwnd,
+                  HWND_NOTOPMOST,
+                  0,
+                  0,
+                  0,
+                  0,
+                  SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW );
   }
 #endif
 }
@@ -1269,65 +1273,205 @@ QList< BuddhistGlossaryEntry > glossaryEntriesForTerms( const QString & primaryT
   return result;
 }
 
-QString glossaryEntryHtml( const BuddhistGlossaryEntry & entry )
+QString sutraHtmlLabelPhatHocV3()
 {
-  const int fontSize = loadSutraPopupFontSize();
+  return QStringLiteral( "Ph&#7853;t h&#7885;c" );
+}
 
+QString sutraGlossaryChipHtmlV5( const QString & text )
+{
+  if ( text.trimmed().isEmpty() ) {
+    return {};
+  }
+
+  return QStringLiteral( "<span class='chip'>%1</span>" ).arg( htmlEscape( text.trimmed() ) );
+}
+
+QString sutraGlossaryCardHtmlV5( const BuddhistGlossaryEntry & entry, bool isPrimary )
+{
   QString html;
-  html += QStringLiteral( "<div style='margin:0 0 14px 0; padding:10px; border:1px solid #ddd; border-radius:8px;'>" );
-  html += QStringLiteral( "<div style='font-size:%1px; font-weight:700; margin-bottom:6px;'>%2</div>" )
-            .arg( fontSize + 8 )
-            .arg( htmlEscape( entry.term ) );
+
+  html += QStringLiteral( "<article class='term-card %1'>" )
+            .arg( isPrimary ? QStringLiteral( "primary-card" ) : QStringLiteral( "related-card" ) );
+
+  html += QStringLiteral( "<div class='card-top'>" );
+  html += QStringLiteral( "<div class='term-block'>" );
+  html += QStringLiteral( "<div class='term-title'>%1</div>" ).arg( htmlEscape( entry.term ) );
 
   if ( !entry.hanViet.isEmpty() ) {
-    html += QStringLiteral( "<div><b>Hán Việt:</b> %1</div>" ).arg( htmlEscape( entry.hanViet ) );
-  }
-  if ( !entry.pinyin.isEmpty() ) {
-    html += QStringLiteral( "<div><b>Pinyin:</b> %1</div>" ).arg( htmlEscape( entry.pinyin ) );
-  }
-  if ( !entry.meaningVi.isEmpty() ) {
-    html += QStringLiteral( "<div><b>Nghĩa:</b> %1</div>" ).arg( htmlEscape( entry.meaningVi ) );
-  }
-  if ( !entry.category.isEmpty() ) {
-    html += QStringLiteral( "<div><b>Nhóm:</b> %1</div>" ).arg( htmlEscape( entry.category ) );
-  }
-  if ( !entry.suggestedTranslations.isEmpty() ) {
-    html += QStringLiteral( "<div><b>Gợi ý dịch:</b> %1</div>" )
-              .arg( htmlEscape( entry.suggestedTranslations.join( QStringLiteral( " / " ) ) ) );
-  }
-  if ( !entry.related.isEmpty() ) {
-    html += QStringLiteral( "<div><b>Liên quan:</b> %1</div>" )
-              .arg( htmlEscape( entry.related.join( QStringLiteral( "、" ) ) ) );
+    html += QStringLiteral( "<div class='term-subtitle'>%1</div>" ).arg( htmlEscape( entry.hanViet ) );
   }
 
   html += QStringLiteral( "</div>" );
+
+  if ( !entry.category.isEmpty() ) {
+    html += QStringLiteral( "<div class='category-badge'>%1</div>" ).arg( htmlEscape( entry.category ) );
+  }
+
+  html += QStringLiteral( "</div>" );
+
+  if ( !entry.pinyin.isEmpty() ) {
+    html += QStringLiteral(
+      "<div class='meta-row'><span class='meta-label'>Pinyin</span><span class='meta-value latin'>%1</span></div>" )
+              .arg( htmlEscape( entry.pinyin ) );
+  }
+
+  if ( !entry.meaningVi.isEmpty() ) {
+    html += QStringLiteral(
+      "<section class='meaning-box'>"
+      "<div class='section-label'>Ngh&#297;a ti&#7871;ng Vi&#7879;t</div>"
+      "<div class='meaning-text'>%1</div>"
+      "</section>" )
+              .arg( htmlEscape( entry.meaningVi ) );
+  }
+
+  if ( !entry.suggestedTranslations.isEmpty() ) {
+    QStringList suggestionChips;
+
+    for ( const QString & suggestion : entry.suggestedTranslations ) {
+      suggestionChips << sutraGlossaryChipHtmlV5( suggestion );
+    }
+
+    html += QStringLiteral(
+      "<section class='mini-section'>"
+      "<div class='section-label'>G&#7907;i &#253; d&#7883;ch</div>"
+      "<div class='chip-row'>%1</div>"
+      "</section>" )
+              .arg( suggestionChips.join( QString() ) );
+  }
+
+  if ( !entry.related.isEmpty() ) {
+    QStringList relatedChips;
+
+    for ( const QString & related : entry.related ) {
+      relatedChips << sutraGlossaryChipHtmlV5( related );
+    }
+
+    html += QStringLiteral(
+      "<section class='mini-section'>"
+      "<div class='section-label'>Li&#234;n quan</div>"
+      "<div class='chip-row related-chips'>%1</div>"
+      "</section>" )
+              .arg( relatedChips.join( QString() ) );
+  }
+
+  html += QStringLiteral( "</article>" );
   return html;
+}
+
+QString glossaryEntryHtml( const BuddhistGlossaryEntry & entry )
+{
+  return sutraGlossaryCardHtmlV5( entry, false );
 }
 
 QString glossaryHtml( const QString & primaryTerm, const QStringList & detectedTerms )
 {
   const QList< BuddhistGlossaryEntry > entries = glossaryEntriesForTerms( primaryTerm, detectedTerms );
   const int fontSize                           = loadSutraPopupFontSize();
+  const int titleSize                          = qMax( 24, fontSize + 10 );
+  const int cardTermSize                       = qMax( 26, fontSize + 12 );
+  const int smallSize                          = qMax( 11, fontSize - 2 );
 
   QString html;
-  html += QStringLiteral( "<html><head><meta charset='utf-8'></head>" );
-  html +=
-    QStringLiteral( "<body style='font-family:&quot;Segoe UI&quot;, Arial, sans-serif; font-size:%1px; margin:12px;'>" )
-      .arg( fontSize );
-  html += QStringLiteral( "<h2 style='margin-top:0;'>Phật học / Buddhist Glossary</h2>" );
+  html += QStringLiteral( "<html><head><meta charset='utf-8'>" );
+  html += QStringLiteral(
+    "<style>"
+    "body{font-family:'Segoe UI','Noto Sans','Arial',sans-serif;font-size:%1px;line-height:1.58;margin:0;padding:14px;background:#f6f8fb;color:#1f2937;}"
+    ".wrap{max-width:980px;margin:0 auto;}"
+    ".hero{background:linear-gradient(135deg,#eef6ff 0%,#f8fbff 100%);border:1px solid #d7e7fb;border-radius:14px;padding:14px 16px;margin-bottom:12px;}"
+    ".hero-title{font-size:%2px;font-weight:800;color:#111827;margin:0 0 4px 0;}"
+    ".hero-subtitle{color:#64748b;margin:0;font-size:%3px;}"
+    ".section-title{font-size:%4px;font-weight:800;color:#334155;margin:14px 0 8px 2px;display:flex;align-items:center;gap:8px;}"
+    ".section-title:before{content:'';display:inline-block;width:4px;height:18px;border-radius:999px;background:#2563eb;}"
+    ".term-card{background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;padding:14px 16px;margin:0 0 12px 0;box-shadow:0 4px 14px rgba(15,23,42,.06);}"
+    ".primary-card{border-color:#bfdbfe;box-shadow:0 6px 18px rgba(37,99,235,.10);}"
+    ".related-card{background:#ffffff;}"
+    ".card-top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:8px;}"
+    ".term-title{font-size:%5px;font-weight:850;line-height:1.18;color:#020617;letter-spacing:.2px;}"
+    ".term-subtitle{font-size:%6px;color:#0f766e;font-weight:700;margin-top:4px;}"
+    ".category-badge{display:inline-block;white-space:nowrap;background:#ecfdf5;color:#047857;border:1px solid #bbf7d0;border-radius:999px;font-size:%3px;font-weight:700;padding:4px 9px;}"
+    ".meta-row{display:flex;gap:10px;margin:6px 0;color:#334155;}"
+    ".meta-label,.section-label{font-size:%3px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#64748b;}"
+    ".meta-value{font-weight:650;color:#111827;}"
+    ".latin{font-family:'Segoe UI','Arial',sans-serif;}"
+    ".meaning-box{margin-top:10px;padding:12px;border-radius:12px;background:#f8fafc;border:1px solid #e2e8f0;}"
+    ".meaning-text{margin-top:5px;color:#111827;font-weight:500;}"
+    ".mini-section{margin-top:10px;}"
+    ".chip-row{margin-top:7px;display:flex;flex-wrap:wrap;gap:6px;}"
+    ".chip{display:inline-block;background:#f1f5f9;border:1px solid #e2e8f0;color:#334155;border-radius:999px;padding:4px 9px;font-weight:650;}"
+    ".related-chips .chip{background:#fff7ed;border-color:#fed7aa;color:#9a3412;}"
+    ".empty-card{background:#ffffff;border:1px dashed #cbd5e1;border-radius:14px;padding:18px;box-shadow:0 4px 14px rgba(15,23,42,.05);}"
+    ".empty-title{font-size:%4px;font-weight:800;color:#111827;margin-bottom:6px;}"
+    ".empty-text{color:#64748b;margin-bottom:10px;}"
+    ".tips{margin:10px 0 0 0;padding-left:18px;color:#475569;}"
+    ".source{color:#94a3b8;font-size:%3px;margin:14px 2px 2px 2px;}"
+    "</style></head><body><div class='wrap'>" )
+      .arg( fontSize )
+      .arg( titleSize )
+      .arg( smallSize )
+      .arg( qMax( 18, fontSize + 2 ) )
+      .arg( cardTermSize )
+      .arg( qMax( 17, fontSize + 2 ) );
+
+  html += QStringLiteral(
+    "<div class='hero'>"
+    "<div class='hero-title'>Ph&#7853;t h&#7885;c / Buddhist Glossary</div>"
+    "<p class='hero-subtitle'>K&#7871;t qu&#7843; nh&#7853;n di&#7879;n t&#7915; buddhist_terms.json, &#432;u ti&#234;n c&#7909;m thu&#7853;t ng&#7919; ch&#237;nh tr&#432;&#7899;c r&#7891;i m&#7899;i &#273;&#7871;n t&#7915; li&#234;n quan.</p>"
+    "</div>" );
 
   if ( entries.isEmpty() ) {
-    html += QStringLiteral( "<p>Không có glossary cho thuật ngữ này.</p>" );
+    html += QStringLiteral(
+      "<div class='empty-card'>"
+      "<div class='empty-title'>Ch&#432;a c&#243; thu&#7853;t ng&#7919; ph&#249; h&#7907;p</div>"
+      "<div class='empty-text'>Kh&#244;ng t&#236;m th&#7845;y m&#7909;c Ph&#7853;t h&#7885;c n&#7897;i b&#7897; cho: <b>%1</b></div>"
+      "<ul class='tips'>"
+      "<li>Th&#7917; tra c&#7909;m ng&#7855;n h&#417;n ho&#7863;c ch&#7885;n &#273;&#250;ng c&#7909;m H&#225;n/Vi&#7879;t.</li>"
+      "<li>N&#7871;u &#273;&#226;y l&#224; thu&#7853;t ng&#7919; c&#7847;n d&#249;ng th&#432;&#7901;ng xuy&#234;n, h&#227;y b&#7893; sung v&#224;o <b>buddhist_terms.json</b>.</li>"
+      "<li>C&#243; th&#7875; xem tab <b>Web</b> &#273;&#7875; tham kh&#7843;o ngu&#7891;n ngo&#224;i.</li>"
+      "</ul>"
+      "</div>" )
+        .arg( htmlEscape( primaryTerm ) );
   }
   else {
+    QList< BuddhistGlossaryEntry > primaryEntries;
+    QList< BuddhistGlossaryEntry > relatedEntries;
+
+    const QString normalizedPrimary = normalizeSmartLookupInput( primaryTerm );
+
     for ( const BuddhistGlossaryEntry & entry : entries ) {
-      html += glossaryEntryHtml( entry );
+      if ( normalizeSmartLookupInput( entry.term ) == normalizedPrimary ) {
+        primaryEntries << entry;
+      }
+      else {
+        relatedEntries << entry;
+      }
+    }
+
+    if ( primaryEntries.isEmpty() && !entries.isEmpty() ) {
+      primaryEntries << entries.first();
+
+      for ( int i = 1; i < entries.size(); ++i ) {
+        relatedEntries << entries.at( i );
+      }
+    }
+
+    html += QStringLiteral( "<div class='section-title'>K&#7871;t qu&#7843; ch&#237;nh</div>" );
+
+    for ( const BuddhistGlossaryEntry & entry : primaryEntries ) {
+      html += sutraGlossaryCardHtmlV5( entry, true );
+    }
+
+    if ( !relatedEntries.isEmpty() ) {
+      html += QStringLiteral( "<div class='section-title'>T&#7915; li&#234;n quan</div>" );
+
+      for ( const BuddhistGlossaryEntry & entry : relatedEntries ) {
+        html += sutraGlossaryCardHtmlV5( entry, false );
+      }
     }
   }
 
-  html += QStringLiteral( "<p style='color:#777; font-size:%1px;'>Nguồn dữ liệu: buddhist_terms.json</p>" )
-            .arg( qMax( 10, fontSize - 2 ) );
-  html += QStringLiteral( "</body></html>" );
+  html += QStringLiteral( "<p class='source'>Ngu&#7891;n d&#7919; li&#7879;u: buddhist_terms.json</p>" );
+  html += QStringLiteral( "</div></body></html>" );
   return html;
 }
 
@@ -1369,11 +1513,6 @@ void updateBuddhistGlossaryTab( QTabWidget * tabs, const QString & primaryTerm, 
     return;
   }
 
-  const QList< BuddhistGlossaryEntry > entries = glossaryEntriesForTerms( primaryTerm, detectedTerms );
-  if ( entries.isEmpty() ) {
-    removeBuddhistGlossaryTab( tabs );
-    return;
-  }
 
   QTextBrowser * browser = findBuddhistGlossaryBrowser( tabs );
   if ( !browser ) {
@@ -1427,44 +1566,59 @@ QString webReferenceHtml( const QString & primaryTerm, const QStringList & detec
   const int fontSize      = loadSutraPopupFontSize();
 
   QString html;
-  html += QStringLiteral( "<html><head><meta charset='utf-8'></head>" );
-  html +=
-    QStringLiteral( "<body style='font-family:&quot;Segoe UI&quot;, Arial, sans-serif; font-size:%1px; margin:12px;'>" )
-      .arg( fontSize );
-  html += QStringLiteral( "<h2 style='margin-top:0;'>Wikipedia / Web Reference</h2>" );
+  html += QStringLiteral( "<html><head><meta charset='utf-8'>" );
+  html += QStringLiteral(
+    "<style>"
+    "body{font-family:'Segoe UI','Noto Sans','Arial',sans-serif;font-size:%1px;line-height:1.55;margin:0;padding:14px;background:#f6f8fb;color:#1f2937;}"
+    ".wrap{max-width:980px;margin:0 auto;}"
+    ".hero{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:14px 16px;margin-bottom:12px;box-shadow:0 4px 14px rgba(15,23,42,.05);}"
+    ".title{font-size:%2px;font-weight:850;margin-bottom:4px;color:#111827;}"
+    ".subtitle{color:#64748b;margin:0;}"
+    ".term-card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:12px 14px;margin:0 0 10px 0;}"
+    ".term{font-size:%3px;font-weight:800;margin-bottom:8px;color:#111827;}"
+    ".links{margin:0;padding-left:20px;}"
+    ".links li{margin:5px 0;}"
+    "a{color:#2563eb;text-decoration:none;font-weight:650;}"
+    "a:hover{text-decoration:underline;}"
+    ".empty{background:#fff;border:1px dashed #cbd5e1;border-radius:14px;padding:18px;color:#64748b;}"
+    ".source{color:#94a3b8;font-size:%4px;margin-top:12px;}"
+    "</style></head><body><div class='wrap'>" )
+      .arg( fontSize )
+      .arg( qMax( 22, fontSize + 6 ) )
+      .arg( qMax( 18, fontSize + 3 ) )
+      .arg( qMax( 11, fontSize - 2 ) );
+
+  html += QStringLiteral(
+    "<div class='hero'>"
+    "<div class='title'>Web Reference</div>"
+    "<p class='subtitle'>Ngu&#7891;n ngo&#224;i &#273;&#7875; tham kh&#7843;o nhanh, kh&#244;ng thay th&#7871; glossary n&#7897;i b&#7897;.</p>"
+    "</div>" );
 
   if ( terms.isEmpty() ) {
-    html += QStringLiteral( "<p>Không có thuật ngữ để mở nguồn tham khảo.</p>" );
+    html += QStringLiteral(
+      "<div class='empty'>Ch&#432;a c&#243; t&#7915; kh&#243;a &#273;&#7875; t&#7841;o li&#234;n k&#7871;t tham kh&#7843;o. H&#227;y th&#7917; tra l&#7841;i b&#7857;ng m&#7897;t thu&#7853;t ng&#7919; c&#7909; th&#7875; h&#417;n.</div>" );
   }
   else {
-    html +=
-      QStringLiteral( "<p style='color:#555;'>Các liên kết này mở trong trình duyệt ngoài để tham khảo nhanh.</p>" );
-
     for ( const QString & term : terms ) {
       const QString encoded = webReferenceUrlEncode( term );
-      html +=
-        QStringLiteral( "<div style='border:1px solid #ddd; border-radius:8px; padding:10px; margin:0 0 10px 0;'>" );
-      html += QStringLiteral( "<h3 style='margin:0 0 8px 0;'>%1</h3>" ).arg( htmlEscape( term ) );
-      html += QStringLiteral( "<ul style='margin-top:6px;'>" );
-      html += webReferenceLinkHtml( QStringLiteral( "Wikipedia tiếng Trung" ),
+
+      html += QStringLiteral( "<div class='term-card'>" );
+      html += QStringLiteral( "<div class='term'>%1</div>" ).arg( htmlEscape( term ) );
+      html += QStringLiteral( "<ul class='links'>" );
+      html += webReferenceLinkHtml( QStringLiteral( "Wikipedia ti&#7871;ng Trung" ),
                                     QStringLiteral( "https://zh.wikipedia.org/wiki/%1" ).arg( encoded ) );
-      html += webReferenceLinkHtml(
-        QStringLiteral( "Wikipedia search tiếng Anh" ),
-        QStringLiteral( "https://en.wikipedia.org/wiki/Special:Search?search=%1" ).arg( encoded ) );
+      html += webReferenceLinkHtml( QStringLiteral( "Wikipedia search ti&#7871;ng Anh" ),
+                                    QStringLiteral( "https://en.wikipedia.org/w/index.php?search=%1" ).arg( encoded ) );
       html += webReferenceLinkHtml( QStringLiteral( "Wiktionary" ),
                                     QStringLiteral( "https://en.wiktionary.org/wiki/%1" ).arg( encoded ) );
       html += webReferenceLinkHtml( QStringLiteral( "Google Search" ),
                                     QStringLiteral( "https://www.google.com/search?q=%1" ).arg( encoded ) );
-      html += QStringLiteral( "</ul>" );
-      html += QStringLiteral( "</div>" );
+      html += QStringLiteral( "</ul></div>" );
     }
   }
 
-  html +=
-    QStringLiteral(
-      "<p style='color:#777; font-size:%1px;'>Gợi ý: dùng các nguồn web như tài liệu tham khảo, không thay thế glossary nội bộ.</p>" )
-      .arg( qMax( 10, fontSize - 2 ) );
-  html += QStringLiteral( "</body></html>" );
+  html += QStringLiteral( "<div class='source'>G&#7907;i &#253;: d&#249;ng c&#225;c ngu&#7891;n web nh&#432; t&#224;i li&#7879;u tham kh&#7843;o.</div>" );
+  html += QStringLiteral( "</div></body></html>" );
   return html;
 }
 
@@ -1475,27 +1629,27 @@ QTextBrowser * findWebReferenceBrowser( QTabWidget * tabs )
   }
 
   for ( int i = 0; i < tabs->count(); ++i ) {
-    QTextBrowser * browser = qobject_cast< QTextBrowser * >( tabs->widget( i ) );
-    if ( browser && browser->objectName() == QStringLiteral( "webReferenceBrowser" ) ) {
-      return browser;
+    if ( tabs->tabText( i ) == QObject::tr( "Web" ) ) {
+      return qobject_cast< QTextBrowser * >( tabs->widget( i ) );
     }
   }
 
   return nullptr;
 }
-
 void removeWebReferenceTab( QTabWidget * tabs )
 {
   if ( !tabs ) {
     return;
   }
 
-  for ( int i = 0; i < tabs->count(); ++i ) {
-    QTextBrowser * browser = qobject_cast< QTextBrowser * >( tabs->widget( i ) );
-    if ( browser && browser->objectName() == QStringLiteral( "webReferenceBrowser" ) ) {
+  for ( int i = tabs->count() - 1; i >= 0; --i ) {
+    if ( tabs->tabText( i ) == QObject::tr( "Web" ) ) {
+      QWidget * widget = tabs->widget( i );
       tabs->removeTab( i );
-      browser->deleteLater();
-      return;
+
+      if ( widget ) {
+        widget->deleteLater();
+      }
     }
   }
 }
@@ -1541,6 +1695,13 @@ void refreshSutraCustomTabs( QTabWidget * tabs, const QString & primaryTerm, con
 
   updateBuddhistGlossaryTab( tabs, smartQuery, smartTerms );
   updateWebReferenceTab( tabs, smartQuery, smartTerms );
+
+  if ( QTextBrowser * glossaryBrowser = findBuddhistGlossaryBrowser( tabs ) ) {
+    const int index = tabs->indexOf( glossaryBrowser );
+    if ( index >= 0 ) {
+      tabs->setCurrentIndex( index );
+    }
+  }
 }
 
 } // namespace
@@ -1856,12 +2017,7 @@ ScanPopup::ScanPopup( QWidget * parent,
 
   sutraPopupLayoutMenu->addSeparator();
 
-  
-  QAction * sutraPopupAlwaysOnTopAction = sutraPopupLayoutMenu->addAction(
-    tr( "Always on top" ) );
-  sutraPopupAlwaysOnTopAction->setCheckable( true );
-  sutraPopupAlwaysOnTopAction->setChecked( ui.onTopButton->isChecked() );
-QAction * sutraPopupRestoreDefaultsAction = sutraPopupLayoutMenu->addAction( tr( "Restore popup defaults" ) );
+  QAction * sutraPopupRestoreDefaultsAction = sutraPopupLayoutMenu->addAction( tr( "Restore popup defaults" ) );
 
   const auto updateSutraPopupLayoutMenu = [ this,
                                             sutraPopupPinAction,
@@ -1930,14 +2086,7 @@ QAction * sutraPopupRestoreDefaultsAction = sutraPopupLayoutMenu->addAction( tr(
     showStatusBarMessage( tr( "Popup layout: fit to results" ), 4000 );
   } );
 
-  
-  connect( sutraPopupAlwaysOnTopAction, &QAction::triggered, this, [ this ]( bool checked ) {
-    ui.onTopButton->setChecked( checked );
-    alwaysOnTopClicked( checked );
-    showStatusBarMessage( checked ? tr( "Popup always on top: ON" )
-                                  : tr( "Popup always on top: OFF" ), 4000 );
-  } );
-connect( sutraPopupRestoreDefaultsAction, &QAction::triggered, this, [ this ] {
+  connect( sutraPopupRestoreDefaultsAction, &QAction::triggered, this, [ this ] {
     resetSutraPopupAppearanceDefaults();
     applySutraPopupOpacity( this );
     refreshSutraCustomTabs( tabWidget, pendingWord, translateBox->translateLine()->text() );
@@ -2029,6 +2178,7 @@ connect( sutraPopupRestoreDefaultsAction, &QAction::triggered, this, [ this ] {
 #ifdef Q_OS_WIN
 #include <windows.h>
 #include <oleauto.h>
+#include <QWidget>
   {
     QPointer< ScanPopup > popup( this );
 
@@ -3246,24 +3396,18 @@ void ScanPopup::openSearch()
 
 void ScanPopup::alwaysOnTopClicked( bool checked )
 {
-  const bool wasVisible = isVisible();
-
-  Qt::WindowFlags flags = windowFlags();
-
-  if ( checked ) {
-    flags |= Qt::WindowStaysOnTopHint;
-  }
-  else {
-    flags &= ~Qt::WindowStaysOnTopHint;
-  }
-
-  setWindowFlags( flags );
-  cfg.popupWindowAlwaysOnTop = checked;
-
-  if ( wasVisible ) {
-    show();
-    raise();
-    activateWindow();
+  bool wasVisible = isVisible();
+  if ( ui.pinButton->isChecked() ) {
+    Qt::WindowFlags flags = this->windowFlags();
+    if ( checked ) {
+      setWindowFlags( flags | Qt::WindowStaysOnTopHint );
+    }
+    else {
+      setWindowFlags( flags ^ Qt::WindowStaysOnTopHint );
+    }
+    if ( wasVisible ) {
+      show();
+    }
   }
 }
 

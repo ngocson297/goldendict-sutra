@@ -411,6 +411,17 @@ void sendSutraStartupLineSelectionAt( const QPoint & globalPos )
 
   SendInput( 6, inputs, sizeof( INPUT ) );
 }
+static bool sutraStartupIsCjkChar( const QChar & ch )
+{
+  const uint u = ch.unicode();
+
+  return ( u >= 0x3400 && u <= 0x4DBF )   // CJK Extension A
+      || ( u >= 0x4E00 && u <= 0x9FFF )   // CJK Unified Ideographs
+      || ( u >= 0xF900 && u <= 0xFAFF )   // CJK Compatibility Ideographs
+      || ( u >= 0x3000 && u <= 0x303F )   // CJK Symbols and Punctuation
+      || ( u >= 0x2E80 && u <= 0x2EFF )   // CJK Radicals Supplement
+      || ( u >= 0x2F00 && u <= 0x2FDF );  // Kangxi Radicals
+}
 
 bool sutraStartupIsTooShortCjkLookupText( const QString & text )
 {
@@ -810,15 +821,6 @@ QString sutraStartupUiAutomationTextAtPoint( const QPoint & globalPos )
 
   return result.trimmed();
 }
-
-bool sutraStartupIsCjkChar( const QChar & ch )
-{
-  const uint u = ch.unicode();
-  return ( u >= 0x3400 && u <= 0x4DBF )
-      || ( u >= 0x4E00 && u <= 0x9FFF )
-      || ( u >= 0xF900 && u <= 0xFAFF );
-}
-
 QString sutraStartupCleanLookupText( const QString & text )
 {
   QString result = text.trimmed();
