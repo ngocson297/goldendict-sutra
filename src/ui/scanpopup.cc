@@ -15,6 +15,7 @@
 #include <QSettings>
 #include <QApplication>
 #include <QActionGroup>
+#include <QHBoxLayout>
 #include <QUrl>
 #include <algorithm>
 #include "scanpopup.hh"
@@ -124,6 +125,32 @@ void applySutraPopupOpacity( QWidget * popup )
   }
 
   popup->setWindowOpacity( loadSutraPopupOpacityPercent() / 100.0 );
+}
+
+QString sutraPopupCornerToolsObjectName()
+{
+  return QStringLiteral( "sutraPopupCornerTools" );
+}
+
+void positionSutraPopupCornerTools( QWidget * popup )
+{
+  if ( !popup ) {
+    return;
+  }
+
+  QWidget * tools = popup->findChild< QWidget * >( sutraPopupCornerToolsObjectName() );
+  if ( !tools ) {
+    return;
+  }
+
+  tools->adjustSize();
+
+  constexpr int margin = 10;
+  const int x          = qMax( margin, popup->width() - tools->width() - margin );
+  const int y          = qMax( margin, popup->height() - tools->height() - margin );
+
+  tools->move( x, y );
+  tools->raise();
 }
 
 QString sutraPopupLayoutModeToString( SutraPopupLayoutMode mode )
@@ -1343,6 +1370,72 @@ ScanPopup::ScanPopup( QWidget * parent,
     } );
   }
 
+  QWidget * sutraPopupCornerTools = new QWidget( this );
+  sutraPopupCornerTools->setObjectName( sutraPopupCornerToolsObjectName() );
+  sutraPopupCornerTools->setAttribute( Qt::WA_TranslucentBackground );
+  sutraPopupCornerTools->setToolTip( tr( "Popup quick settings" ) );
+  sutraPopupCornerTools->setStyleSheet(
+    QStringLiteral( "QWidget#sutraPopupCornerTools {"
+                    "  background: rgba(245, 248, 252, 225);"
+                    "  border: 1px solid rgba(120, 120, 120, 170);"
+                    "  border-radius: 4px;"
+                    "}"
+                    "QToolButton {"
+                    "  min-width: 22px;"
+                    "  min-height: 20px;"
+                    "  padding: 1px;"
+                    "  border: 0;"
+                    "  background: transparent;"
+                    "  font-weight: bold;"
+                    "}"
+                    "QToolButton:hover {"
+                    "  background: rgba(80, 140, 220, 60);"
+                    "  border-radius: 3px;"
+                    "}" ) );
+
+  QHBoxLayout * sutraPopupCornerLayout = new QHBoxLayout( sutraPopupCornerTools );
+  sutraPopupCornerLayout->setContentsMargins( 4, 2, 4, 2 );
+  sutraPopupCornerLayout->setSpacing( 2 );
+
+  QToolButton * sutraPopupOptionsButton = new QToolButton( sutraPopupCornerTools );
+  sutraPopupOptionsButton->setText( QStringLiteral( "⚙" ) );
+  sutraPopupOptionsButton->setToolTip( tr( "Popup settings" ) );
+  sutraPopupOptionsButton->setAutoRaise( true );
+
+  QToolButton * sutraPopupQuickFixButton = new QToolButton( sutraPopupCornerTools );
+  sutraPopupQuickFixButton->setText( QStringLiteral( "📌" ) );
+  sutraPopupQuickFixButton->setToolTip( tr( "Fix current size and position" ) );
+  sutraPopupQuickFixButton->setAutoRaise( true );
+
+  QToolButton * sutraPopupQuickFitButton = new QToolButton( sutraPopupCornerTools );
+  sutraPopupQuickFitButton->setText( QStringLiteral( "▣" ) );
+  sutraPopupQuickFitButton->setToolTip( tr( "Fit window size to results" ) );
+  sutraPopupQuickFitButton->setAutoRaise( true );
+
+  sutraPopupCornerLayout->addWidget( sutraPopupOptionsButton );
+  sutraPopupCornerLayout->addWidget( sutraPopupQuickFixButton );
+  sutraPopupCornerLayout->addWidget( sutraPopupQuickFitButton );
+
+  connect( sutraPopupOptionsButton, &QToolButton::clicked, this, [ = ] {
+    updateSutraPopupLayoutMenu();
+    positionSutraPopupCornerTools( this );
+    sutraPopupLayoutMenu->exec(
+      sutraPopupOptionsButton->mapToGlobal( QPoint( 0, sutraPopupOptionsButton->height() ) ) );
+  } );
+
+  connect( sutraPopupQuickFixButton, &QToolButton::clicked, this, [ = ] {
+    sutraPopupFixedAction->trigger();
+    positionSutraPopupCornerTools( this );
+  } );
+
+  connect( sutraPopupQuickFitButton, &QToolButton::clicked, this, [ = ] {
+    sutraPopupFitAction->trigger();
+    positionSutraPopupCornerTools( this );
+  } );
+
+  sutraPopupCornerTools->show();
+  positionSutraPopupCornerTools( this );
+
   applySutraPopupLayoutMode( this, tabWidget );
   applySutraPopupOpacity( this );
 
@@ -2005,6 +2098,14 @@ bool ScanPopup::eventFilter( QObject * watched, QEvent * event )
       QTimer::singleShot( 0, this, &ScanPopup::focusTranslateLine );
     }
     return false;
+  }
+
+  if ( watched == this
+       && ( event->type() == QEvent::Resize || event->type() == QEvent::Show
+            || event->type() == QEvent::LayoutRequest ) ) {
+    QTimer::singleShot( 0, this, [ this ] {
+      positionSutraPopupCornerTools( this );
+    } );
   }
 
   if ( mouseIntercepted ) {
