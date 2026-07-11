@@ -1511,43 +1511,60 @@ QString glossaryHtmlFinalUxBaseV6( const QString & primaryTerm, const QStringLis
 ;
 
 
-static QString sutraPolishGlossaryFinalUxV9( QString html )
+static QString sutraPolishGlossaryFinalUxV7( QString html )
 {
-  // sutraGlossaryUiFinalV9
-  // Final UI/UX polish for the Buddhist explanation tab.
-  // This runs on final generated HTML, so it fixes the real rendered output.
-
-  if ( html.contains( QStringLiteral( "data-sutra-v9" ) ) ) {
-    return html;
-  }
+  // sutraGlossaryFinalUxV7
+  // This polish runs on the final generated HTML. It is intentionally regex-based
+  // because older patches changed the exact tag style, so exact QString::replace is too fragile.
 
   html.remove( QRegularExpression( QStringLiteral( R"GD(<style[\s\S]*?</style>)GD" ) ) );
 
   const QString outerOpen = QStringLiteral(
-    "<div data-sutra-v9='1' style='padding:12px 14px 20px 14px;background:#f7f9fc;color:#0f172a;font-size:16px;line-height:1.55;'>" );
+    "<div style='padding:10px 12px 18px 12px;background:#f7f9fc;color:#0f172a;font-size:16px;line-height:1.55;'>" );
 
   const QString titleBlock = QStringLiteral(
-    "<div style='margin:2px 0 6px 0;font-size:29px;line-height:1.22;font-weight:800;color:#0f172a;'>"
+    "<div style='margin:6px 0 4px 0;padding:0 0 4px 0;font-size:28px;line-height:1.25;font-weight:800;color:#0f172a;'>"
     "Gi&#7843;i ngh&#297;a Ph&#7853;t h&#7885;c</div>" );
 
   const QString subtitleBlock = QStringLiteral(
-    "<div style='margin:4px 0 16px 0;padding:10px 12px;background:#eef6ff;border-left:4px solid #38bdf8;"
+    "<div style='margin:4px 0 16px 0;padding:10px 12px;background:#f8fafc;border-left:4px solid #38bdf8;"
     "color:#475569;font-size:14px;line-height:1.55;'>"
     "K&#7871;t qu&#7843; t&#7915; d&#7919; li&#7879;u thu&#7853;t ng&#7919; Ph&#7853;t h&#7885;c, "
     "&#432;u ti&#234;n c&#7909;m t&#7915; ch&#237;nh tr&#432;&#7899;c r&#7891;i &#273;&#7871;n t&#7915; li&#234;n quan.</div>" );
 
-  const QString primaryOpen = QStringLiteral(
+  html.replace( QRegularExpression( QStringLiteral( R"GD(<h1[^>]*>\s*(?:Pháº­t há»c / Buddhist Glossary|Ph&#7853;t h&#7885;c / Buddhist Glossary|Giáº£i nghÄ©a Pháº­t há»c|Gi&#7843;i ngh&#297;a Ph&#7853;t h&#7885;c|Buddhist Glossary)\s*</h1>)GD" ) ),
+                titleBlock );
+
+  html.replace( QStringLiteral( "Pháº­t há»c / Buddhist Glossary" ),
+                QStringLiteral( "Gi&#7843;i ngh&#297;a Ph&#7853;t h&#7885;c" ) );
+  html.replace( QStringLiteral( "Ph&#7853;t h&#7885;c / Buddhist Glossary" ),
+                QStringLiteral( "Gi&#7843;i ngh&#297;a Ph&#7853;t h&#7885;c" ) );
+  html.replace( QStringLiteral( "Buddhist Glossary" ),
+                QStringLiteral( "Gi&#7843;i ngh&#297;a Ph&#7853;t h&#7885;c" ) );
+
+  html.replace( QRegularExpression( QStringLiteral( R"GD(<p[^>]*>[^<]*buddhist_terms\.json[^<]*</p>)GD" ) ),
+                subtitleBlock );
+  html.replace( QRegularExpression( QStringLiteral( R"GD(<div[^>]*>[^<]*buddhist_terms\.json[^<]*</div>)GD" ) ),
+                subtitleBlock );
+
+  const QString primarySection = QStringLiteral(
     "<div style='margin:14px 0 10px 0;font-size:16px;line-height:1.2;font-weight:800;color:#0f766e;letter-spacing:.3px;'>"
     "K&#7871;t qu&#7843; ch&#237;nh</div>"
-    "<div data-sutra-v9-primary='1' style='margin:0 8px 18px 0;padding:18px 20px 20px 20px;"
+    "<div data-sutra-v7-primary='1' style='margin:0 8px 18px 0;padding:18px 20px 20px 20px;"
     "background:#ffffff;border:1px solid #dbeafe;border-left:6px solid #0f766e;'>" );
 
-  const QString relatedOpen = QStringLiteral(
+  const QString relatedSection = QStringLiteral(
     "</div>"
     "<div style='margin:18px 0 10px 0;font-size:16px;line-height:1.2;font-weight:800;color:#7c2d12;letter-spacing:.3px;'>"
     "T&#7915; li&#234;n quan</div>"
-    "<div data-sutra-v9-related='1' style='margin:0 8px 14px 0;padding:14px 16px;"
+    "<div data-sutra-v7-related='1' style='margin:0 8px 14px 0;padding:14px 16px;"
     "background:#fffdf8;border:1px solid #fed7aa;border-left:4px solid #f97316;'>" );
+
+  html.replace( QRegularExpression( QStringLiteral( R"GD(<h2[^>]*>\s*(?:Káº¿t quáº£ chÃ­nh|K&#7871;t qu&#7843; ch&#237;nh)\s*</h2>)GD" ) ),
+                primarySection );
+
+  html.replace( QRegularExpression( QStringLiteral( R"GD(<h2[^>]*>\s*(?:Tá»« liÃªn quan|T&#7915; li&#234;n quan)\s*</h2>)GD" ) ),
+                relatedSection );
 
   const QString pinyinLabel = QStringLiteral(
     "<div style='margin:14px 0 5px 0;font-size:12px;line-height:1.1;font-weight:800;letter-spacing:1px;color:#64748b;'>PINYIN</div>" );
@@ -1561,53 +1578,27 @@ static QString sutraPolishGlossaryFinalUxV9( QString html )
   const QString relatedLabel = QStringLiteral(
     "<div style='margin:14px 0 6px 0;font-size:12px;line-height:1.1;font-weight:800;letter-spacing:1px;color:#64748b;'>LI&#202;N QUAN</div>" );
 
-  // Header/title/subtitle. Match both raw Vietnamese and entity versions.
-  html.replace( QRegularExpression( QStringLiteral( R"GD(<h1[^>]*>[\s\S]*?</h1>)GD" ) ),
-                titleBlock );
-  html.replace( QString::fromUtf8( "Giáº£i nghÄ©a Pháº­t há»c" ), titleBlock );
-  html.replace( QStringLiteral( "Gi&#7843;i ngh&#297;a Ph&#7853;t h&#7885;c" ), titleBlock );
-  html.replace( QString::fromUtf8( "Pháº­t há»c / Buddhist Glossary" ), titleBlock );
-  html.replace( QStringLiteral( "Ph&#7853;t h&#7885;c / Buddhist Glossary" ), titleBlock );
-  html.replace( QStringLiteral( "Buddhist Glossary" ), titleBlock );
+  html.replace( QRegularExpression( QStringLiteral( R"GD(<(?:b|strong)[^>]*>\s*PINYIN\s*</(?:b|strong)>)GD" ) ),
+                pinyinLabel );
+  html.replace( QRegularExpression( QStringLiteral( R"GD(<(?:b|strong)[^>]*>\s*(?:NGHÄ¨A TIáº¾NG VIá»†T|NGH&#296;A TI&#7870;NG VI&#7878;T)\s*</(?:b|strong)>)GD" ) ),
+                meaningLabel );
+  html.replace( QRegularExpression( QStringLiteral( R"GD(<(?:b|strong)[^>]*>\s*(?:Gá»¢I Ã Dá»ŠCH|G&#7906;I &#221; D&#7882;CH)\s*</(?:b|strong)>)GD" ) ),
+                suggestionLabel );
+  html.replace( QRegularExpression( QStringLiteral( R"GD(<(?:b|strong)[^>]*>\s*(?:LIÃŠN QUAN|LI&#202;N QUAN)\s*</(?:b|strong)>)GD" ) ),
+                relatedLabel );
 
-  html.replace( QRegularExpression( QStringLiteral( R"GD(<p[^>]*>[^<]*buddhist_terms\.json[^<]*</p>)GD" ) ),
-                subtitleBlock );
-  html.replace( QRegularExpression( QStringLiteral( R"GD(<div[^>]*>[^<]*buddhist_terms\.json[^<]*</div>)GD" ) ),
-                subtitleBlock );
-  html.replace( QRegularExpression( QStringLiteral( R"GD([^\n<]*buddhist_terms\.json[^\n<]*)GD" ) ),
-                subtitleBlock );
-
-  // Main sections. Plain text replacement is important because the current source may already have stripped/styled tags.
-  html.replace( QString::fromUtf8( "Káº¿t quáº£ chÃ­nh" ), primaryOpen );
-  html.replace( QStringLiteral( "K&#7871;t qu&#7843; ch&#237;nh" ), primaryOpen );
-  html.replace( QString::fromUtf8( "Tá»« liÃªn quan" ), relatedOpen );
-  html.replace( QStringLiteral( "T&#7915; li&#234;n quan" ), relatedOpen );
-
-  // Labels. These fix bugs like "PinyinguÄn..." by forcing the label to a separate block.
-  html.replace( QStringLiteral( "PINYIN" ), pinyinLabel, Qt::CaseInsensitive );
-  html.replace( QString::fromUtf8( "Pinyin" ), pinyinLabel, Qt::CaseInsensitive );
-
-  html.replace( QString::fromUtf8( "NghÄ©a tiáº¿ng Viá»‡t" ), meaningLabel, Qt::CaseInsensitive );
-  html.replace( QStringLiteral( "NGH&#296;A TI&#7870;NG VI&#7878;T" ), meaningLabel, Qt::CaseInsensitive );
-
-  html.replace( QString::fromUtf8( "Gá»£i Ã½ dá»‹ch" ), suggestionLabel, Qt::CaseInsensitive );
-  html.replace( QStringLiteral( "G&#7906;I &#221; D&#7882;CH" ), suggestionLabel, Qt::CaseInsensitive );
-
-  html.replace( QString::fromUtf8( "LiÃªn quan" ), relatedLabel, Qt::CaseInsensitive );
-  html.replace( QStringLiteral( "LI&#202;N QUAN" ), relatedLabel, Qt::CaseInsensitive );
-
-  // Improve entry headings and related chips/links.
   html.replace( QRegularExpression( QStringLiteral( R"GD(<h1[^>]*>)GD" ) ),
                 QStringLiteral( "<h1 style='font-size:32px;line-height:1.15;margin:4px 0 8px 0;color:#020617;font-weight:800;'>" ) );
   html.replace( QRegularExpression( QStringLiteral( R"GD(<h2[^>]*>)GD" ) ),
                 QStringLiteral( "<h2 style='font-size:23px;line-height:1.2;margin:10px 0 5px 0;color:#0f172a;font-weight:800;'>" ) );
   html.replace( QRegularExpression( QStringLiteral( R"GD(<h3[^>]*>)GD" ) ),
                 QStringLiteral( "<h3 style='font-size:21px;line-height:1.2;margin:10px 0 5px 0;color:#0f172a;font-weight:800;'>" ) );
+
   html.replace( QRegularExpression( QStringLiteral( R"GD(<a\s+)GD" ) ),
                 QStringLiteral( "<a style='display:inline-block;margin:4px 7px 4px 0;padding:4px 9px;background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;text-decoration:none;font-weight:700;' " ) );
 
-  const bool hasPrimaryCard = html.contains( QStringLiteral( "data-sutra-v9-primary" ) );
-  const bool hasRelatedCard = html.contains( QStringLiteral( "data-sutra-v9-related" ) );
+  const bool hasPrimaryCard = html.contains( QStringLiteral( "data-sutra-v7-primary" ) );
+  const bool hasRelatedCard = html.contains( QStringLiteral( "data-sutra-v7-related" ) );
 
   html.prepend( outerOpen );
 
@@ -1620,11 +1611,10 @@ static QString sutraPolishGlossaryFinalUxV9( QString html )
   return html;
 }
 
-
 QString glossaryHtml( const QString & primaryTerm, const QStringList & detectedTerms )
 
 {
-  return sutraPolishGlossaryFinalUxV9( glossaryHtmlFinalUxBaseV6( primaryTerm, detectedTerms ) );
+  return sutraPolishGlossaryFinalUxV7( glossaryHtmlFinalUxBaseV6( primaryTerm, detectedTerms ) );
 }
 QString glossaryHtmlFinalUxBaseV6( const QString & primaryTerm, const QStringList & detectedTerms )
 {
@@ -1769,6 +1759,195 @@ void removeBuddhistGlossaryTab( QTabWidget * tabs )
   }
 }
 
+
+// sutraFinalSafeWebGlossaryV13
+static QString sutraSafeWebReferenceV13( QString html )
+{
+  // Use only ASCII + HTML numeric entities in generated labels to avoid Vietnamese mojibake.
+
+  if ( html.contains( QStringLiteral( "data-sutra-web-v13" ) ) ) {
+    return html;
+  }
+
+  QRegularExpression sectionRegex( QStringLiteral( R"GD(<h2[^>]*>([^<]+)</h2>\s*<ul>[\s\S]*?</ul>)GD" ) );
+  QRegularExpressionMatchIterator it = sectionRegex.globalMatch( html );
+
+  QString rebuilt;
+  int cursor = 0;
+
+  while ( it.hasNext() ) {
+    const QRegularExpressionMatch match = it.next();
+    const QString sectionTitle = match.captured( 1 ).trimmed();
+
+    rebuilt += html.mid( cursor, match.capturedStart() - cursor );
+
+    const QString encoded = QString::fromLatin1( QUrl::toPercentEncoding( sectionTitle ) );
+
+    const QString viUrl = QStringLiteral( "https://vi.wikipedia.org/wiki/Special:Search?search=" ) + encoded;
+    const QString zhUrl = QStringLiteral( "https://zh.wikipedia.org/wiki/Special:Search?search=" ) + encoded;
+    const QString enUrl = QStringLiteral( "https://en.wikipedia.org/wiki/Special:Search?search=" ) + encoded;
+    const QString wiktionaryUrl = QStringLiteral( "https://en.wiktionary.org/wiki/Special:Search?search=" ) + encoded;
+    const QString googleUrl = QStringLiteral( "https://www.google.com/search?q=" ) + encoded;
+
+    rebuilt += QStringLiteral(
+      "<div style='margin:16px 0 8px 0;padding:7px 10px;background:#ffffff;border-left:4px solid #64748b;"
+      "font-size:22px;line-height:1.25;font-weight:800;color:#0f172a;'>" )
+      + sectionTitle
+      + QStringLiteral( "</div>" );
+
+    rebuilt += QStringLiteral( "<ul style='margin:8px 0 16px 28px;padding:0;font-size:17px;line-height:1.8;'>" );
+
+    rebuilt += QStringLiteral( "<li><a style='font-weight:700;color:#2563eb;text-decoration:none;' href=\"" )
+            + viUrl
+            + QStringLiteral( "\">Wikipedia ti&#7871;ng Vi&#7879;t</a></li>" );
+
+    rebuilt += QStringLiteral( "<li><a style='font-weight:700;color:#2563eb;text-decoration:none;' href=\"" )
+            + zhUrl
+            + QStringLiteral( "\">Wikipedia ti&#7871;ng Trung</a></li>" );
+
+    rebuilt += QStringLiteral( "<li><a style='font-weight:700;color:#2563eb;text-decoration:none;' href=\"" )
+            + enUrl
+            + QStringLiteral( "\">Wikipedia ti&#7871;ng Anh</a></li>" );
+
+    rebuilt += QStringLiteral( "<li><a style='font-weight:700;color:#2563eb;text-decoration:none;' href=\"" )
+            + wiktionaryUrl
+            + QStringLiteral( "\">Wiktionary</a></li>" );
+
+    rebuilt += QStringLiteral( "<li><a style='font-weight:700;color:#2563eb;text-decoration:none;' href=\"" )
+            + googleUrl
+            + QStringLiteral( "\">Google Search</a></li>" );
+
+    rebuilt += QStringLiteral( "</ul>" );
+
+    cursor = match.capturedEnd();
+  }
+
+  if ( cursor > 0 ) {
+    rebuilt += html.mid( cursor );
+    html = rebuilt;
+  }
+  else {
+    // Fallback only. Keep replacements ASCII-safe.
+    html.replace( QStringLiteral( "ti&amp;#7871;ng" ), QStringLiteral( "ti&#7871;ng" ) );
+    html.replace( QStringLiteral( "ti&#7871;ng" ), QStringLiteral( "ti&#7871;ng" ) );
+  }
+
+  html.prepend( QStringLiteral(
+    "<div data-sutra-web-v13='1' style='padding:12px 14px 20px 14px;background:#f7f9fc;color:#0f172a;font-size:16px;line-height:1.55;'>" ) );
+  html.append( QStringLiteral( "</div>" ) );
+
+  return html;
+}
+
+static QString sutraSafeGlossaryUiV13( QString html )
+{
+  // sutraGlossaryContentUiV15
+  // UI-only polish for the "Giáº£i nghÄ©a" tab.
+  // Important: avoid global text replacement for "liÃªn quan" because it appears in the subtitle.
+  // This function only styles structural headers and standalone labels.
+
+  if ( html.contains( QStringLiteral( "data-sutra-glossary-v15" ) ) ) {
+    return html;
+  }
+
+  html.remove( QRegularExpression( QStringLiteral( R"GD(<style[\s\S]*?</style>)GD" ) ) );
+
+  // Main title.
+  html.replace( QRegularExpression( QStringLiteral( R"GD(<h1[^>]*>\s*([^<]+)\s*</h1>)GD" ) ),
+                QStringLiteral( "<div style='margin:4px 0 14px 0;padding:0 0 8px 0;"
+                                "border-bottom:1px solid #e2e8f0;font-size:31px;line-height:1.22;"
+                                "font-weight:800;color:#0f172a;'>\\1</div>" ) );
+
+  // Section headers. First h2 is main result, all later h2 are related sections.
+  QRegularExpression h2Regex( QStringLiteral( R"GD(<h2[^>]*>\s*([^<]+)\s*</h2>)GD" ) );
+  QRegularExpressionMatchIterator h2It = h2Regex.globalMatch( html );
+
+  QString rebuilt;
+  int cursor = 0;
+  int sectionIndex = 0;
+
+  while ( h2It.hasNext() ) {
+    const QRegularExpressionMatch match = h2It.next();
+
+    rebuilt += html.mid( cursor, match.capturedStart() - cursor );
+
+    if ( sectionIndex == 0 ) {
+      rebuilt += QStringLiteral(
+        "<div style='margin:18px 0 11px 0;padding:9px 12px;"
+        "background:#ecfdf5;border-left:5px solid #0f766e;"
+        "font-size:18px;line-height:1.2;font-weight:800;letter-spacing:.4px;"
+        "color:#0f766e;'>K&#7870;T QU&#7842; CH&#205;NH</div>" );
+    }
+    else {
+      rebuilt += QStringLiteral(
+        "<div style='margin:22px 0 11px 0;padding:9px 12px;"
+        "background:#fff7ed;border-left:5px solid #c2410c;"
+        "font-size:18px;line-height:1.2;font-weight:800;letter-spacing:.4px;"
+        "color:#9a3412;'>T&#7914; LI&#202;N QUAN</div>" );
+    }
+
+    cursor = match.capturedEnd();
+    ++sectionIndex;
+  }
+
+  if ( cursor > 0 ) {
+    rebuilt += html.mid( cursor );
+    html = rebuilt;
+  }
+
+  // Entry term title.
+  html.replace( QRegularExpression( QStringLiteral( R"GD(<h3[^>]*>)GD" ) ),
+                QStringLiteral( "<h3 style='margin:12px 0 7px 0;font-size:24px;line-height:1.18;"
+                                "font-weight:800;color:#020617;'>" ) );
+
+  // Standalone labels. Use ASCII-safe output labels with HTML entities.
+  const QString pinyinLabel = QStringLiteral(
+    "<br><span style='display:inline-block;margin:14px 0 5px 0;"
+    "font-size:12px;font-weight:800;letter-spacing:1px;color:#64748b;'>PINYIN</span><br>" );
+
+  const QString meaningLabel = QStringLiteral(
+    "<br><span style='display:inline-block;margin:14px 0 5px 0;"
+    "font-size:12px;font-weight:800;letter-spacing:1px;color:#64748b;'>NGH&#296;A TI&#7870;NG VI&#7878;T</span><br>" );
+
+  const QString suggestionLabel = QStringLiteral(
+    "<br><span style='display:inline-block;margin:14px 0 5px 0;"
+    "font-size:12px;font-weight:800;letter-spacing:1px;color:#64748b;'>G&#7906;I &#221; D&#7882;CH</span><br>" );
+
+  const QString relatedLabel = QStringLiteral(
+    "<br><span style='display:inline-block;margin:14px 0 5px 0;"
+    "font-size:12px;font-weight:800;letter-spacing:1px;color:#64748b;'>LI&#202;N QUAN</span><br>" );
+
+  html.replace( QRegularExpression( QStringLiteral( R"GD(\bPINYIN\b)GD" ) ),
+                pinyinLabel );
+
+  // Case-sensitive and label-shaped only. This prevents matching the subtitle phrase "tá»« liÃªn quan".
+  html.replace( QRegularExpression( QStringLiteral( R"GD(Ngh[^<\n\r]{0,24}Vi[^<\n\r]{0,12}t)GD" ) ),
+                meaningLabel );
+
+  html.replace( QRegularExpression( QStringLiteral( R"GD(G[^<\n\r]{0,14}i[^<\n\r]{0,14}d[^<\n\r]{0,14}ch)GD" ) ),
+                suggestionLabel );
+
+  html.replace( QRegularExpression( QStringLiteral( R"GD(\bLi[^<\n\r]{0,14}n quan\b)GD" ) ),
+                relatedLabel );
+
+  // Related links/chips only.
+  html.replace( QRegularExpression( QStringLiteral( R"GD(<a\s+)GD" ) ),
+                QStringLiteral( "<a style='display:inline-block;margin:4px 7px 4px 0;"
+                                "padding:4px 9px;background:#fff7ed;border:1px solid #fed7aa;"
+                                "color:#9a3412;text-decoration:none;font-weight:700;' " ) );
+
+  html.prepend( QStringLiteral(
+    "<div data-sutra-glossary-v15='1' style='padding:14px 16px 22px 16px;"
+    "background:#f8fafc;color:#0f172a;font-size:16px;line-height:1.58;"
+    "font-family:Segoe UI,Arial,sans-serif;'>" ) );
+
+  html.append( QStringLiteral( "</div>" ) );
+
+  return html;
+}
+
+
+
 void updateBuddhistGlossaryTab( QTabWidget * tabs, const QString & primaryTerm, const QStringList & detectedTerms )
 {
   if ( !tabs ) {
@@ -1781,10 +1960,10 @@ void updateBuddhistGlossaryTab( QTabWidget * tabs, const QString & primaryTerm, 
     browser = new QTextBrowser( tabs );
     browser->setObjectName( QStringLiteral( "buddhistGlossaryBrowser" ) );
     browser->setOpenExternalLinks( true );
-    tabs->addTab( browser, QString::fromUtf8( "\x47" "\x69" "\xe1" "\xba" "\xa3" "\x69" "\x20" "\x6e" "\x67" "\x68" "\xc4" "\xa9" "\x61" ) ); // sutraGlossaryUiFinalV9 tab title // sutraForceGlossaryTabTitleV8
+    tabs->addTab( browser, QString::fromUtf8( "\x47" "\x69" "\xe1" "\xba" "\xa3" "\x69" "\x20" "\x6e" "\x67" "\x68" "\xc4" "\xa9" "\x61" ) ); // sutraForceGlossaryTabTitleV8
   }
 
-  browser->setHtml( glossaryHtml( primaryTerm, detectedTerms ) );
+  browser->setHtml( sutraSafeGlossaryUiV13( glossaryHtml( primaryTerm, detectedTerms ) ) );
   applySutraPopupTextBrowserFont( browser );
 }
 
@@ -1936,7 +2115,7 @@ void updateWebReferenceTab( QTabWidget * tabs, const QString & primaryTerm, cons
     tabs->addTab( browser, QStringLiteral( "Web" ) );
   }
 
-  browser->setHtml( webReferenceHtml( primaryTerm, detectedTerms ) );
+  browser->setHtml( sutraSafeWebReferenceV13( webReferenceHtml( primaryTerm, detectedTerms ) ) );
   applySutraPopupTextBrowserFont( browser );
 }
 
