@@ -22,6 +22,7 @@
 #include <QPalette>
 #include <QColor>
 #include <QPointer>
+#include <QWebEnginePage>
 #include <functional>
 #ifdef Q_OS_WIN
 #include <windows.h>
@@ -389,13 +390,15 @@ QString sutraApplyPopupThemeToHtml( QString html )
 
   // Use temporary tokens first so replacements cannot cascade into one another.
   const ThemeColorReplacement replacements[] = {
-    { "#ffffff", "#111827" }, { "#f8fafc", "#0b1220" }, { "#f6f8fb", "#0b1220" },
-    { "#f1f5f9", "#1e293b" }, { "#ecfdf5", "#063c35" }, { "#eff6ff", "#172554" },
+    { "#ffffff", "#111827" }, { "#f9fafb", "#0b1220" }, { "#f8fafc", "#0b1220" },
+    { "#f7f9fc", "#0b1220" }, { "#f6f8fb", "#0b1220" }, { "#f1f5f9", "#1e293b" },
+    { "#ecfdf5", "#063c35" }, { "#eff6ff", "#172554" },
     { "#fff7ed", "#431407" }, { "#fffdf8", "#2b1609" }, { "#f0fdf4", "#052e16" },
+    { "#fff", "#111827" },
     { "#e2e8f0", "#334155" }, { "#cbd5e1", "#475569" }, { "#dbeafe", "#1e3a5f" },
     { "#bfdbfe", "#1e40af" }, { "#bbf7d0", "#166534" }, { "#fed7aa", "#9a3412" },
     { "#fdba74", "#c2410c" }, { "#0f172a", "#e5e7eb" }, { "#020617", "#f8fafc" },
-    { "#111827", "#f1f5f9" }, { "#334155", "#cbd5e1" }, { "#475569", "#cbd5e1" },
+    { "#1f2937", "#e5e7eb" }, { "#111827", "#f1f5f9" }, { "#334155", "#cbd5e1" }, { "#475569", "#cbd5e1" },
     { "#64748b", "#94a3b8" }, { "#94a3b8", "#64748b" }, { "#0f766e", "#5eead4" },
     { "#047857", "#6ee7b7" }, { "#1d4ed8", "#93c5fd" }, { "#2563eb", "#60a5fa" },
     { "#3b82f6", "#60a5fa" }, { "#7c2d12", "#fdba74" }, { "#9a3412", "#fdba74" },
@@ -416,13 +419,204 @@ QString sutraApplyPopupThemeToHtml( QString html )
   return html;
 }
 
+QString sutraPopupArticleThemeScript( bool dark )
+{
+  if ( !dark ) {
+    return QStringLiteral( R"JS(
+      (function () {
+        const root = document.documentElement;
+        if (!root) return;
+
+        const styleId = 'sutra-popup-content-theme';
+        const themeGeneration = (window.__sutraPopupThemeGeneration || 0) + 1;
+        window.__sutraPopupThemeGeneration = themeGeneration;
+
+        function removeDarkReaderArtifacts() {
+          if (window.__sutraPopupThemeGeneration !== themeGeneration) return;
+          // GoldenDict-ng may generate the first dictionary tab with its global
+          // Dark Reader preference. Popup Light mode must remain independent.
+          try {
+            if (window.DarkReader && typeof window.DarkReader.disable === 'function') {
+              window.DarkReader.disable();
+            }
+          } catch (_) {
+          }
+
+          // Allow a future website navigation to initialise Dark Reader again
+          // when it is actually requested outside this popup Light mode.
+          window.gdDarkModeInjected = false;
+
+          root.removeAttribute('data-darkreader-mode');
+          root.removeAttribute('data-darkreader-scheme');
+          root.removeAttribute('data-sutra-popup-theme');
+          root.classList.remove('sutra-popup-force-invert');
+
+          document.querySelectorAll(
+            'style.darkreader, link.darkreader, '
+            + 'style[class^="darkreader--"], style[class*=" darkreader--"], '
+            + 'link[class^="darkreader--"], link[class*=" darkreader--"], '
+            + 'meta[name="darkreader-lock"]'
+          ).forEach(function (node) {
+            node.remove();
+          });
+
+          let style = document.getElementById(styleId);
+          if (!style) {
+            style = document.createElement('style');
+            style.id = styleId;
+            (document.head || root).appendChild(style);
+          }
+
+          style.textContent = `
+            html[data-sutra-popup-theme="light"] {
+              color-scheme: light !important;
+              background-color: #ffffff !important;
+              filter: none !important;
+            }
+            html[data-sutra-popup-theme="light"] body {
+              min-height: 100vh !important;
+              background-color: #ffffff !important;
+              color: #111827 !important;
+              filter: none !important;
+            }
+            html[data-sutra-popup-theme="light"] img,
+            html[data-sutra-popup-theme="light"] picture,
+            html[data-sutra-popup-theme="light"] video,
+            html[data-sutra-popup-theme="light"] canvas,
+            html[data-sutra-popup-theme="light"] svg,
+            html[data-sutra-popup-theme="light"] iframe {
+              filter: none !important;
+            }
+          `;
+
+          root.setAttribute('data-sutra-popup-theme', 'light');
+        }
+
+        removeDarkReaderArtifacts();
+
+        // Dark Reader can finish asynchronously after loadFinished. Repeat the
+        // cleanup briefly so the first dictionary tab cannot turn dark again.
+        [0, 40, 120, 300, 700, 1500].forEach(function (delay) {
+          window.setTimeout(removeDarkReaderArtifacts, delay);
+        });
+      })();
+    )JS" );
+  }
+
+  return QStringLiteral( R"JS(
+    (function () {
+      const root = document.documentElement;
+      if (!root) return;
+
+      window.__sutraPopupThemeGeneration = (window.__sutraPopupThemeGeneration || 0) + 1;
+
+      const styleId = 'sutra-popup-content-theme';
+      let style = document.getElementById(styleId);
+      if (!style) {
+        style = document.createElement('style');
+        style.id = styleId;
+        (document.head || root).appendChild(style);
+      }
+
+      style.textContent = `
+        html[data-sutra-popup-theme="dark"] {
+          color-scheme: dark !important;
+          background-color: #0b1220 !important;
+        }
+        html[data-sutra-popup-theme="dark"] body {
+          min-height: 100vh !important;
+          background-color: #0b1220 !important;
+          color: #e5e7eb !important;
+        }
+        html[data-sutra-popup-theme="dark"] a {
+          color: #60a5fa !important;
+        }
+        html[data-sutra-popup-theme="dark"] input,
+        html[data-sutra-popup-theme="dark"] textarea,
+        html[data-sutra-popup-theme="dark"] select,
+        html[data-sutra-popup-theme="dark"] button {
+          background-color: #111827 !important;
+          color: #e5e7eb !important;
+          border-color: #475569 !important;
+        }
+        html[data-sutra-popup-theme="dark"] pre,
+        html[data-sutra-popup-theme="dark"] code,
+        html[data-sutra-popup-theme="dark"] blockquote,
+        html[data-sutra-popup-theme="dark"] table,
+        html[data-sutra-popup-theme="dark"] th,
+        html[data-sutra-popup-theme="dark"] td {
+          border-color: #334155 !important;
+        }
+        html[data-sutra-popup-theme="dark"] ::selection {
+          background-color: #2563eb !important;
+          color: #ffffff !important;
+        }
+        html[data-sutra-popup-theme="dark"].sutra-popup-force-invert {
+          filter: invert(0.90) hue-rotate(180deg) !important;
+        }
+        html[data-sutra-popup-theme="dark"].sutra-popup-force-invert img,
+        html[data-sutra-popup-theme="dark"].sutra-popup-force-invert picture,
+        html[data-sutra-popup-theme="dark"].sutra-popup-force-invert video,
+        html[data-sutra-popup-theme="dark"].sutra-popup-force-invert canvas,
+        html[data-sutra-popup-theme="dark"].sutra-popup-force-invert svg,
+        html[data-sutra-popup-theme="dark"].sutra-popup-force-invert iframe {
+          filter: invert(1) hue-rotate(180deg) !important;
+        }
+      `;
+
+      // Measure the page before our stylesheet is activated. This avoids
+      // double-darkening pages that already provide their own dark palette.
+      root.removeAttribute('data-sutra-popup-theme');
+      root.classList.remove('sutra-popup-force-invert');
+
+      function parseColor(value) {
+        const match = String(value || '').match(/rgba?\s*\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)(?:\s*,\s*([\d.]+))?\s*\)/i);
+        if (!match) return null;
+        const alpha = match[4] === undefined ? 1 : Number(match[4]);
+        if (alpha < 0.05) return null;
+        return [Number(match[1]), Number(match[2]), Number(match[3])];
+      }
+
+      function luminance(rgb) {
+        if (!rgb) return 1;
+        return (0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]) / 255;
+      }
+
+      const body = document.body;
+      const bodyColor = body ? parseColor(getComputedStyle(body).backgroundColor) : null;
+      const rootColor = parseColor(getComputedStyle(root).backgroundColor);
+      const effectiveColor = bodyColor || rootColor;
+      const shouldInvert = luminance(effectiveColor) > 0.58;
+
+      root.setAttribute('data-sutra-popup-theme', 'dark');
+
+      // Only invert pages that are effectively light. Pages that already supply
+      // a dark stylesheet keep their own colors and only receive the dark canvas.
+      if (shouldInvert) {
+        root.classList.add('sutra-popup-force-invert');
+      }
+    })();
+  )JS" );
+}
+
+void applySutraPopupThemeToArticleView( ArticleView * view )
+{
+  if ( !view || !view->page() ) {
+    return;
+  }
+
+  const bool dark = sutraPopupUsesDarkTheme();
+  view->page()->setBackgroundColor( dark ? QColor( 11, 18, 32 ) : QColor( 255, 255, 255 ) );
+  view->page()->runJavaScript( sutraPopupArticleThemeScript( dark ) );
+}
+
 QString sutraPopupCornerToolsThemeStyleSheet()
 {
   if ( sutraPopupUsesDarkTheme() ) {
     return QStringLiteral(
       "QWidget#sutraPopupCornerTools {"
-      "  background: rgba(15, 23, 42, 235);"
-      "  border: 1px solid rgba(100, 116, 139, 210);"
+      "  background: #0f172a;"
+      "  border: 1px solid #64748b;"
       "  border-radius: 4px;"
       "  color: #e5e7eb;"
       "}"
@@ -443,8 +637,8 @@ QString sutraPopupCornerToolsThemeStyleSheet()
 
   return QStringLiteral(
     "QWidget#sutraPopupCornerTools {"
-    "  background: rgba(245, 248, 252, 225);"
-    "  border: 1px solid rgba(120, 120, 120, 170);"
+    "  background: #f5f8fc;"
+    "  border: 1px solid #787878;"
     "  border-radius: 4px;"
     "  color: #0f172a;"
     "}"
@@ -586,8 +780,13 @@ void applySutraPopupTheme( QWidget * popup, QTabWidget * tabs )
 
   if ( tabs ) {
     for ( int i = 0; i < tabs->count(); ++i ) {
-      if ( QTextBrowser * browser = qobject_cast< QTextBrowser * >( tabs->widget( i ) ) ) {
+      QWidget * tab = tabs->widget( i );
+
+      if ( QTextBrowser * browser = qobject_cast< QTextBrowser * >( tab ) ) {
         applySutraPopupTextBrowserFont( browser );
+      }
+      else if ( ArticleView * view = qobject_cast< ArticleView * >( tab ) ) {
+        applySutraPopupThemeToArticleView( view );
       }
     }
   }
@@ -3566,7 +3765,8 @@ ScanPopup::ScanPopup( QWidget * parent,
 
   QWidget * sutraPopupCornerTools = new QWidget( this );
   sutraPopupCornerTools->setObjectName( sutraPopupCornerToolsObjectName() );
-  sutraPopupCornerTools->setAttribute( Qt::WA_TranslucentBackground );
+  sutraPopupCornerTools->setAttribute( Qt::WA_StyledBackground, true );
+  sutraPopupCornerTools->setAutoFillBackground( true );
   sutraPopupCornerTools->setToolTip( tr( "Popup quick settings" ) );
   sutraPopupCornerTools->setStyleSheet( sutraPopupCornerToolsThemeStyleSheet() );
 
@@ -3942,6 +4142,7 @@ void ScanPopup::refresh()
   setDictionaryIconSize();
 
   definition->syncBackgroundColorWithCfgDarkReader();
+  applySutraPopupThemeToArticleView( definition );
 
   connect( groupList, &GroupComboBox::currentIndexChanged, this, &ScanPopup::currentGroupChanged );
 #ifdef WITH_X11
@@ -4756,8 +4957,12 @@ void ScanPopup::hideTimerExpired()
   }
 }
 
-void ScanPopup::pageLoaded( ArticleView * ) const
+void ScanPopup::pageLoaded( ArticleView * view ) const
 {
+  // Theme the page even if it finishes loading while the popup is hidden.
+  // Otherwise the next popup open can briefly retain a light document canvas.
+  applySutraPopupThemeToArticleView( view );
+
   if ( !isVisible() ) {
     return;
   }
@@ -5014,6 +5219,7 @@ void ScanPopup::openWebsiteInNewTab( QString name, QString url, QString dictId, 
         if ( !word.isEmpty() ) {
           view->setCurrentWord( word );
         }
+        applySutraPopupThemeToArticleView( view );
         view->load( url, name );
         // Truncate long website names for tab labels
         const int maxTabTitleLength = 30;
@@ -5058,6 +5264,7 @@ void ScanPopup::openWebsiteInNewTab( QString name, QString url, QString dictId, 
   int index = tabWidget->addTab( view, truncatedName );
   tabWidget->setCurrentIndex( index );
 
+  applySutraPopupThemeToArticleView( view );
   view->load( url, name );
 }
 
