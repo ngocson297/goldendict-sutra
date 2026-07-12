@@ -21,6 +21,7 @@
 #include <QActionGroup>
 #include <QPalette>
 #include <QColor>
+#include <QColorDialog>
 #include <QPointer>
 #include <QWebEnginePage>
 #include <functional>
@@ -336,8 +337,9 @@ void saveSutraPopupOpacityPercent( int opacityPercent )
 
 
 enum class SutraPopupThemeMode {
-  Light = 0,
-  Dark  = 1
+  Light  = 0,
+  Dark   = 1,
+  Custom = 2
 };
 
 QString sutraPopupThemeSettingsKey()
@@ -350,6 +352,67 @@ QString sutraPopupThemeToggleButtonObjectName()
   return QStringLiteral( "sutraPopupThemeToggleButton" );
 }
 
+QString sutraPopupColorsButtonObjectName()
+{
+  return QStringLiteral( "sutraPopupColorsButton" );
+}
+
+QString sutraPopupCustomTextColorSettingsKey()
+{
+  return QStringLiteral( "SutraEdition/PopupCustomTextColor" );
+}
+
+QString sutraPopupCustomBackgroundColorSettingsKey()
+{
+  return QStringLiteral( "SutraEdition/PopupCustomBackgroundColor" );
+}
+
+QColor sutraPopupDefaultCustomTextColor()
+{
+  return QColor( 17, 17, 17 );
+}
+
+QColor sutraPopupDefaultCustomBackgroundColor()
+{
+  return QColor( 255, 255, 255 );
+}
+
+QColor loadSutraPopupCustomTextColor()
+{
+  QSettings settings;
+  const QColor color( settings.value( sutraPopupCustomTextColorSettingsKey(),
+                                      sutraPopupDefaultCustomTextColor().name() ).toString() );
+  return color.isValid() ? color : sutraPopupDefaultCustomTextColor();
+}
+
+QColor loadSutraPopupCustomBackgroundColor()
+{
+  QSettings settings;
+  const QColor color( settings.value( sutraPopupCustomBackgroundColorSettingsKey(),
+                                      sutraPopupDefaultCustomBackgroundColor().name() ).toString() );
+  return color.isValid() ? color : sutraPopupDefaultCustomBackgroundColor();
+}
+
+void saveSutraPopupCustomTextColor( const QColor & color )
+{
+  if ( !color.isValid() ) {
+    return;
+  }
+
+  QSettings settings;
+  settings.setValue( sutraPopupCustomTextColorSettingsKey(), color.name( QColor::HexRgb ) );
+}
+
+void saveSutraPopupCustomBackgroundColor( const QColor & color )
+{
+  if ( !color.isValid() ) {
+    return;
+  }
+
+  QSettings settings;
+  settings.setValue( sutraPopupCustomBackgroundColorSettingsKey(), color.name( QColor::HexRgb ) );
+}
+
 constexpr int sutraPopupDefaultThemeMode = static_cast< int >( SutraPopupThemeMode::Light );
 
 SutraPopupThemeMode loadSutraPopupThemeMode()
@@ -357,7 +420,7 @@ SutraPopupThemeMode loadSutraPopupThemeMode()
   QSettings settings;
   const int value = qBound( 0,
                             settings.value( sutraPopupThemeSettingsKey(), sutraPopupDefaultThemeMode ).toInt(),
-                            1 );
+                            2 );
   return static_cast< SutraPopupThemeMode >( value );
 }
 
@@ -372,14 +435,102 @@ bool sutraPopupUsesDarkTheme()
   return loadSutraPopupThemeMode() == SutraPopupThemeMode::Dark;
 }
 
+bool sutraPopupUsesCustomTheme()
+{
+  return loadSutraPopupThemeMode() == SutraPopupThemeMode::Custom;
+}
+
+QColor sutraPopupActiveTextColor()
+{
+  switch ( loadSutraPopupThemeMode() ) {
+    case SutraPopupThemeMode::Dark:
+      return QColor( 255, 255, 255 );
+    case SutraPopupThemeMode::Custom:
+      return loadSutraPopupCustomTextColor();
+    case SutraPopupThemeMode::Light:
+    default:
+      return QColor( 0, 0, 0 );
+  }
+}
+
+QColor sutraPopupActiveBackgroundColor()
+{
+  switch ( loadSutraPopupThemeMode() ) {
+    case SutraPopupThemeMode::Dark:
+      return QColor( 0, 0, 0 );
+    case SutraPopupThemeMode::Custom:
+      return loadSutraPopupCustomBackgroundColor();
+    case SutraPopupThemeMode::Light:
+    default:
+      return QColor( 255, 255, 255 );
+  }
+}
+
+QColor sutraPopupRaisedSurfaceColor( const QColor & background )
+{
+  return background.lightnessF() < 0.5 ? background.lighter( 145 ) : background.darker( 106 );
+}
+
+QColor sutraPopupBorderColor( const QColor & background, const QColor & text )
+{
+  QColor mixed;
+  mixed.setRed( ( background.red() * 2 + text.red() ) / 3 );
+  mixed.setGreen( ( background.green() * 2 + text.green() ) / 3 );
+  mixed.setBlue( ( background.blue() * 2 + text.blue() ) / 3 );
+  return mixed;
+}
+
+QIcon sutraPopupColorSwatchIcon( const QColor & color )
+{
+  QPixmap pixmap( 16, 16 );
+  pixmap.fill( color );
+  return QIcon( pixmap );
+}
+
 QString sutraPopupThemeModeLabel( SutraPopupThemeMode mode )
 {
-  return mode == SutraPopupThemeMode::Dark ? QStringLiteral( "Dark" ) : QStringLiteral( "Light" );
+  switch ( mode ) {
+    case SutraPopupThemeMode::Dark:
+      return QStringLiteral( "Dark" );
+    case SutraPopupThemeMode::Custom:
+      return QStringLiteral( "Custom" );
+    case SutraPopupThemeMode::Light:
+    default:
+      return QStringLiteral( "Light" );
+  }
 }
 
 QString sutraApplyPopupThemeToHtml( QString html )
 {
-  if ( !sutraPopupUsesDarkTheme() || html.isEmpty() ) {
+  if ( html.isEmpty() ) {
+    return html;
+  }
+
+  if ( sutraPopupUsesCustomTheme() ) {
+    const QString textColor = loadSutraPopupCustomTextColor().name( QColor::HexRgb );
+    const QString backgroundColor = loadSutraPopupCustomBackgroundColor().name( QColor::HexRgb );
+    const QString customStyle = QStringLiteral(
+      "<style id='sutra-popup-custom-colors'>"
+      "html,body{background:%1!important;color:%2!important;}"
+      "body *{color:%2!important;border-color:%2!important;}"
+      "body div,body section,body article,body header,body footer,body main,body aside,"
+      "body p,body span,body h1,body h2,body h3,body h4,body h5,body h6,body ul,body ol,body li,"
+      "body table,body tr,body td,body th,body blockquote,body pre,body code{background:transparent!important;}"
+      "body a,body a *{color:%2!important;}"
+      "body input,body textarea,body select,body button{background:%1!important;color:%2!important;border-color:%2!important;}"
+      "</style>" ).arg( backgroundColor, textColor );
+
+    const qsizetype headEnd = html.indexOf( QStringLiteral( "</head>" ), 0, Qt::CaseInsensitive );
+    if ( headEnd >= 0 ) {
+      html.insert( headEnd, customStyle );
+    }
+    else {
+      html.prepend( customStyle );
+    }
+    return html;
+  }
+
+  if ( !sutraPopupUsesDarkTheme() ) {
     return html;
   }
 
@@ -419,8 +570,139 @@ QString sutraApplyPopupThemeToHtml( QString html )
   return html;
 }
 
-QString sutraPopupArticleThemeScript( bool dark )
+QString sutraPopupArticleThemeScript( bool dark, bool monochrome )
 {
+  if ( monochrome ) {
+    const QColor background = sutraPopupActiveBackgroundColor();
+    const QColor text = sutraPopupActiveTextColor();
+    const QString colorScheme = background.lightnessF() < 0.5 ? QStringLiteral( "dark" )
+                                                                : QStringLiteral( "light" );
+
+    return QStringLiteral( R"JS(
+      (function () {
+        const root = document.documentElement;
+        if (!root) return;
+
+        const styleId = 'sutra-popup-content-theme';
+        const themeGeneration = (window.__sutraPopupThemeGeneration || 0) + 1;
+        window.__sutraPopupThemeGeneration = themeGeneration;
+
+        function applyMonochromeTheme() {
+          if (window.__sutraPopupThemeGeneration !== themeGeneration) return;
+
+          try {
+            if (window.DarkReader && typeof window.DarkReader.disable === 'function') {
+              window.DarkReader.disable();
+            }
+          } catch (_) {
+          }
+
+          window.gdDarkModeInjected = false;
+          root.removeAttribute('data-darkreader-mode');
+          root.removeAttribute('data-darkreader-scheme');
+          root.classList.remove('sutra-popup-force-invert');
+
+          document.querySelectorAll(
+            'style.darkreader, link.darkreader, '
+            + 'style[class^="darkreader--"], style[class*=" darkreader--"], '
+            + 'link[class^="darkreader--"], link[class*=" darkreader--"], '
+            + 'meta[name="darkreader-lock"]'
+          ).forEach(function (node) {
+            node.remove();
+          });
+
+          let style = document.getElementById(styleId);
+          if (!style) {
+            style = document.createElement('style');
+            style.id = styleId;
+            (document.head || root).appendChild(style);
+          }
+
+          style.textContent = `
+            html[data-sutra-popup-theme="monochrome"] {
+              color-scheme: %3 !important;
+              background-color: %1 !important;
+              color: %2 !important;
+              filter: none !important;
+            }
+            html[data-sutra-popup-theme="monochrome"] body {
+              min-height: 100vh !important;
+              background-color: %1 !important;
+              color: %2 !important;
+              filter: none !important;
+            }
+            html[data-sutra-popup-theme="monochrome"] body * {
+              color: %2 !important;
+              background-color: transparent !important;
+              background-image: none !important;
+              text-shadow: none !important;
+              border-color: %2 !important;
+            }
+            html[data-sutra-popup-theme="monochrome"] body div,
+            html[data-sutra-popup-theme="monochrome"] body section,
+            html[data-sutra-popup-theme="monochrome"] body article,
+            html[data-sutra-popup-theme="monochrome"] body header,
+            html[data-sutra-popup-theme="monochrome"] body footer,
+            html[data-sutra-popup-theme="monochrome"] body main,
+            html[data-sutra-popup-theme="monochrome"] body aside,
+            html[data-sutra-popup-theme="monochrome"] body p,
+            html[data-sutra-popup-theme="monochrome"] body span,
+            html[data-sutra-popup-theme="monochrome"] body h1,
+            html[data-sutra-popup-theme="monochrome"] body h2,
+            html[data-sutra-popup-theme="monochrome"] body h3,
+            html[data-sutra-popup-theme="monochrome"] body h4,
+            html[data-sutra-popup-theme="monochrome"] body h5,
+            html[data-sutra-popup-theme="monochrome"] body h6,
+            html[data-sutra-popup-theme="monochrome"] body ul,
+            html[data-sutra-popup-theme="monochrome"] body ol,
+            html[data-sutra-popup-theme="monochrome"] body li,
+            html[data-sutra-popup-theme="monochrome"] body table,
+            html[data-sutra-popup-theme="monochrome"] body tr,
+            html[data-sutra-popup-theme="monochrome"] body td,
+            html[data-sutra-popup-theme="monochrome"] body th,
+            html[data-sutra-popup-theme="monochrome"] body blockquote,
+            html[data-sutra-popup-theme="monochrome"] body pre,
+            html[data-sutra-popup-theme="monochrome"] body code {
+              background-color: transparent !important;
+              background-image: none !important;
+            }
+            html[data-sutra-popup-theme="monochrome"] body a,
+            html[data-sutra-popup-theme="monochrome"] body a * {
+              color: %2 !important;
+            }
+            html[data-sutra-popup-theme="monochrome"] body input,
+            html[data-sutra-popup-theme="monochrome"] body textarea,
+            html[data-sutra-popup-theme="monochrome"] body select,
+            html[data-sutra-popup-theme="monochrome"] body button {
+              background-color: %1 !important;
+              color: %2 !important;
+              border-color: %2 !important;
+            }
+            html[data-sutra-popup-theme="monochrome"] img,
+            html[data-sutra-popup-theme="monochrome"] picture,
+            html[data-sutra-popup-theme="monochrome"] video,
+            html[data-sutra-popup-theme="monochrome"] canvas,
+            html[data-sutra-popup-theme="monochrome"] svg,
+            html[data-sutra-popup-theme="monochrome"] iframe {
+              filter: none !important;
+            }
+            html[data-sutra-popup-theme="monochrome"] ::selection {
+              background-color: %2 !important;
+              color: %1 !important;
+            }
+          `;
+
+          root.setAttribute('data-sutra-popup-theme', 'monochrome');
+        }
+
+        applyMonochromeTheme();
+        [0, 40, 120, 300, 700, 1500].forEach(function (delay) {
+          window.setTimeout(applyMonochromeTheme, delay);
+        });
+      })();
+    )JS" ).arg( background.name( QColor::HexRgb ), text.name( QColor::HexRgb ), colorScheme );
+  }
+
   if ( !dark ) {
     return QStringLiteral( R"JS(
       (function () {
@@ -606,12 +888,48 @@ void applySutraPopupThemeToArticleView( ArticleView * view )
   }
 
   const bool dark = sutraPopupUsesDarkTheme();
-  view->page()->setBackgroundColor( dark ? QColor( 11, 18, 32 ) : QColor( 255, 255, 255 ) );
-  view->page()->runJavaScript( sutraPopupArticleThemeScript( dark ) );
+  const bool monochrome = view->property( "sutraPopupPrimaryArticleTab" ).toBool()
+                          || sutraPopupUsesCustomTheme();
+  const QColor background = monochrome ? sutraPopupActiveBackgroundColor()
+                                       : ( dark ? QColor( 11, 18, 32 ) : QColor( 255, 255, 255 ) );
+
+  view->page()->setBackgroundColor( background );
+  view->page()->runJavaScript( sutraPopupArticleThemeScript( dark, monochrome ) );
 }
 
 QString sutraPopupCornerToolsThemeStyleSheet()
 {
+  if ( sutraPopupUsesCustomTheme() ) {
+    const QColor background = loadSutraPopupCustomBackgroundColor();
+    const QColor text = loadSutraPopupCustomTextColor();
+    const QColor border = sutraPopupBorderColor( background, text );
+    const QColor hover = sutraPopupRaisedSurfaceColor( background );
+
+    return QStringLiteral(
+      "QWidget#sutraPopupCornerTools {"
+      "  background: %1;"
+      "  border: 1px solid %2;"
+      "  border-radius: 4px;"
+      "  color: %3;"
+      "}"
+      "QToolButton {"
+      "  min-width: 22px;"
+      "  min-height: 20px;"
+      "  padding: 1px;"
+      "  border: 0;"
+      "  background: transparent;"
+      "  color: %3;"
+      "  font-weight: bold;"
+      "}"
+      "QToolButton:hover {"
+      "  background: %4;"
+      "  border-radius: 3px;"
+      "}" ).arg( background.name( QColor::HexRgb ),
+                    border.name( QColor::HexRgb ),
+                    text.name( QColor::HexRgb ),
+                    hover.name( QColor::HexRgb ) );
+  }
+
   if ( sutraPopupUsesDarkTheme() ) {
     return QStringLiteral(
       "QWidget#sutraPopupCornerTools {"
@@ -659,6 +977,43 @@ QString sutraPopupCornerToolsThemeStyleSheet()
 
 QString sutraPopupThemeStyleSheet()
 {
+  if ( sutraPopupUsesCustomTheme() ) {
+    const QColor background = loadSutraPopupCustomBackgroundColor();
+    const QColor text = loadSutraPopupCustomTextColor();
+    const QColor surface = sutraPopupRaisedSurfaceColor( background );
+    const QColor border = sutraPopupBorderColor( background, text );
+
+    return QStringLiteral(
+      "QMainWindow { background: %1; color: %2; }"
+      "QToolBar, QStatusBar { background: %1; color: %2; border-color: %4; }"
+      "QTabWidget::pane { background: %1; border: 1px solid %4; top: -1px; }"
+      "QTabWidget::tab-bar { left: 6px; }"
+      "QTabBar { qproperty-drawBase: 0; }"
+      "QTabBar::tab {"
+      "  background: %3; color: %2; border: 1px solid %4; border-bottom: 0;"
+      "  border-top-left-radius: 5px; border-top-right-radius: 5px;"
+      "  padding: 6px 12px; margin-right: 4px; min-width: 72px; min-height: 22px;"
+      "}"
+      "QTabBar::tab:selected { background: %1; color: %2; margin-bottom: -1px; }"
+      "QTabBar::tab:hover:!selected { background: %3; }"
+      "QTabBar::close-button { margin-left: 7px; subcontrol-position: right; }"
+      "QLineEdit, QComboBox, QListView, QTreeView, QTableView, QTextEdit, QTextBrowser {"
+      "  background: %1; color: %2; border: 1px solid %4; selection-background-color: %2;"
+      "  selection-color: %1; }"
+      "QToolButton, QPushButton { color: %2; background: transparent; }"
+      "QToolButton:hover, QPushButton:hover { background: %3; }"
+      "QMenu { background: %1; color: %2; border: 1px solid %4; }"
+      "QMenu::item:selected { background: %3; color: %2; }"
+      "QMenu::separator { background: %4; }"
+      "QScrollBar:vertical, QScrollBar:horizontal { background: %1; border: 0; }"
+      "QScrollBar::handle:vertical, QScrollBar::handle:horizontal { background: %4; border-radius: 4px; }"
+      "QToolTip { background: %1; color: %2; border: 1px solid %4; }"
+    ).arg( background.name( QColor::HexRgb ),
+           text.name( QColor::HexRgb ),
+           surface.name( QColor::HexRgb ),
+           border.name( QColor::HexRgb ) );
+  }
+
   if ( sutraPopupUsesDarkTheme() ) {
     return QStringLiteral(
       "QMainWindow { background: #0b1220; color: #e5e7eb; }"
@@ -718,10 +1073,23 @@ void updateSutraPopupThemeToggleButton( QWidget * popup )
 
   if ( QToolButton * button =
          popup->findChild< QToolButton * >( sutraPopupThemeToggleButtonObjectName() ) ) {
-    const bool dark = sutraPopupUsesDarkTheme();
-    button->setText( dark ? QStringLiteral( "L" ) : QStringLiteral( "D" ) );
-    button->setToolTip( dark ? QObject::tr( "Switch popup to Light mode (Ctrl+Shift+L)" )
-                             : QObject::tr( "Switch popup to Dark mode (Ctrl+Shift+L)" ) );
+    const SutraPopupThemeMode mode = loadSutraPopupThemeMode();
+    if ( mode == SutraPopupThemeMode::Custom ) {
+      button->setText( QStringLiteral( "C" ) );
+      button->setToolTip( QObject::tr( "Custom popup colors are active. Click to switch to Light mode." ) );
+    }
+    else {
+      const bool dark = mode == SutraPopupThemeMode::Dark;
+      button->setText( dark ? QStringLiteral( "L" ) : QStringLiteral( "D" ) );
+      button->setToolTip( dark ? QObject::tr( "Switch popup to Light mode (Ctrl+Shift+L)" )
+                               : QObject::tr( "Switch popup to Dark mode (Ctrl+Shift+L)" ) );
+    }
+  }
+
+  if ( QToolButton * colorsButton =
+         popup->findChild< QToolButton * >( sutraPopupColorsButtonObjectName() ) ) {
+    colorsButton->setIcon( sutraPopupColorSwatchIcon( sutraPopupActiveBackgroundColor() ) );
+    colorsButton->setToolTip( QObject::tr( "Popup text and background colors" ) );
   }
 }
 
@@ -740,7 +1108,26 @@ void applySutraPopupTheme( QWidget * popup, QTabWidget * tabs )
   popup->setProperty( "sutraPopupDarkTheme", dark );
 
   QPalette palette = QApplication::palette();
-  if ( dark ) {
+  if ( sutraPopupUsesCustomTheme() ) {
+    const QColor background = loadSutraPopupCustomBackgroundColor();
+    const QColor text = loadSutraPopupCustomTextColor();
+    const QColor surface = sutraPopupRaisedSurfaceColor( background );
+    const QColor border = sutraPopupBorderColor( background, text );
+
+    palette.setColor( QPalette::Window, background );
+    palette.setColor( QPalette::WindowText, text );
+    palette.setColor( QPalette::Base, background );
+    palette.setColor( QPalette::AlternateBase, surface );
+    palette.setColor( QPalette::Text, text );
+    palette.setColor( QPalette::Button, surface );
+    palette.setColor( QPalette::ButtonText, text );
+    palette.setColor( QPalette::Highlight, text );
+    palette.setColor( QPalette::HighlightedText, background );
+    palette.setColor( QPalette::ToolTipBase, background );
+    palette.setColor( QPalette::ToolTipText, text );
+    palette.setColor( QPalette::Mid, border );
+  }
+  else if ( dark ) {
     palette.setColor( QPalette::Window, QColor( 11, 18, 32 ) );
     palette.setColor( QPalette::WindowText, QColor( 229, 231, 235 ) );
     palette.setColor( QPalette::Base, QColor( 17, 24, 39 ) );
@@ -786,6 +1173,7 @@ void applySutraPopupTheme( QWidget * popup, QTabWidget * tabs )
         applySutraPopupTextBrowserFont( browser );
       }
       else if ( ArticleView * view = qobject_cast< ArticleView * >( tab ) ) {
+        view->setProperty( "sutraPopupPrimaryArticleTab", i == 0 );
         applySutraPopupThemeToArticleView( view );
       }
     }
@@ -913,6 +1301,8 @@ void resetSutraPopupAppearanceDefaults()
   settings.setValue( sutraPopupFontSizeSettingsKey(), sutraPopupDefaultFontSize );
   settings.setValue( sutraPopupOpacitySettingsKey(), sutraPopupDefaultOpacityPercent );
   settings.setValue( sutraPopupThemeSettingsKey(), sutraPopupDefaultThemeMode );
+  settings.remove( sutraPopupCustomTextColorSettingsKey() );
+  settings.remove( sutraPopupCustomBackgroundColorSettingsKey() );
   settings.setValue( sutraMouseLookupModeSettingsKey(), sutraMouseLookupDefaultMode );
   settings.setValue( sutraMouseLookupEnabledSettingsKey(), true );
   settings.setValue( sutraMouseLookupModifiersSettingsKey(), sutraMouseLookupCtrlModifier );
@@ -3310,6 +3700,7 @@ ScanPopup::ScanPopup( QWidget * parent,
                                 translateBox->translateLine(),
                                 dictionaryBar.toggleViewAction(),
                                 cfg.lastPopupGroupId );
+  definition->setProperty( "sutraPopupPrimaryArticleTab", true );
 
   tabWidget->addTab( definition, tr( "Definition" ) );
   tabWidget->tabBar()->setTabButton( 0, QTabBar::RightSide, nullptr );
@@ -3563,11 +3954,6 @@ ScanPopup::ScanPopup( QWidget * parent,
   }
 
   const auto applySutraPopupThemeMode = [ this ]( SutraPopupThemeMode mode ) {
-    if ( mode == loadSutraPopupThemeMode() ) {
-      applySutraPopupTheme( this, tabWidget );
-      return;
-    }
-
     QPointer< QWidget > previousCurrentTab = tabWidget ? tabWidget->currentWidget() : nullptr;
 
     saveSutraPopupThemeMode( mode );
@@ -3609,11 +3995,20 @@ ScanPopup::ScanPopup( QWidget * parent,
   sutraPopupThemeGroup->addAction( sutraPopupDarkThemeAction );
   sutraPopupThemeActions << sutraPopupDarkThemeAction;
 
+  QAction * sutraPopupCustomThemeAction = sutraPopupThemeMenu->addAction( tr( "Custom colors" ) );
+  sutraPopupCustomThemeAction->setCheckable( true );
+  sutraPopupCustomThemeAction->setData( static_cast< int >( SutraPopupThemeMode::Custom ) );
+  sutraPopupThemeGroup->addAction( sutraPopupCustomThemeAction );
+  sutraPopupThemeActions << sutraPopupCustomThemeAction;
+
   connect( sutraPopupLightThemeAction, &QAction::triggered, this, [ applySutraPopupThemeMode ] {
     applySutraPopupThemeMode( SutraPopupThemeMode::Light );
   } );
   connect( sutraPopupDarkThemeAction, &QAction::triggered, this, [ applySutraPopupThemeMode ] {
     applySutraPopupThemeMode( SutraPopupThemeMode::Dark );
+  } );
+  connect( sutraPopupCustomThemeAction, &QAction::triggered, this, [ applySutraPopupThemeMode ] {
+    applySutraPopupThemeMode( SutraPopupThemeMode::Custom );
   } );
 
   sutraPopupThemeMenu->addSeparator();
@@ -3626,10 +4021,60 @@ ScanPopup::ScanPopup( QWidget * parent,
   sutraPopupThemeMenu->addAction( sutraPopupThemeToggleAction );
 
   connect( sutraPopupThemeToggleAction, &QAction::triggered, this, [ applySutraPopupThemeMode ] {
-    const SutraPopupThemeMode nextMode = sutraPopupUsesDarkTheme()
+    const SutraPopupThemeMode currentMode = loadSutraPopupThemeMode();
+    const SutraPopupThemeMode nextMode = currentMode == SutraPopupThemeMode::Dark
                                                ? SutraPopupThemeMode::Light
-                                               : SutraPopupThemeMode::Dark;
+                                               : ( currentMode == SutraPopupThemeMode::Custom
+                                                     ? SutraPopupThemeMode::Light
+                                                     : SutraPopupThemeMode::Dark );
     applySutraPopupThemeMode( nextMode );
+  } );
+
+  QMenu * sutraPopupColorsMenu = sutraPopupThemeMenu->addMenu( tr( "Colors" ) );
+
+  QAction * sutraPopupTextColorAction = sutraPopupColorsMenu->addAction( tr( "Text color..." ) );
+  QAction * sutraPopupBackgroundColorAction = sutraPopupColorsMenu->addAction( tr( "Popup background..." ) );
+  sutraPopupColorsMenu->addSeparator();
+  QAction * sutraPopupResetColorsAction = sutraPopupColorsMenu->addAction( tr( "Reset custom colors" ) );
+
+  const auto chooseSutraPopupColor = [ this, applySutraPopupThemeMode ]( bool chooseTextColor ) {
+    const QColor initialColor = chooseTextColor ? loadSutraPopupCustomTextColor()
+                                                : loadSutraPopupCustomBackgroundColor();
+    const QString title = chooseTextColor ? tr( "Choose popup text color" )
+                                          : tr( "Choose popup background color" );
+    const QColor selectedColor = QColorDialog::getColor( initialColor, this, title );
+    if ( !selectedColor.isValid() ) {
+      return;
+    }
+
+    if ( chooseTextColor ) {
+      saveSutraPopupCustomTextColor( selectedColor );
+    }
+    else {
+      saveSutraPopupCustomBackgroundColor( selectedColor );
+    }
+
+    applySutraPopupThemeMode( SutraPopupThemeMode::Custom );
+  };
+
+  connect( sutraPopupTextColorAction, &QAction::triggered, this, [ chooseSutraPopupColor ] {
+    chooseSutraPopupColor( true );
+  } );
+  connect( sutraPopupBackgroundColorAction, &QAction::triggered, this, [ chooseSutraPopupColor ] {
+    chooseSutraPopupColor( false );
+  } );
+  connect( sutraPopupResetColorsAction, &QAction::triggered, this, [ applySutraPopupThemeMode ] {
+    QSettings settings;
+    settings.remove( sutraPopupCustomTextColorSettingsKey() );
+    settings.remove( sutraPopupCustomBackgroundColorSettingsKey() );
+    applySutraPopupThemeMode( SutraPopupThemeMode::Light );
+  } );
+
+  connect( sutraPopupColorsMenu, &QMenu::aboutToShow, this, [ sutraPopupTextColorAction,
+                                                              sutraPopupBackgroundColorAction ] {
+    sutraPopupTextColorAction->setIcon( sutraPopupColorSwatchIcon( loadSutraPopupCustomTextColor() ) );
+    sutraPopupBackgroundColorAction->setIcon(
+      sutraPopupColorSwatchIcon( loadSutraPopupCustomBackgroundColor() ) );
   } );
 
   sutraPopupLayoutMenu->addSeparator();
@@ -3795,6 +4240,13 @@ ScanPopup::ScanPopup( QWidget * parent,
   sutraPopupThemeToggleButton->setMinimumWidth( 24 );
   sutraPopupThemeToggleButton->setAutoRaise( true );
 
+  QToolButton * sutraPopupColorsButton = new QToolButton( sutraPopupCornerTools );
+  sutraPopupColorsButton->setObjectName( sutraPopupColorsButtonObjectName() );
+  sutraPopupColorsButton->setMinimumWidth( 24 );
+  sutraPopupColorsButton->setAutoRaise( true );
+  sutraPopupColorsButton->setIcon( sutraPopupColorSwatchIcon( sutraPopupActiveBackgroundColor() ) );
+  sutraPopupColorsButton->setToolTip( tr( "Popup text and background colors" ) );
+
   QToolButton * sutraPopupOptionsButton = new QToolButton( sutraPopupCornerTools );
   sutraPopupOptionsButton->setText( QStringLiteral( "⚙" ) );
   sutraPopupOptionsButton->setToolTip( tr( "Popup settings" ) );
@@ -3814,6 +4266,7 @@ ScanPopup::ScanPopup( QWidget * parent,
   sutraPopupCornerLayout->addWidget( sutraPopupZoomIndicator );
   sutraPopupCornerLayout->addWidget( sutraPopupZoomInButton );
   sutraPopupCornerLayout->addWidget( sutraPopupThemeToggleButton );
+  sutraPopupCornerLayout->addWidget( sutraPopupColorsButton );
   sutraPopupCornerLayout->addWidget( sutraPopupOptionsButton );
   sutraPopupCornerLayout->addWidget( sutraPopupQuickFixButton );
   sutraPopupCornerLayout->addWidget( sutraPopupQuickFitButton );
@@ -3822,6 +4275,11 @@ ScanPopup::ScanPopup( QWidget * parent,
   connect( sutraPopupZoomIndicator, &QToolButton::clicked, sutraPopupZoomResetAction, &QAction::trigger );
   connect( sutraPopupZoomInButton, &QToolButton::clicked, sutraPopupZoomInAction, &QAction::trigger );
   connect( sutraPopupThemeToggleButton, &QToolButton::clicked, sutraPopupThemeToggleAction, &QAction::trigger );
+  connect( sutraPopupColorsButton, &QToolButton::clicked, this, [ = ] {
+    positionSutraPopupCornerTools( this );
+    sutraPopupColorsMenu->exec(
+      sutraPopupColorsButton->mapToGlobal( QPoint( 0, sutraPopupColorsButton->height() ) ) );
+  } );
 
   // Receive Ctrl + mouse-wheel events from every widget inside the popup,
   // including the article view, custom Definition/Web tabs and their scroll areas.
