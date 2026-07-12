@@ -13,6 +13,9 @@
 #include <QTextBrowser>
 #include <QTabWidget>
 #include <QToolButton>
+#include <QAbstractButton>
+#include <QTabBar>
+#include <QComboBox>
 #include <QTimer>
 #include <QTextDocument>
 #include <QSettings>
@@ -44,12 +47,20 @@
 #include "utils.hh"
 #include <QCursor>
 #include <QPixmap>
+#include <QIcon>
+#include <QPainter>
+#include <QPainterPath>
+#include <QtMath>
+#include <cmath>
 #include <QMenu>
 #include <QMouseEvent>
 #include <QWheelEvent>
 #include <QChildEvent>
 #include <QFileDialog>
 #include <QMessageBox>
+#include <QInputDialog>
+#include <QDateTime>
+#include <QVariantMap>
 #include "gestures.hh"
 
 using std::set;
@@ -59,11 +70,35 @@ using std::pair;
 namespace {
 
 
+void sutraApplyNativeTopmost( QWidget * window, bool enabled )
+{
+  if ( !window ) {
+    return;
+  }
+
+#ifdef Q_OS_WIN
+  HWND hwnd = reinterpret_cast< HWND >( window->winId() );
+  if ( hwnd ) {
+    SetWindowPos( hwnd,
+                  enabled ? HWND_TOPMOST : HWND_NOTOPMOST,
+                  0,
+                  0,
+                  0,
+                  0,
+                  SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW );
+  }
+#else
+  Q_UNUSED( enabled );
+#endif
+}
+
 void sutraForcePopupToFront( QWidget * window )
 {
   if ( !window ) {
     return;
   }
+
+  const bool keepTopmost = window->windowFlags().testFlag( Qt::WindowStaysOnTopHint );
 
   window->show();
   window->raise();
@@ -73,8 +108,9 @@ void sutraForcePopupToFront( QWidget * window )
   HWND hwnd = reinterpret_cast< HWND >( window->winId() );
 
   if ( hwnd ) {
-    // Toggle topmost briefly so the popup is brought above the source app,
-    // but do not keep it permanently Always-on-top.
+    // Bring the popup forward without accidentally clearing a persistent
+    // Always-on-top setting. The old code always called HWND_NOTOPMOST here,
+    // which made the checkbox appear enabled while Windows had already removed it.
     SetWindowPos( hwnd,
                   HWND_TOPMOST,
                   0,
@@ -83,13 +119,15 @@ void sutraForcePopupToFront( QWidget * window )
                   0,
                   SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW );
     SetForegroundWindow( hwnd );
-    SetWindowPos( hwnd,
-                  HWND_NOTOPMOST,
-                  0,
-                  0,
-                  0,
-                  0,
-                  SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW );
+    if ( !keepTopmost ) {
+      SetWindowPos( hwnd,
+                    HWND_NOTOPMOST,
+                    0,
+                    0,
+                    0,
+                    0,
+                    SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW );
+    }
   }
 #endif
 }
@@ -347,6 +385,52 @@ QString sutraPopupThemeSettingsKey()
   return QStringLiteral( "SutraEdition/PopupThemeMode" );
 }
 
+QString sutraPopupShowGlossaryTabSettingsKey()
+{
+  return QStringLiteral( "SutraEdition/PopupShowGlossaryTab" );
+}
+
+QString sutraPopupShowWebTabSettingsKey()
+{
+  return QStringLiteral( "SutraEdition/PopupShowWebTab" );
+}
+
+constexpr bool sutraPopupDefaultShowGlossaryTab = false;
+constexpr bool sutraPopupDefaultShowWebTab      = false;
+
+bool loadSutraPopupShowGlossaryTab()
+{
+  QSettings settings;
+  return settings.value( sutraPopupShowGlossaryTabSettingsKey(),
+                         sutraPopupDefaultShowGlossaryTab ).toBool();
+}
+
+bool loadSutraPopupShowWebTab()
+{
+  QSettings settings;
+  return settings.value( sutraPopupShowWebTabSettingsKey(),
+                         sutraPopupDefaultShowWebTab ).toBool();
+}
+
+void saveSutraPopupShowGlossaryTab( bool visible )
+{
+  QSettings settings;
+  settings.setValue( sutraPopupShowGlossaryTabSettingsKey(), visible );
+}
+
+void saveSutraPopupShowWebTab( bool visible )
+{
+  QSettings settings;
+  settings.setValue( sutraPopupShowWebTabSettingsKey(), visible );
+}
+
+QString sutraGlossaryTabTitle()
+{
+  // UTF-8 byte escapes keep non-ASCII UI text independent of source-file encoding.
+  return QString::fromUtf8( "\x47" "\x69" "\xe1" "\xba" "\xa3" "\x69" "\x20"
+                            "\x6e" "\x67" "\x68" "\xc4" "\xa9" "\x61" );
+}
+
 QString sutraPopupThemeToggleButtonObjectName()
 {
   return QStringLiteral( "sutraPopupThemeToggleButton" );
@@ -484,6 +568,52 @@ QIcon sutraPopupColorSwatchIcon( const QColor & color )
 {
   QPixmap pixmap( 16, 16 );
   pixmap.fill( color );
+  return QIcon( pixmap );
+}
+
+QIcon sutraPopupThemeToggleIcon( SutraPopupThemeMode mode, const QColor & color )
+{
+  QPixmap pixmap( 20, 20 );
+  pixmap.fill( Qt::transparent );
+
+  QPainter painter( &pixmap );
+  painter.setRenderHint( QPainter::Antialiasing, true );
+  QPen pen( color, 1.7, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin );
+  painter.setPen( pen );
+  painter.setBrush( color );
+
+  if ( mode == SutraPopupThemeMode::Dark ) {
+    // Current mode is Dark: show a sun icon because clicking switches to Light.
+    painter.setBrush( Qt::NoBrush );
+    painter.drawEllipse( QRectF( 7.0, 7.0, 6.0, 6.0 ) );
+    const QPointF center( 10.0, 10.0 );
+    for ( int i = 0; i < 8; ++i ) {
+      const qreal angle = qDegreesToRadians( static_cast< qreal >( i * 45 ) );
+      const QPointF inner( center.x() + std::cos( angle ) * 5.0,
+                           center.y() + std::sin( angle ) * 5.0 );
+      const QPointF outer( center.x() + std::cos( angle ) * 7.2,
+                           center.y() + std::sin( angle ) * 7.2 );
+      painter.drawLine( inner, outer );
+    }
+  }
+  else if ( mode == SutraPopupThemeMode::Light ) {
+    // Current mode is Light: show a moon icon because clicking switches to Dark.
+    QPainterPath outer;
+    outer.addEllipse( QRectF( 4.0, 3.0, 12.0, 14.0 ) );
+    QPainterPath cutout;
+    cutout.addEllipse( QRectF( 8.0, 1.5, 12.0, 14.0 ) );
+    painter.fillPath( outer.subtracted( cutout ), color );
+  }
+  else {
+    // Custom colors: use a small palette-style icon.
+    painter.setBrush( Qt::NoBrush );
+    painter.drawEllipse( QRectF( 3.0, 3.0, 14.0, 14.0 ) );
+    painter.drawEllipse( QRectF( 6.0, 6.0, 1.8, 1.8 ) );
+    painter.drawEllipse( QRectF( 10.0, 5.0, 1.8, 1.8 ) );
+    painter.drawEllipse( QRectF( 12.5, 8.5, 1.8, 1.8 ) );
+    painter.drawLine( QPointF( 7.0, 14.0 ), QPointF( 13.5, 14.0 ) );
+  }
+
   return QIcon( pixmap );
 }
 
@@ -1074,13 +1204,16 @@ void updateSutraPopupThemeToggleButton( QWidget * popup )
   if ( QToolButton * button =
          popup->findChild< QToolButton * >( sutraPopupThemeToggleButtonObjectName() ) ) {
     const SutraPopupThemeMode mode = loadSutraPopupThemeMode();
+    button->setText( QString() );
+    button->setIcon( sutraPopupThemeToggleIcon( mode, sutraPopupActiveTextColor() ) );
+    button->setIconSize( QSize( 20, 20 ) );
+    button->setToolButtonStyle( Qt::ToolButtonIconOnly );
+
     if ( mode == SutraPopupThemeMode::Custom ) {
-      button->setText( QStringLiteral( "C" ) );
       button->setToolTip( QObject::tr( "Custom popup colors are active. Click to switch to Light mode." ) );
     }
     else {
       const bool dark = mode == SutraPopupThemeMode::Dark;
-      button->setText( dark ? QStringLiteral( "L" ) : QStringLiteral( "D" ) );
       button->setToolTip( dark ? QObject::tr( "Switch popup to Light mode (Ctrl+Shift+L)" )
                                : QObject::tr( "Switch popup to Dark mode (Ctrl+Shift+L)" ) );
     }
@@ -1090,6 +1223,36 @@ void updateSutraPopupThemeToggleButton( QWidget * popup )
          popup->findChild< QToolButton * >( sutraPopupColorsButtonObjectName() ) ) {
     colorsButton->setIcon( sutraPopupColorSwatchIcon( sutraPopupActiveBackgroundColor() ) );
     colorsButton->setToolTip( QObject::tr( "Popup text and background colors" ) );
+  }
+}
+
+void applySutraPointingCursorToObject( QObject * object )
+{
+  if ( QAbstractButton * button = qobject_cast< QAbstractButton * >( object ) ) {
+    button->setCursor( Qt::PointingHandCursor );
+  }
+  else if ( QTabBar * tabBar = qobject_cast< QTabBar * >( object ) ) {
+    tabBar->setCursor( Qt::PointingHandCursor );
+  }
+  else if ( QMenu * menu = qobject_cast< QMenu * >( object ) ) {
+    menu->setCursor( Qt::PointingHandCursor );
+  }
+  else if ( QComboBox * comboBox = qobject_cast< QComboBox * >( object ) ) {
+    comboBox->setCursor( Qt::PointingHandCursor );
+  }
+}
+
+void applySutraPopupPointingCursors( QWidget * popup )
+{
+  if ( !popup ) {
+    return;
+  }
+
+  // Keep text editors and article content on their native cursor. Only controls
+  // that are directly clickable receive the pointing-hand cursor.
+  applySutraPointingCursorToObject( popup );
+  for ( QObject * object : popup->findChildren< QObject * >() ) {
+    applySutraPointingCursorToObject( object );
   }
 }
 
@@ -1191,6 +1354,11 @@ enum class SutraMouseLookupMode {
   Custom         = 4
 };
 
+enum class SutraMouseLookupCaptureMode {
+  Automatic    = 0,
+  SelectedText = 1
+};
+
 QString sutraMouseLookupModeSettingsKey()
 {
   return QStringLiteral( "SutraEdition/MouseLookupMode" );
@@ -1209,6 +1377,11 @@ QString sutraMouseLookupModifiersSettingsKey()
 QString sutraMouseLookupButtonSettingsKey()
 {
   return QStringLiteral( "SutraEdition/MouseLookupButton" );
+}
+
+QString sutraMouseLookupCaptureModeSettingsKey()
+{
+  return QStringLiteral( "SutraEdition/MouseLookupCaptureMode" );
 }
 
 constexpr int sutraMouseLookupDefaultMode = static_cast< int >( SutraMouseLookupMode::CtrlRightClick );
@@ -1293,6 +1466,29 @@ QString sutraMouseLookupModeLabel( SutraMouseLookupMode mode )
   }
 }
 
+SutraMouseLookupCaptureMode loadSutraMouseLookupCaptureMode()
+{
+  QSettings settings;
+  const int value = settings.value( sutraMouseLookupCaptureModeSettingsKey(),
+                                    static_cast< int >( SutraMouseLookupCaptureMode::Automatic ) ).toInt();
+  return value == static_cast< int >( SutraMouseLookupCaptureMode::SelectedText )
+           ? SutraMouseLookupCaptureMode::SelectedText
+           : SutraMouseLookupCaptureMode::Automatic;
+}
+
+void saveSutraMouseLookupCaptureMode( SutraMouseLookupCaptureMode mode )
+{
+  QSettings settings;
+  settings.setValue( sutraMouseLookupCaptureModeSettingsKey(), static_cast< int >( mode ) );
+}
+
+QString sutraMouseLookupCaptureModeLabel( SutraMouseLookupCaptureMode mode )
+{
+  return mode == SutraMouseLookupCaptureMode::SelectedText
+           ? QStringLiteral( "Manual - selected text only" )
+           : QStringLiteral( "Automatic phrase detection" );
+}
+
 void resetSutraPopupAppearanceDefaults()
 {
   QSettings settings;
@@ -1301,12 +1497,16 @@ void resetSutraPopupAppearanceDefaults()
   settings.setValue( sutraPopupFontSizeSettingsKey(), sutraPopupDefaultFontSize );
   settings.setValue( sutraPopupOpacitySettingsKey(), sutraPopupDefaultOpacityPercent );
   settings.setValue( sutraPopupThemeSettingsKey(), sutraPopupDefaultThemeMode );
+  settings.setValue( sutraPopupShowGlossaryTabSettingsKey(), sutraPopupDefaultShowGlossaryTab );
+  settings.setValue( sutraPopupShowWebTabSettingsKey(), sutraPopupDefaultShowWebTab );
   settings.remove( sutraPopupCustomTextColorSettingsKey() );
   settings.remove( sutraPopupCustomBackgroundColorSettingsKey() );
   settings.setValue( sutraMouseLookupModeSettingsKey(), sutraMouseLookupDefaultMode );
   settings.setValue( sutraMouseLookupEnabledSettingsKey(), true );
   settings.setValue( sutraMouseLookupModifiersSettingsKey(), sutraMouseLookupCtrlModifier );
   settings.setValue( sutraMouseLookupButtonSettingsKey(), 2 );
+  settings.setValue( sutraMouseLookupCaptureModeSettingsKey(),
+                     static_cast< int >( SutraMouseLookupCaptureMode::Automatic ) );
 }
 
 void applySutraPopupOpacity( QWidget * popup )
@@ -3291,13 +3491,17 @@ void updateBuddhistGlossaryTab( QTabWidget * tabs, const QString & primaryTerm, 
     return;
   }
 
+  if ( !loadSutraPopupShowGlossaryTab() ) {
+    removeBuddhistGlossaryTab( tabs );
+    return;
+  }
 
   QTextBrowser * browser = findBuddhistGlossaryBrowser( tabs );
   if ( !browser ) {
     browser = new QTextBrowser( tabs );
     browser->setObjectName( QStringLiteral( "buddhistGlossaryBrowser" ) );
     browser->setOpenExternalLinks( true );
-    tabs->addTab( browser, QString::fromUtf8( "\x47" "\x69" "\xe1" "\xba" "\xa3" "\x69" "\x20" "\x6e" "\x67" "\x68" "\xc4" "\xa9" "\x61" ) ); // sutraForceGlossaryTabTitleV8
+    tabs->addTab( browser, sutraGlossaryTabTitle() );
   }
 
   browser->setHtml( sutraApplyPopupThemeToHtml( glossaryHtmlStableV16( primaryTerm, detectedTerms ) ) );
@@ -3435,6 +3639,11 @@ void removeWebReferenceTab( QTabWidget * tabs )
 void updateWebReferenceTab( QTabWidget * tabs, const QString & primaryTerm, const QStringList & detectedTerms )
 {
   if ( !tabs ) {
+    return;
+  }
+
+  if ( !loadSutraPopupShowWebTab() ) {
+    removeWebReferenceTab( tabs );
     return;
   }
 
@@ -3577,6 +3786,432 @@ void refreshSutraCustomTabs( QTabWidget * tabs, const QString & primaryTerm, con
       tabs->setCurrentIndex( index );
     }
   }
+}
+
+// Popup productivity suite --------------------------------------------------
+// These features are intentionally self-contained in scanpopup.cc and use
+// QSettings. They do not modify dictionary lookup, smart phrase detection,
+// ArticleView navigation, or the existing GoldenDict history/favorites paths.
+
+constexpr int sutraLookupHistoryLimit = 100;
+
+QString sutraLookupHistorySettingsKey()
+{
+  return QStringLiteral( "SutraEdition/PopupLookupHistory" );
+}
+
+QString sutraLookupFavoritesSettingsKey()
+{
+  return QStringLiteral( "SutraEdition/PopupLookupFavorites" );
+}
+
+QString sutraLookupNotesSettingsKey()
+{
+  return QStringLiteral( "SutraEdition/PopupLookupNotes" );
+}
+
+QString sutraLookupTimesSettingsKey()
+{
+  return QStringLiteral( "SutraEdition/PopupLookupTimes" );
+}
+
+QString sutraHistoryBackButtonObjectName()
+{
+  return QStringLiteral( "sutraHistoryBackButton" );
+}
+
+QString sutraHistoryForwardButtonObjectName()
+{
+  return QStringLiteral( "sutraHistoryForwardButton" );
+}
+
+QString sutraFavoriteButtonObjectName()
+{
+  return QStringLiteral( "sutraFavoriteButton" );
+}
+
+QString sutraNoteButtonObjectName()
+{
+  return QStringLiteral( "sutraNoteButton" );
+}
+
+QString sutraHistoryButtonObjectName()
+{
+  return QStringLiteral( "sutraHistoryButton" );
+}
+
+QStringList loadSutraLookupHistory()
+{
+  QSettings settings;
+  QStringList history = settings.value( sutraLookupHistorySettingsKey() ).toStringList();
+  history.removeAll( QString() );
+  while ( history.size() > sutraLookupHistoryLimit ) {
+    history.removeFirst();
+  }
+  return history;
+}
+
+void saveSutraLookupHistory( const QStringList & history )
+{
+  QSettings settings;
+  settings.setValue( sutraLookupHistorySettingsKey(), history );
+}
+
+QStringList loadSutraLookupFavorites()
+{
+  QSettings settings;
+  QStringList favorites = settings.value( sutraLookupFavoritesSettingsKey() ).toStringList();
+  favorites.removeAll( QString() );
+  favorites.removeDuplicates();
+  return favorites;
+}
+
+void saveSutraLookupFavorites( const QStringList & favorites )
+{
+  QSettings settings;
+  settings.setValue( sutraLookupFavoritesSettingsKey(), favorites );
+}
+
+QVariantMap loadSutraLookupNotes()
+{
+  QSettings settings;
+  return settings.value( sutraLookupNotesSettingsKey() ).toMap();
+}
+
+void saveSutraLookupNotes( const QVariantMap & notes )
+{
+  QSettings settings;
+  settings.setValue( sutraLookupNotesSettingsKey(), notes );
+}
+
+QVariantMap loadSutraLookupTimes()
+{
+  QSettings settings;
+  return settings.value( sutraLookupTimesSettingsKey() ).toMap();
+}
+
+void saveSutraLookupTimes( const QVariantMap & times )
+{
+  QSettings settings;
+  settings.setValue( sutraLookupTimesSettingsKey(), times );
+}
+
+QString sutraCurrentLookupTerm( QWidget * popup )
+{
+  if ( !popup ) {
+    return {};
+  }
+  return normalizeSmartLookupInput( popup->property( "sutraCurrentLookupTerm" ).toString() );
+}
+
+QString sutraNoteForTerm( const QString & term )
+{
+  return loadSutraLookupNotes().value( term ).toString();
+}
+
+struct SutraLookupDetails
+{
+  QString original;
+  QString hanViet;
+  QString pinyin;
+  QString meaning;
+  QString suggested;
+  QString note;
+};
+
+QList< const BuddhistGlossaryEntry * > sutraGlossaryEntriesForLookup( const QString & lookupText )
+{
+  QList< const BuddhistGlossaryEntry * > matches;
+  const QString normalized = normalizeSmartLookupInput( lookupText );
+  if ( normalized.isEmpty() ) {
+    return matches;
+  }
+
+  const auto & entries = buddhistGlossaryEntries();
+  for ( const BuddhistGlossaryEntry & entry : entries ) {
+    if ( entry.term == normalized || entry.hanViet.compare( normalized, Qt::CaseInsensitive ) == 0
+         || entry.suggestedTranslations.contains( normalized, Qt::CaseInsensitive ) ) {
+      matches << &entry;
+      return matches;
+    }
+  }
+
+  const QStringList detected = detectSmartLookupTerms( normalized );
+  for ( const QString & detectedTerm : detected ) {
+    for ( const BuddhistGlossaryEntry & entry : entries ) {
+      if ( entry.term == detectedTerm && !matches.contains( &entry ) ) {
+        matches << &entry;
+        break;
+      }
+    }
+  }
+
+  return matches;
+}
+
+SutraLookupDetails sutraLookupDetailsForTerm( const QString & lookupText )
+{
+  SutraLookupDetails details;
+  details.original = normalizeSmartLookupInput( lookupText );
+  details.note     = sutraNoteForTerm( details.original );
+
+  QStringList hanVietValues;
+  QStringList pinyinValues;
+  QStringList meaningValues;
+  QStringList suggestedValues;
+
+  const auto matches = sutraGlossaryEntriesForLookup( details.original );
+  for ( const BuddhistGlossaryEntry * entry : matches ) {
+    if ( !entry ) {
+      continue;
+    }
+    if ( !entry->hanViet.isEmpty() && !hanVietValues.contains( entry->hanViet ) ) {
+      hanVietValues << entry->hanViet;
+    }
+    if ( !entry->pinyin.isEmpty() && !pinyinValues.contains( entry->pinyin ) ) {
+      pinyinValues << entry->pinyin;
+    }
+    if ( !entry->meaningVi.isEmpty() && !meaningValues.contains( entry->meaningVi ) ) {
+      meaningValues << entry->meaningVi;
+    }
+    for ( const QString & value : entry->suggestedTranslations ) {
+      if ( !value.isEmpty() && !suggestedValues.contains( value ) ) {
+        suggestedValues << value;
+      }
+    }
+  }
+
+  details.hanViet   = hanVietValues.join( QStringLiteral( " | " ) );
+  details.pinyin    = pinyinValues.join( QStringLiteral( " | " ) );
+  details.meaning   = meaningValues.join( QStringLiteral( "\n" ) );
+  details.suggested = suggestedValues.join( QStringLiteral( " | " ) );
+  return details;
+}
+
+QString sutraFullCopyText( const SutraLookupDetails & details )
+{
+  QStringList lines;
+  if ( !details.original.isEmpty() ) {
+    lines << QStringLiteral( "Original: %1" ).arg( details.original );
+  }
+  if ( !details.hanViet.isEmpty() ) {
+    lines << QStringLiteral( "Han-Viet: %1" ).arg( details.hanViet );
+  }
+  if ( !details.pinyin.isEmpty() ) {
+    lines << QStringLiteral( "Pinyin: %1" ).arg( details.pinyin );
+  }
+  if ( !details.meaning.isEmpty() ) {
+    lines << QStringLiteral( "Meaning: %1" ).arg( details.meaning );
+  }
+  if ( !details.suggested.isEmpty() ) {
+    lines << QStringLiteral( "Suggested translation: %1" ).arg( details.suggested );
+  }
+  if ( !details.note.isEmpty() ) {
+    lines << QStringLiteral( "Note: %1" ).arg( details.note );
+  }
+  return lines.join( QLatin1Char( '\n' ) );
+}
+
+void copySutraTextToClipboard( const QString & text )
+{
+  if ( text.isEmpty() ) {
+    return;
+  }
+  if ( QClipboard * clipboard = QApplication::clipboard() ) {
+    clipboard->setText( text, QClipboard::Clipboard );
+  }
+}
+
+void updateSutraLookupFeatureControls( QWidget * popup, const QString & term = QString() )
+{
+  if ( !popup ) {
+    return;
+  }
+
+  const QString currentTerm = term.isEmpty() ? sutraCurrentLookupTerm( popup ) : normalizeSmartLookupInput( term );
+  const QStringList history = loadSutraLookupHistory();
+  int historyIndex          = popup->property( "sutraLookupHistoryIndex" ).toInt();
+  if ( history.isEmpty() ) {
+    historyIndex = -1;
+  }
+  else if ( historyIndex < 0 || historyIndex >= history.size() ) {
+    historyIndex = history.size() - 1;
+  }
+  popup->setProperty( "sutraLookupHistoryIndex", historyIndex );
+
+  if ( QToolButton * back = popup->findChild< QToolButton * >( sutraHistoryBackButtonObjectName() ) ) {
+    back->setEnabled( historyIndex > 0 );
+  }
+  if ( QToolButton * forward = popup->findChild< QToolButton * >( sutraHistoryForwardButtonObjectName() ) ) {
+    forward->setEnabled( historyIndex >= 0 && historyIndex + 1 < history.size() );
+  }
+  if ( QToolButton * historyButton = popup->findChild< QToolButton * >( sutraHistoryButtonObjectName() ) ) {
+    historyButton->setToolTip( QObject::tr( "Lookup history and favorites (%1)" ).arg( history.size() ) );
+  }
+
+  const bool favorite = !currentTerm.isEmpty() && loadSutraLookupFavorites().contains( currentTerm );
+  if ( QToolButton * favoriteButton = popup->findChild< QToolButton * >( sutraFavoriteButtonObjectName() ) ) {
+    favoriteButton->setText( QString( QChar( favorite ? 0x2605 : 0x2606 ) ) );
+    favoriteButton->setToolTip( favorite ? QObject::tr( "Remove from popup favorites" )
+                                         : QObject::tr( "Add to popup favorites" ) );
+    favoriteButton->setEnabled( !currentTerm.isEmpty() );
+  }
+
+  if ( QToolButton * noteButton = popup->findChild< QToolButton * >( sutraNoteButtonObjectName() ) ) {
+    const bool hasNote = !currentTerm.isEmpty() && !sutraNoteForTerm( currentTerm ).isEmpty();
+    noteButton->setText( hasNote ? QStringLiteral( "N*" ) : QStringLiteral( "N" ) );
+    noteButton->setToolTip( hasNote ? QObject::tr( "Edit personal note" ) : QObject::tr( "Add personal note" ) );
+    noteButton->setEnabled( !currentTerm.isEmpty() );
+  }
+}
+
+void recordSutraLookupHistory( QWidget * popup, const QString & lookupText )
+{
+  if ( !popup ) {
+    return;
+  }
+
+  const QString term = normalizeSmartLookupInput( lookupText );
+  if ( term.isEmpty() ) {
+    return;
+  }
+
+  popup->setProperty( "sutraCurrentLookupTerm", term );
+
+  const bool navigating = popup->property( "sutraLookupHistoryNavigating" ).toBool();
+  popup->setProperty( "sutraLookupHistoryNavigating", false );
+
+  QStringList history = loadSutraLookupHistory();
+  if ( navigating ) {
+    int index = popup->property( "sutraLookupHistoryIndex" ).toInt();
+    const int matchingIndex = history.lastIndexOf( term );
+    if ( matchingIndex >= 0 ) {
+      index = matchingIndex;
+    }
+    popup->setProperty( "sutraLookupHistoryIndex", index );
+  }
+  else {
+    int index = popup->property( "sutraLookupHistoryIndex" ).toInt();
+    if ( index >= 0 && index + 1 < history.size() ) {
+      history = history.mid( 0, index + 1 );
+    }
+
+    if ( history.isEmpty() || history.constLast() != term ) {
+      history << term;
+      while ( history.size() > sutraLookupHistoryLimit ) {
+        history.removeFirst();
+      }
+      saveSutraLookupHistory( history );
+    }
+    popup->setProperty( "sutraLookupHistoryIndex", history.size() - 1 );
+  }
+
+  QVariantMap times = loadSutraLookupTimes();
+  times.insert( term, QDateTime::currentDateTimeUtc().toString( Qt::ISODateWithMs ) );
+  saveSutraLookupTimes( times );
+
+  updateSutraLookupFeatureControls( popup, term );
+}
+
+QString sutraCsvCell( QString value )
+{
+  value.replace( QLatin1Char( '"' ), QStringLiteral( "\"\"" ) );
+  return QStringLiteral( "\"%1\"" ).arg( value );
+}
+
+QStringList sutraExportTerms()
+{
+  const QStringList history = loadSutraLookupHistory();
+  QStringList terms;
+  for ( int i = history.size() - 1; i >= 0; --i ) {
+    const QString & term = history.at( i );
+    if ( !terms.contains( term ) ) {
+      terms << term;
+    }
+  }
+  for ( const QString & favorite : loadSutraLookupFavorites() ) {
+    if ( !terms.contains( favorite ) ) {
+      terms << favorite;
+    }
+  }
+  return terms;
+}
+
+bool exportSutraLookupDataCsv( QWidget * parent )
+{
+  const QString path = QFileDialog::getSaveFileName( parent,
+                                                     QObject::tr( "Export popup data as CSV" ),
+                                                     QStringLiteral( "sutra-popup-data.csv" ),
+                                                     QObject::tr( "CSV files (*.csv)" ) );
+  if ( path.isEmpty() ) {
+    return false;
+  }
+
+  const QStringList favorites = loadSutraLookupFavorites();
+  const QVariantMap times     = loadSutraLookupTimes();
+  QStringList lines;
+  lines << QStringLiteral( "\"term\",\"han_viet\",\"pinyin\",\"meaning_vi\",\"suggested_translation\",\"note\",\"favorite\",\"last_lookup_utc\"" );
+
+  for ( const QString & term : sutraExportTerms() ) {
+    const SutraLookupDetails details = sutraLookupDetailsForTerm( term );
+    lines << QStringList{ sutraCsvCell( term ),
+                          sutraCsvCell( details.hanViet ),
+                          sutraCsvCell( details.pinyin ),
+                          sutraCsvCell( details.meaning ),
+                          sutraCsvCell( details.suggested ),
+                          sutraCsvCell( details.note ),
+                          sutraCsvCell( favorites.contains( term ) ? QStringLiteral( "true" ) : QStringLiteral( "false" ) ),
+                          sutraCsvCell( times.value( term ).toString() ) }
+               .join( QLatin1Char( ',' ) );
+  }
+
+  QFile file( path );
+  if ( !file.open( QIODevice::WriteOnly | QIODevice::Truncate ) ) {
+    QMessageBox::warning( parent, QObject::tr( "Export failed" ), file.errorString() );
+    return false;
+  }
+
+  file.write( QByteArray::fromHex( "EFBBBF" ) );
+  file.write( lines.join( QStringLiteral( "\r\n" ) ).toUtf8() );
+  file.close();
+  return true;
+}
+
+bool exportSutraLookupDataJson( QWidget * parent )
+{
+  const QString path = QFileDialog::getSaveFileName( parent,
+                                                     QObject::tr( "Export popup data as JSON" ),
+                                                     QStringLiteral( "sutra-popup-data.json" ),
+                                                     QObject::tr( "JSON files (*.json)" ) );
+  if ( path.isEmpty() ) {
+    return false;
+  }
+
+  const QStringList favorites = loadSutraLookupFavorites();
+  const QVariantMap times     = loadSutraLookupTimes();
+  QJsonArray array;
+  for ( const QString & term : sutraExportTerms() ) {
+    const SutraLookupDetails details = sutraLookupDetailsForTerm( term );
+    QJsonObject object;
+    object.insert( QStringLiteral( "term" ), term );
+    object.insert( QStringLiteral( "han_viet" ), details.hanViet );
+    object.insert( QStringLiteral( "pinyin" ), details.pinyin );
+    object.insert( QStringLiteral( "meaning_vi" ), details.meaning );
+    object.insert( QStringLiteral( "suggested_translation" ), details.suggested );
+    object.insert( QStringLiteral( "note" ), details.note );
+    object.insert( QStringLiteral( "favorite" ), favorites.contains( term ) );
+    object.insert( QStringLiteral( "last_lookup_utc" ), times.value( term ).toString() );
+    array.append( object );
+  }
+
+  QFile file( path );
+  if ( !file.open( QIODevice::WriteOnly | QIODevice::Truncate ) ) {
+    QMessageBox::warning( parent, QObject::tr( "Export failed" ), file.errorString() );
+    return false;
+  }
+  file.write( QJsonDocument( array ).toJson( QJsonDocument::Indented ) );
+  file.close();
+  return true;
 }
 
 } // namespace
@@ -3827,6 +4462,10 @@ ScanPopup::ScanPopup( QWidget * parent,
   QAction * sutraPopupPinAction = sutraPopupLayoutMenu->addAction( tr( "Pin / keep popup open" ) );
   sutraPopupPinAction->setCheckable( true );
 
+  QAction * sutraPopupAlwaysOnTopAction = sutraPopupLayoutMenu->addAction( tr( "Always stay on top" ) );
+  sutraPopupAlwaysOnTopAction->setCheckable( true );
+  sutraPopupAlwaysOnTopAction->setToolTip( tr( "Keep a pinned popup above other windows" ) );
+
   sutraPopupLayoutMenu->addSeparator();
 
   QActionGroup * sutraPopupLayoutGroup = new QActionGroup( sutraPopupLayoutMenu );
@@ -3853,6 +4492,27 @@ ScanPopup::ScanPopup( QWidget * parent,
     sutraPopupFitAction->setChecked( mode == SutraPopupLayoutMode::FitToResults );
     sutraPopupLayoutGroup->setExclusive( true );
   };
+
+  sutraPopupLayoutMenu->addSeparator();
+
+  QMenu * sutraPopupTabsMenu = sutraPopupLayoutMenu->addMenu( tr( "Tabs" ) );
+
+  QAction * sutraPopupPrimaryTabInfoAction =
+    sutraPopupTabsMenu->addAction( tr( "Dictionary tab (always shown)" ) );
+  sutraPopupPrimaryTabInfoAction->setEnabled( false );
+
+  sutraPopupTabsMenu->addSeparator();
+
+  QAction * sutraPopupShowGlossaryTabAction =
+    sutraPopupTabsMenu->addAction( tr( "Show %1 tab" ).arg( sutraGlossaryTabTitle() ) );
+  sutraPopupShowGlossaryTabAction->setCheckable( true );
+  sutraPopupShowGlossaryTabAction->setToolTip(
+    tr( "Show or hide the Buddhist glossary explanation tab" ) );
+
+  QAction * sutraPopupShowWebTabAction = sutraPopupTabsMenu->addAction( tr( "Show Web tab" ) );
+  sutraPopupShowWebTabAction->setCheckable( true );
+  sutraPopupShowWebTabAction->setToolTip(
+    tr( "Show or hide external web reference links" ) );
 
   sutraPopupLayoutMenu->addSeparator();
 
@@ -4103,8 +4763,33 @@ ScanPopup::ScanPopup( QWidget * parent,
   addSutraMouseLookupAction( tr( "Ctrl + Left Click" ), SutraMouseLookupMode::CtrlLeftClick );
   addSutraMouseLookupAction( tr( "Alt + Right Click" ), SutraMouseLookupMode::AltRightClick );
 
+  sutraMouseLookupMenu->addSeparator();
+  QMenu * sutraMouseCaptureMenu = sutraMouseLookupMenu->addMenu( tr( "Text capture" ) );
+  QActionGroup * sutraMouseCaptureGroup = new QActionGroup( sutraMouseCaptureMenu );
+  QList< QAction * > sutraMouseCaptureActions;
+
+  const auto addSutraMouseCaptureAction = [ & ]( const QString & label, SutraMouseLookupCaptureMode mode ) {
+    QAction * action = sutraMouseCaptureMenu->addAction( label );
+    action->setCheckable( true );
+    action->setData( static_cast< int >( mode ) );
+    sutraMouseCaptureGroup->addAction( action );
+    sutraMouseCaptureActions << action;
+
+    connect( action, &QAction::triggered, this, [ this, mode ] {
+      saveSutraMouseLookupCaptureMode( mode );
+      showStatusBarMessage( tr( "Mouse text capture: %1" ).arg( sutraMouseLookupCaptureModeLabel( mode ) ), 5000 );
+    } );
+  };
+
+  addSutraMouseCaptureAction( tr( "Automatic - detect phrase under pointer" ),
+                              SutraMouseLookupCaptureMode::Automatic );
+  addSutraMouseCaptureAction( tr( "Manual - use selected text only" ),
+                              SutraMouseLookupCaptureMode::SelectedText );
+
   QAction * sutraMouseLookupInfoAction = sutraPopupLayoutMenu->addAction(
-    tr( "Current mouse lookup: %1" ).arg( sutraMouseLookupModeLabel( loadSutraMouseLookupMode() ) ) );
+    tr( "Current mouse lookup: %1 / %2" )
+      .arg( sutraMouseLookupModeLabel( loadSutraMouseLookupMode() ),
+            sutraMouseLookupCaptureModeLabel( loadSutraMouseLookupCaptureMode() ) ) );
   sutraMouseLookupInfoAction->setEnabled( false );
 
   sutraPopupLayoutMenu->addSeparator();
@@ -4113,6 +4798,7 @@ ScanPopup::ScanPopup( QWidget * parent,
 
   const auto updateSutraPopupLayoutMenu = [ this,
                                             sutraPopupPinAction,
+                                            sutraPopupAlwaysOnTopAction,
                                             sutraPopupAutoAction,
                                             sutraPopupFixedAction,
                                             sutraPopupFitAction,
@@ -4120,9 +4806,14 @@ ScanPopup::ScanPopup( QWidget * parent,
                                             sutraPopupFontSizeActions,
                                             sutraPopupTransparencyActions,
                                             sutraPopupThemeActions,
+                                            sutraPopupShowGlossaryTabAction,
+                                            sutraPopupShowWebTabAction,
                                             sutraMouseLookupActions,
+                                            sutraMouseCaptureActions,
                                             sutraMouseLookupInfoAction ] {
     sutraPopupPinAction->setChecked( ui.pinButton->isChecked() );
+    sutraPopupAlwaysOnTopAction->setEnabled( ui.pinButton->isChecked() );
+    sutraPopupAlwaysOnTopAction->setChecked( ui.onTopButton->isChecked() );
 
     const int currentFontSize = loadSutraPopupFontSize();
     for ( QAction * fontAction : sutraPopupFontSizeActions ) {
@@ -4139,13 +4830,25 @@ ScanPopup::ScanPopup( QWidget * parent,
       themeAction->setChecked( themeAction->data().toInt() == static_cast< int >( currentThemeMode ) );
     }
 
+    sutraPopupShowGlossaryTabAction->setChecked( loadSutraPopupShowGlossaryTab() );
+    sutraPopupShowWebTabAction->setChecked( loadSutraPopupShowWebTab() );
+
     const SutraMouseLookupMode currentMouseLookupMode = loadSutraMouseLookupMode();
     for ( QAction * mouseLookupAction : sutraMouseLookupActions ) {
       mouseLookupAction->setChecked( mouseLookupAction->data().toInt()
                                      == static_cast< int >( currentMouseLookupMode ) );
     }
+
+    const SutraMouseLookupCaptureMode currentCaptureMode = loadSutraMouseLookupCaptureMode();
+    for ( QAction * captureAction : sutraMouseCaptureActions ) {
+      captureAction->setChecked( captureAction->data().toInt()
+                                 == static_cast< int >( currentCaptureMode ) );
+    }
+
     sutraMouseLookupInfoAction->setText(
-      tr( "Current mouse lookup: %1" ).arg( sutraMouseLookupModeLabel( currentMouseLookupMode ) ) );
+      tr( "Current mouse lookup: %1 / %2" )
+        .arg( sutraMouseLookupModeLabel( currentMouseLookupMode ),
+              sutraMouseLookupCaptureModeLabel( currentCaptureMode ) ) );
 
     syncSutraPopupLayoutActions( loadSutraPopupLayoutMode() );
   };
@@ -4156,6 +4859,14 @@ ScanPopup::ScanPopup( QWidget * parent,
     ui.pinButton->setChecked( checked );
     pinButtonClicked( checked );
     showStatusBarMessage( checked ? tr( "Popup pinned" ) : tr( "Popup unpinned" ), 4000 );
+  } );
+
+  connect( sutraPopupAlwaysOnTopAction, &QAction::triggered, this, [ this ]( bool checked ) {
+    ui.onTopButton->setChecked( checked );
+    alwaysOnTopClicked( checked );
+    showStatusBarMessage( checked ? tr( "Always stay on top: enabled" )
+                                  : tr( "Always stay on top: disabled" ),
+                          4000 );
   } );
 
   connect( sutraPopupAutoAction, &QAction::triggered, this, [ this, syncSutraPopupLayoutActions ] {
@@ -4177,6 +4888,54 @@ ScanPopup::ScanPopup( QWidget * parent,
     showStatusBarMessage( tr( "Popup layout: fit to results" ), 4000 );
   } );
 
+  connect( sutraPopupShowGlossaryTabAction, &QAction::triggered, this, [ this ]( bool checked ) {
+    saveSutraPopupShowGlossaryTab( checked );
+    refreshSutraCustomTabs( tabWidget, pendingWord, translateBox->translateLine()->text() );
+    applySutraPopupTheme( this, tabWidget );
+    applySutraPopupFontSizeToTabs( tabWidget );
+
+    if ( checked ) {
+      if ( QTextBrowser * browser = findBuddhistGlossaryBrowser( tabWidget ) ) {
+        tabWidget->setCurrentWidget( browser );
+      }
+    }
+    else if ( tabWidget->count() > 0 ) {
+      tabWidget->setCurrentIndex( 0 );
+    }
+
+    if ( loadSutraPopupLayoutMode() == SutraPopupLayoutMode::FitToResults ) {
+      fitSutraPopupToResults( this, tabWidget );
+    }
+    positionSutraPopupCornerTools( this );
+
+    showStatusBarMessage(
+      checked ? tr( "Definition tab shown" ) : tr( "Definition tab hidden" ),
+      3500 );
+  } );
+
+  connect( sutraPopupShowWebTabAction, &QAction::triggered, this, [ this ]( bool checked ) {
+    saveSutraPopupShowWebTab( checked );
+    refreshSutraCustomTabs( tabWidget, pendingWord, translateBox->translateLine()->text() );
+    applySutraPopupTheme( this, tabWidget );
+    applySutraPopupFontSizeToTabs( tabWidget );
+
+    if ( checked ) {
+      if ( QTextBrowser * browser = findWebReferenceBrowser( tabWidget ) ) {
+        tabWidget->setCurrentWidget( browser );
+      }
+    }
+    else if ( tabWidget->count() > 0 ) {
+      tabWidget->setCurrentIndex( 0 );
+    }
+
+    if ( loadSutraPopupLayoutMode() == SutraPopupLayoutMode::FitToResults ) {
+      fitSutraPopupToResults( this, tabWidget );
+    }
+    positionSutraPopupCornerTools( this );
+
+    showStatusBarMessage( checked ? tr( "Web tab shown" ) : tr( "Web tab hidden" ), 3500 );
+  } );
+
   connect( sutraPopupRestoreDefaultsAction, &QAction::triggered, this, [ this ] {
     resetSutraPopupAppearanceDefaults();
     applySutraPopupOpacity( this );
@@ -4193,7 +4952,7 @@ ScanPopup::ScanPopup( QWidget * parent,
     } );
 
     showStatusBarMessage(
-      tr( "Popup defaults restored: Light theme, Auto layout, 100% zoom, 100% opacity, Ctrl + Right Click" ),
+      tr( "Popup defaults restored: optional tabs hidden, Light theme, Auto layout, 100% zoom, 100% opacity, Ctrl + Right Click, automatic capture" ),
       5000 );
   } );
 
@@ -4219,6 +4978,345 @@ ScanPopup::ScanPopup( QWidget * parent,
   sutraPopupCornerLayout->setContentsMargins( 4, 2, 4, 2 );
   sutraPopupCornerLayout->setSpacing( 2 );
 
+  const auto openSutraHistoryTerm = [ this ]( const QString & term, bool preserveHistoryPosition ) {
+    const QString normalized = normalizeSmartLookupInput( term );
+    if ( normalized.isEmpty() ) {
+      return;
+    }
+
+    if ( preserveHistoryPosition ) {
+      const QStringList history = loadSutraLookupHistory();
+      const int index           = history.lastIndexOf( normalized );
+      if ( index >= 0 ) {
+        setProperty( "sutraLookupHistoryIndex", index );
+        setProperty( "sutraLookupHistoryNavigating", true );
+      }
+    }
+    translateWord( normalized );
+  };
+
+  const auto navigateSutraLookupHistory = [ this, openSutraHistoryTerm ]( int direction ) {
+    const QStringList history = loadSutraLookupHistory();
+    if ( history.isEmpty() ) {
+      return;
+    }
+
+    int index = property( "sutraLookupHistoryIndex" ).toInt();
+    if ( index < 0 || index >= history.size() ) {
+      index = history.size() - 1;
+    }
+
+    const int targetIndex = qBound( 0, index + direction, history.size() - 1 );
+    if ( targetIndex == index ) {
+      updateSutraLookupFeatureControls( this );
+      return;
+    }
+
+    setProperty( "sutraLookupHistoryIndex", targetIndex );
+    setProperty( "sutraLookupHistoryNavigating", true );
+    openSutraHistoryTerm( history.at( targetIndex ), false );
+  };
+
+  QMenu * sutraQuickCopyMenu = new QMenu( tr( "Quick copy" ), sutraPopupCornerTools );
+  QAction * sutraCopyOriginalAction = sutraQuickCopyMenu->addAction( tr( "Copy original text" ) );
+  QAction * sutraCopyHanVietAction  = sutraQuickCopyMenu->addAction( tr( "Copy Han-Viet" ) );
+  QAction * sutraCopyMeaningAction  = sutraQuickCopyMenu->addAction( tr( "Copy meaning" ) );
+  QAction * sutraCopyFullAction     = sutraQuickCopyMenu->addAction( tr( "Copy full result" ) );
+
+  const auto copyCurrentSutraLookup = [ this ]( int copyMode ) {
+    const SutraLookupDetails details = sutraLookupDetailsForTerm( sutraCurrentLookupTerm( this ) );
+    QString text;
+    switch ( copyMode ) {
+      case 0:
+        text = details.original;
+        break;
+      case 1:
+        text = details.hanViet;
+        break;
+      case 2:
+        text = details.meaning;
+        break;
+      default:
+        text = sutraFullCopyText( details );
+        break;
+    }
+
+    if ( text.isEmpty() ) {
+      showStatusBarMessage( tr( "No matching text is available to copy" ), 3500 );
+      return;
+    }
+
+    copySutraTextToClipboard( text );
+    showStatusBarMessage( tr( "Copied to clipboard" ), 2500 );
+  };
+
+  connect( sutraCopyOriginalAction, &QAction::triggered, this, [ copyCurrentSutraLookup ] {
+    copyCurrentSutraLookup( 0 );
+  } );
+  connect( sutraCopyHanVietAction, &QAction::triggered, this, [ copyCurrentSutraLookup ] {
+    copyCurrentSutraLookup( 1 );
+  } );
+  connect( sutraCopyMeaningAction, &QAction::triggered, this, [ copyCurrentSutraLookup ] {
+    copyCurrentSutraLookup( 2 );
+  } );
+  connect( sutraCopyFullAction, &QAction::triggered, this, [ copyCurrentSutraLookup ] {
+    copyCurrentSutraLookup( 3 );
+  } );
+
+  connect( sutraQuickCopyMenu, &QMenu::aboutToShow, this, [ = ] {
+    const SutraLookupDetails details = sutraLookupDetailsForTerm( sutraCurrentLookupTerm( this ) );
+    sutraCopyOriginalAction->setEnabled( !details.original.isEmpty() );
+    sutraCopyHanVietAction->setEnabled( !details.hanViet.isEmpty() );
+    sutraCopyMeaningAction->setEnabled( !details.meaning.isEmpty() );
+    sutraCopyFullAction->setEnabled( !sutraFullCopyText( details ).isEmpty() );
+  } );
+
+  const auto toggleCurrentSutraFavorite = [ this ] {
+    const QString term = sutraCurrentLookupTerm( this );
+    if ( term.isEmpty() ) {
+      return;
+    }
+
+    QStringList favorites = loadSutraLookupFavorites();
+    const bool removing   = favorites.contains( term );
+    if ( removing ) {
+      favorites.removeAll( term );
+    }
+    else {
+      favorites << term;
+      favorites.removeDuplicates();
+    }
+    saveSutraLookupFavorites( favorites );
+    updateSutraLookupFeatureControls( this, term );
+    showStatusBarMessage( removing ? tr( "Removed from popup favorites" )
+                                      : tr( "Added to popup favorites" ),
+                          3000 );
+  };
+
+  QMenu * sutraLookupLibraryMenu = new QMenu( tr( "History and favorites" ), sutraPopupCornerTools );
+  connect( sutraLookupLibraryMenu, &QMenu::aboutToShow, this, [ = ] {
+    sutraLookupLibraryMenu->clear();
+
+    const QStringList history   = loadSutraLookupHistory();
+    const QStringList favorites = loadSutraLookupFavorites();
+    const QString currentTerm   = sutraCurrentLookupTerm( this );
+
+    // Keep productivity features available without occupying permanent space
+    // in the compact bottom toolbar.
+    sutraLookupLibraryMenu->addMenu( sutraQuickCopyMenu );
+    QAction * toggleFavoriteAction = sutraLookupLibraryMenu->addAction(
+      favorites.contains( currentTerm ) ? tr( "Remove current lookup from favorites" )
+                                        : tr( "Add current lookup to favorites" ) );
+    toggleFavoriteAction->setEnabled( !currentTerm.isEmpty() );
+    connect( toggleFavoriteAction, &QAction::triggered, this, toggleCurrentSutraFavorite );
+    sutraLookupLibraryMenu->addSeparator();
+
+    QAction * recentHeader = sutraLookupLibraryMenu->addAction( tr( "Recent lookups" ) );
+    recentHeader->setEnabled( false );
+    if ( history.isEmpty() ) {
+      QAction * emptyHistory = sutraLookupLibraryMenu->addAction( tr( "No lookup history" ) );
+      emptyHistory->setEnabled( false );
+    }
+    else {
+      const int first = qMax( 0, history.size() - 20 );
+      for ( int i = history.size() - 1; i >= first; --i ) {
+        const QString term = history.at( i );
+        QString label      = term;
+        if ( label.size() > 64 ) {
+          label = label.left( 61 ) + QStringLiteral( "..." );
+        }
+        QAction * action = sutraLookupLibraryMenu->addAction( label );
+        action->setToolTip( term );
+        connect( action, &QAction::triggered, this, [ openSutraHistoryTerm, term ] {
+          openSutraHistoryTerm( term, true );
+        } );
+      }
+    }
+
+    sutraLookupLibraryMenu->addSeparator();
+    QAction * favoritesHeader = sutraLookupLibraryMenu->addAction( tr( "Popup favorites" ) );
+    favoritesHeader->setEnabled( false );
+    if ( favorites.isEmpty() ) {
+      QAction * emptyFavorites = sutraLookupLibraryMenu->addAction( tr( "No popup favorites" ) );
+      emptyFavorites->setEnabled( false );
+    }
+    else {
+      for ( const QString & term : favorites ) {
+        QString label = term;
+        if ( label.size() > 64 ) {
+          label = label.left( 61 ) + QStringLiteral( "..." );
+        }
+        QAction * action = sutraLookupLibraryMenu->addAction( label );
+        action->setToolTip( term );
+        connect( action, &QAction::triggered, this, [ openSutraHistoryTerm, term ] {
+          openSutraHistoryTerm( term, false );
+        } );
+      }
+    }
+
+    sutraLookupLibraryMenu->addSeparator();
+    QAction * exportCsvAction = sutraLookupLibraryMenu->addAction( tr( "Export CSV..." ) );
+    QAction * exportJsonAction = sutraLookupLibraryMenu->addAction( tr( "Export JSON..." ) );
+    exportCsvAction->setEnabled( !history.isEmpty() || !favorites.isEmpty() );
+    exportJsonAction->setEnabled( !history.isEmpty() || !favorites.isEmpty() );
+    connect( exportCsvAction, &QAction::triggered, this, [ this ] {
+      if ( exportSutraLookupDataCsv( this ) ) {
+        showStatusBarMessage( tr( "Popup data exported as CSV" ), 3500 );
+      }
+    } );
+    connect( exportJsonAction, &QAction::triggered, this, [ this ] {
+      if ( exportSutraLookupDataJson( this ) ) {
+        showStatusBarMessage( tr( "Popup data exported as JSON" ), 3500 );
+      }
+    } );
+
+    sutraLookupLibraryMenu->addSeparator();
+    QAction * clearHistoryAction = sutraLookupLibraryMenu->addAction( tr( "Clear lookup history" ) );
+    QAction * clearFavoritesAction = sutraLookupLibraryMenu->addAction( tr( "Clear popup favorites" ) );
+    clearHistoryAction->setEnabled( !history.isEmpty() );
+    clearFavoritesAction->setEnabled( !favorites.isEmpty() );
+
+    connect( clearHistoryAction, &QAction::triggered, this, [ this ] {
+      if ( QMessageBox::question( this,
+                                  tr( "Clear lookup history" ),
+                                  tr( "Remove all saved popup lookup history?" ) )
+           != QMessageBox::Yes ) {
+        return;
+      }
+      saveSutraLookupHistory( {} );
+      setProperty( "sutraLookupHistoryIndex", -1 );
+      updateSutraLookupFeatureControls( this );
+      showStatusBarMessage( tr( "Lookup history cleared" ), 3000 );
+    } );
+
+    connect( clearFavoritesAction, &QAction::triggered, this, [ this ] {
+      if ( QMessageBox::question( this,
+                                  tr( "Clear popup favorites" ),
+                                  tr( "Remove all saved popup favorites?" ) )
+           != QMessageBox::Yes ) {
+        return;
+      }
+      saveSutraLookupFavorites( {} );
+      updateSutraLookupFeatureControls( this );
+      showStatusBarMessage( tr( "Popup favorites cleared" ), 3000 );
+    } );
+  } );
+
+  QToolButton * sutraHistoryBackButton = new QToolButton( sutraPopupCornerTools );
+  sutraHistoryBackButton->setObjectName( sutraHistoryBackButtonObjectName() );
+  sutraHistoryBackButton->setText( QStringLiteral( "<" ) );
+  sutraHistoryBackButton->setToolTip( tr( "Previous lookup (Alt+Left)" ) );
+  sutraHistoryBackButton->setAutoRaise( true );
+
+  QToolButton * sutraHistoryForwardButton = new QToolButton( sutraPopupCornerTools );
+  sutraHistoryForwardButton->setObjectName( sutraHistoryForwardButtonObjectName() );
+  sutraHistoryForwardButton->setText( QStringLiteral( ">" ) );
+  sutraHistoryForwardButton->setToolTip( tr( "Next lookup (Alt+Right)" ) );
+  sutraHistoryForwardButton->setAutoRaise( true );
+
+  QToolButton * sutraHistoryButton = new QToolButton( sutraPopupCornerTools );
+  sutraHistoryButton->setObjectName( sutraHistoryButtonObjectName() );
+  sutraHistoryButton->setText( QStringLiteral( "H" ) );
+  sutraHistoryButton->setMenu( sutraLookupLibraryMenu );
+  sutraHistoryButton->setPopupMode( QToolButton::InstantPopup );
+  sutraHistoryButton->setAutoRaise( true );
+
+  QToolButton * sutraNoteButton = new QToolButton( sutraPopupCornerTools );
+  sutraNoteButton->setObjectName( sutraNoteButtonObjectName() );
+  sutraNoteButton->setText( QStringLiteral( "N" ) );
+  sutraNoteButton->setAutoRaise( true );
+
+  connect( sutraHistoryBackButton, &QToolButton::clicked, this, [ navigateSutraLookupHistory ] {
+    navigateSutraLookupHistory( -1 );
+  } );
+  connect( sutraHistoryForwardButton, &QToolButton::clicked, this, [ navigateSutraLookupHistory ] {
+    navigateSutraLookupHistory( 1 );
+  } );
+
+  connect( sutraNoteButton, &QToolButton::clicked, this, [ this ] {
+    const QString term = sutraCurrentLookupTerm( this );
+    if ( term.isEmpty() ) {
+      return;
+    }
+
+    QVariantMap notes = loadSutraLookupNotes();
+    bool accepted     = false;
+    const QString note = QInputDialog::getMultiLineText( this,
+                                                         tr( "Personal note" ),
+                                                         tr( "Note for \"%1\":" ).arg( term ),
+                                                         notes.value( term ).toString(),
+                                                         &accepted );
+    if ( !accepted ) {
+      return;
+    }
+
+    if ( note.trimmed().isEmpty() ) {
+      notes.remove( term );
+      showStatusBarMessage( tr( "Personal note removed" ), 3000 );
+    }
+    else {
+      notes.insert( term, note.left( 5000 ) );
+      showStatusBarMessage( tr( "Personal note saved" ), 3000 );
+    }
+    saveSutraLookupNotes( notes );
+    updateSutraLookupFeatureControls( this, term );
+  } );
+
+  QAction * sutraHistoryBackAction = new QAction( this );
+  sutraHistoryBackAction->setShortcutContext( Qt::WidgetWithChildrenShortcut );
+  sutraHistoryBackAction->setShortcut( QKeySequence( Qt::ALT | Qt::Key_Left ) );
+  addAction( sutraHistoryBackAction );
+  connect( sutraHistoryBackAction, &QAction::triggered, this, [ navigateSutraLookupHistory ] {
+    navigateSutraLookupHistory( -1 );
+  } );
+
+  QAction * sutraHistoryForwardAction = new QAction( this );
+  sutraHistoryForwardAction->setShortcutContext( Qt::WidgetWithChildrenShortcut );
+  sutraHistoryForwardAction->setShortcut( QKeySequence( Qt::ALT | Qt::Key_Right ) );
+  addAction( sutraHistoryForwardAction );
+  connect( sutraHistoryForwardAction, &QAction::triggered, this, [ navigateSutraLookupHistory ] {
+    navigateSutraLookupHistory( 1 );
+  } );
+
+  const auto createSutraTabShortcut = [ this ]( const QKeySequence & sequence,
+                                                 const std::function< void() > & callback ) {
+    QAction * action = new QAction( this );
+    action->setShortcutContext( Qt::WidgetWithChildrenShortcut );
+    action->setShortcut( sequence );
+    addAction( action );
+    connect( action, &QAction::triggered, this, [ callback ] {
+      callback();
+    } );
+  };
+
+  createSutraTabShortcut( QKeySequence( Qt::CTRL | Qt::Key_1 ), [ this ] {
+    if ( tabWidget->count() > 0 ) {
+      tabWidget->setCurrentIndex( 0 );
+    }
+  } );
+  createSutraTabShortcut( QKeySequence( Qt::CTRL | Qt::Key_2 ), [ this ] {
+    if ( QTextBrowser * browser = findBuddhistGlossaryBrowser( tabWidget ) ) {
+      tabWidget->setCurrentWidget( browser );
+    }
+  } );
+  createSutraTabShortcut( QKeySequence( Qt::CTRL | Qt::Key_3 ), [ this ] {
+    if ( QTextBrowser * browser = findWebReferenceBrowser( tabWidget ) ) {
+      tabWidget->setCurrentWidget( browser );
+    }
+  } );
+  createSutraTabShortcut( QKeySequence( Qt::CTRL | Qt::Key_Tab ), [ this ] {
+    const int count = tabWidget->count();
+    if ( count > 1 ) {
+      tabWidget->setCurrentIndex( ( tabWidget->currentIndex() + 1 ) % count );
+    }
+  } );
+  createSutraTabShortcut( QKeySequence( Qt::CTRL | Qt::SHIFT | Qt::Key_Tab ), [ this ] {
+    const int count = tabWidget->count();
+    if ( count > 1 ) {
+      tabWidget->setCurrentIndex( ( tabWidget->currentIndex() - 1 + count ) % count );
+    }
+  } );
+
   QToolButton * sutraPopupZoomOutButton = new QToolButton( sutraPopupCornerTools );
   sutraPopupZoomOutButton->setText( QStringLiteral( "-" ) );
   sutraPopupZoomOutButton->setToolTip( tr( "Zoom out (Ctrl+-)" ) );
@@ -4237,7 +5335,9 @@ ScanPopup::ScanPopup( QWidget * parent,
 
   QToolButton * sutraPopupThemeToggleButton = new QToolButton( sutraPopupCornerTools );
   sutraPopupThemeToggleButton->setObjectName( sutraPopupThemeToggleButtonObjectName() );
-  sutraPopupThemeToggleButton->setMinimumWidth( 24 );
+  sutraPopupThemeToggleButton->setMinimumWidth( 26 );
+  sutraPopupThemeToggleButton->setIconSize( QSize( 20, 20 ) );
+  sutraPopupThemeToggleButton->setToolButtonStyle( Qt::ToolButtonIconOnly );
   sutraPopupThemeToggleButton->setAutoRaise( true );
 
   QToolButton * sutraPopupColorsButton = new QToolButton( sutraPopupCornerTools );
@@ -4262,6 +5362,10 @@ ScanPopup::ScanPopup( QWidget * parent,
   sutraPopupQuickFitButton->setToolTip( tr( "Fit window size to results" ) );
   sutraPopupQuickFitButton->setAutoRaise( true );
 
+  sutraPopupCornerLayout->addWidget( sutraHistoryBackButton );
+  sutraPopupCornerLayout->addWidget( sutraHistoryForwardButton );
+  sutraPopupCornerLayout->addWidget( sutraHistoryButton );
+  sutraPopupCornerLayout->addWidget( sutraNoteButton );
   sutraPopupCornerLayout->addWidget( sutraPopupZoomOutButton );
   sutraPopupCornerLayout->addWidget( sutraPopupZoomIndicator );
   sutraPopupCornerLayout->addWidget( sutraPopupZoomInButton );
@@ -4306,6 +5410,8 @@ ScanPopup::ScanPopup( QWidget * parent,
   } );
 
   updateSutraPopupZoomIndicator( this );
+  updateSutraLookupFeatureControls( this );
+  applySutraPopupPointingCursors( this );
   sutraPopupCornerTools->show();
   positionSutraPopupCornerTools( this );
 
@@ -4695,8 +5801,13 @@ void ScanPopup::translateWord( const QString & word )
 {
   const QString normalizedWord = normalizeSmartLookupInput( cfg.preferences.sanitizeInputPhrase( word ) );
   const QStringList smartTerms = detectSmartLookupTerms( normalizedWord );
+  const bool manualCapture =
+    loadSutraMouseLookupCaptureMode() == SutraMouseLookupCaptureMode::SelectedText;
 
-  pendingWord = chooseSmartLookupQuery( normalizedWord, smartTerms );
+  // Manual capture means the user intentionally highlighted the exact text to
+  // translate. Do not collapse that selection to the first detected glossary
+  // term. Automatic capture keeps the existing smart-term selection behavior.
+  pendingWord = manualCapture ? normalizedWord : chooseSmartLookupQuery( normalizedWord, smartTerms );
 
   if ( pendingWord.isEmpty() ) {
     return; // Nothing there
@@ -4711,7 +5822,10 @@ void ScanPopup::translateWord( const QString & word )
   updateBuddhistGlossaryTab( tabWidget, pendingWord, smartTerms );
   updateWebReferenceTab( tabWidget, pendingWord, smartTerms );
 
-  if ( !smartTerms.isEmpty() && pendingWord != normalizedWord ) {
+  if ( manualCapture ) {
+    showStatusBarMessage( tr( "Manual selection lookup" ), 3000 );
+  }
+  else if ( !smartTerms.isEmpty() && pendingWord != normalizedWord ) {
     showStatusBarMessage( tr( "Smart terms: %1" ).arg( smartTerms.join( QStringLiteral( " | " ) ) ), 8000 );
   }
 }
@@ -4978,6 +6092,7 @@ void ScanPopup::translateInputFinished()
 
 void ScanPopup::showTranslationFor( const QString & word ) const
 {
+  recordSutraLookupHistory( const_cast< ScanPopup * >( this ), word );
   ui.pronounceButton->setDisabled( true );
 
   unsigned groupId = groupList->getCurrentGroup();
@@ -5058,8 +6173,10 @@ bool ScanPopup::eventFilter( QObject * watched, QEvent * event )
 
     if ( child ) {
       child->installEventFilter( this );
+      applySutraPointingCursorToObject( child );
       for ( QObject * descendant : child->findChildren< QObject * >() ) {
         descendant->installEventFilter( this );
+        applySutraPointingCursorToObject( descendant );
       }
     }
   }
@@ -5375,6 +6492,7 @@ void ScanPopup::pinButtonClicked( bool checked )
   show();
 
   if ( checked ) {
+    sutraApplyNativeTopmost( this, ui.onTopButton->isChecked() );
     pinnedGeometry = saveGeometry();
   }
 }
@@ -5609,18 +6727,32 @@ void ScanPopup::openSearch()
 
 void ScanPopup::alwaysOnTopClicked( bool checked )
 {
-  bool wasVisible = isVisible();
-  if ( ui.pinButton->isChecked() ) {
-    Qt::WindowFlags flags = this->windowFlags();
-    if ( checked ) {
-      setWindowFlags( flags | Qt::WindowStaysOnTopHint );
+  cfg.popupWindowAlwaysOnTop = checked;
+
+  if ( !ui.pinButton->isChecked() ) {
+    return;
+  }
+
+  const bool wasVisible = isVisible();
+  const QByteArray geometryBeforeFlags = saveGeometry();
+
+  Qt::WindowFlags flags = pinnedWindowFlags;
+  if ( checked ) {
+    flags |= Qt::WindowStaysOnTopHint;
+  }
+
+  setWindowFlags( flags );
+
+  if ( wasVisible ) {
+    show();
+    if ( !geometryBeforeFlags.isEmpty() ) {
+      restoreGeometry( geometryBeforeFlags );
     }
-    else {
-      setWindowFlags( flags ^ Qt::WindowStaysOnTopHint );
-    }
-    if ( wasVisible ) {
-      show();
-    }
+  }
+
+  sutraApplyNativeTopmost( this, checked );
+  if ( checked ) {
+    raise();
   }
 }
 
