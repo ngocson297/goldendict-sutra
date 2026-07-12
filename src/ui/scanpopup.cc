@@ -42,6 +42,8 @@
 #include <QPixmap>
 #include <QMenu>
 #include <QMouseEvent>
+#include <QWheelEvent>
+#include <QChildEvent>
 #include <QFileDialog>
 #include <QMessageBox>
 #include "gestures.hh"
@@ -203,6 +205,55 @@ void saveSutraPopupFontSize( int fontSize )
   QSettings settings;
   settings.setValue( sutraPopupFontSizeSettingsKey(),
                      qBound( sutraPopupMinFontSize, fontSize, sutraPopupMaxFontSize ) );
+}
+
+QString sutraPopupZoomIndicatorObjectName()
+{
+  return QStringLiteral( "sutraPopupZoomIndicator" );
+}
+
+int sutraPopupZoomPercent()
+{
+  return qRound( 100.0 * static_cast< double >( loadSutraPopupFontSize() )
+                 / static_cast< double >( sutraPopupDefaultFontSize ) );
+}
+
+int nextSutraPopupFontSize( int direction )
+{
+  const QList< int > levels = { 11, 12, 14, 16, 18, 20, 22, 24, 26, 28, 32, 36 };
+  const int current          = loadSutraPopupFontSize();
+
+  if ( direction > 0 ) {
+    for ( int level : levels ) {
+      if ( level > current ) {
+        return level;
+      }
+    }
+    return levels.last();
+  }
+
+  if ( direction < 0 ) {
+    for ( auto it = levels.crbegin(); it != levels.crend(); ++it ) {
+      if ( *it < current ) {
+        return *it;
+      }
+    }
+    return levels.first();
+  }
+
+  return sutraPopupDefaultFontSize;
+}
+
+void updateSutraPopupZoomIndicator( QWidget * popup )
+{
+  if ( !popup ) {
+    return;
+  }
+
+  if ( QToolButton * indicator =
+         popup->findChild< QToolButton * >( sutraPopupZoomIndicatorObjectName() ) ) {
+    indicator->setText( QStringLiteral( "%1%" ).arg( sutraPopupZoomPercent() ) );
+  }
 }
 
 
@@ -2855,29 +2906,81 @@ ScanPopup::ScanPopup( QWidget * parent,
 
   sutraPopupLayoutMenu->addSeparator();
 
-  QMenu * sutraPopupFontSizeMenu         = sutraPopupLayoutMenu->addMenu( tr( "Font size" ) );
+  const auto applySutraPopupZoom = [ this ]( int requestedFontSize ) {
+    const int fontSize = qBound( sutraPopupMinFontSize, requestedFontSize, sutraPopupMaxFontSize );
+
+    if ( fontSize == loadSutraPopupFontSize() ) {
+      updateSutraPopupZoomIndicator( this );
+      return;
+    }
+
+    saveSutraPopupFontSize( fontSize );
+    applyZoomFactor();
+
+    // Re-render only the popup presentation so inline HTML sizes follow the zoom level.
+    // The current lookup text and translation result remain unchanged.
+    refreshSutraCustomTabs( tabWidget, pendingWord, translateBox->translateLine()->text() );
+    applySutraPopupFontSizeToTabs( tabWidget );
+    updateSutraPopupZoomIndicator( this );
+
+    if ( loadSutraPopupLayoutMode() == SutraPopupLayoutMode::FitToResults ) {
+      QTimer::singleShot( 0, this, [ this ] {
+        fitSutraPopupToResults( this, tabWidget );
+        positionSutraPopupCornerTools( this );
+      } );
+    }
+
+    showStatusBarMessage( tr( "Popup zoom: %1%" ).arg( sutraPopupZoomPercent() ), 3000 );
+  };
+
+  QMenu * sutraPopupFontSizeMenu         = sutraPopupLayoutMenu->addMenu( tr( "Zoom" ) );
   QActionGroup * sutraPopupFontSizeGroup = new QActionGroup( sutraPopupFontSizeMenu );
   QList< QAction * > sutraPopupFontSizeActions;
 
-  for ( int fontSize : { 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 32, 36 } ) {
+  QAction * sutraPopupZoomOutAction = new QAction( tr( "Zoom out" ), this );
+  sutraPopupZoomOutAction->setObjectName( QStringLiteral( "sutraPopupZoomOutAction" ) );
+  sutraPopupZoomOutAction->setShortcutContext( Qt::WidgetWithChildrenShortcut );
+  sutraPopupZoomOutAction->setShortcut( QKeySequence( Qt::CTRL | Qt::Key_Minus ) );
+  addAction( sutraPopupZoomOutAction );
+  sutraPopupFontSizeMenu->addAction( sutraPopupZoomOutAction );
+
+  QAction * sutraPopupZoomResetAction = new QAction( tr( "Reset zoom (100%)" ), this );
+  sutraPopupZoomResetAction->setObjectName( QStringLiteral( "sutraPopupZoomResetAction" ) );
+  sutraPopupZoomResetAction->setShortcutContext( Qt::WidgetWithChildrenShortcut );
+  sutraPopupZoomResetAction->setShortcut( QKeySequence( Qt::CTRL | Qt::Key_0 ) );
+  addAction( sutraPopupZoomResetAction );
+  sutraPopupFontSizeMenu->addAction( sutraPopupZoomResetAction );
+
+  QAction * sutraPopupZoomInAction = new QAction( tr( "Zoom in" ), this );
+  sutraPopupZoomInAction->setObjectName( QStringLiteral( "sutraPopupZoomInAction" ) );
+  sutraPopupZoomInAction->setShortcutContext( Qt::WidgetWithChildrenShortcut );
+  sutraPopupZoomInAction->setShortcuts(
+    QList< QKeySequence >() << QKeySequence( Qt::CTRL | Qt::Key_Plus )
+                            << QKeySequence( Qt::CTRL | Qt::Key_Equal ) );
+  addAction( sutraPopupZoomInAction );
+  sutraPopupFontSizeMenu->addAction( sutraPopupZoomInAction );
+
+  connect( sutraPopupZoomOutAction, &QAction::triggered, this, [ applySutraPopupZoom ] {
+    applySutraPopupZoom( nextSutraPopupFontSize( -1 ) );
+  } );
+  connect( sutraPopupZoomResetAction, &QAction::triggered, this, [ applySutraPopupZoom ] {
+    applySutraPopupZoom( sutraPopupDefaultFontSize );
+  } );
+  connect( sutraPopupZoomInAction, &QAction::triggered, this, [ applySutraPopupZoom ] {
+    applySutraPopupZoom( nextSutraPopupFontSize( 1 ) );
+  } );
+
+  sutraPopupFontSizeMenu->addSeparator();
+
+  for ( int fontSize : { 11, 12, 14, 16, 18, 20, 22, 24, 26, 28, 32, 36 } ) {
     QAction * fontAction = sutraPopupFontSizeMenu->addAction( tr( "%1 px" ).arg( fontSize ) );
     fontAction->setCheckable( true );
     fontAction->setData( fontSize );
     sutraPopupFontSizeGroup->addAction( fontAction );
     sutraPopupFontSizeActions << fontAction;
 
-    connect( fontAction, &QAction::triggered, this, [ this, fontSize ] {
-      saveSutraPopupFontSize( fontSize );
-      applyZoomFactor();
-      refreshSutraCustomTabs( tabWidget, pendingWord, translateBox->translateLine()->text() );
-  QTimer::singleShot( 0, this, [ this ] {
-    sutraApplyFitToResultsPopup( this, tabWidget );
-  } );
-      applySutraPopupFontSizeToTabs( tabWidget );
-      if ( loadSutraPopupLayoutMode() == SutraPopupLayoutMode::FitToResults ) {
-        fitSutraPopupToResults( this, tabWidget );
-      }
-      showStatusBarMessage( tr( "Popup font size: %1 px" ).arg( fontSize ), 4000 );
+    connect( fontAction, &QAction::triggered, this, [ applySutraPopupZoom, fontSize ] {
+      applySutraPopupZoom( fontSize );
     } );
   }
 
@@ -3006,13 +3109,19 @@ ScanPopup::ScanPopup( QWidget * parent,
   connect( sutraPopupRestoreDefaultsAction, &QAction::triggered, this, [ this ] {
     resetSutraPopupAppearanceDefaults();
     applySutraPopupOpacity( this );
+    applyZoomFactor();
     refreshSutraCustomTabs( tabWidget, pendingWord, translateBox->translateLine()->text() );
-  QTimer::singleShot( 0, this, [ this ] {
-    sutraApplyFitToResultsPopup( this, tabWidget );
-  } );
-      applySutraPopupFontSizeToTabs( tabWidget );
+    applySutraPopupFontSizeToTabs( tabWidget );
+    updateSutraPopupZoomIndicator( this );
     applySutraPopupLayoutMode( this, tabWidget );
-    showStatusBarMessage( tr( "Popup defaults restored: Auto layout, 14 px, 100% opacity, Ctrl + Right Click" ), 5000 );
+
+    QTimer::singleShot( 0, this, [ this ] {
+      positionSutraPopupCornerTools( this );
+    } );
+
+    showStatusBarMessage(
+      tr( "Popup defaults restored: Auto layout, 100% zoom, 100% opacity, Ctrl + Right Click" ),
+      5000 );
   } );
 
   if ( QToolButton * pinToolButton = qobject_cast< QToolButton * >( ui.pinButton ) ) {
@@ -3053,6 +3162,22 @@ ScanPopup::ScanPopup( QWidget * parent,
   sutraPopupCornerLayout->setContentsMargins( 4, 2, 4, 2 );
   sutraPopupCornerLayout->setSpacing( 2 );
 
+  QToolButton * sutraPopupZoomOutButton = new QToolButton( sutraPopupCornerTools );
+  sutraPopupZoomOutButton->setText( QStringLiteral( "-" ) );
+  sutraPopupZoomOutButton->setToolTip( tr( "Zoom out (Ctrl+-)" ) );
+  sutraPopupZoomOutButton->setAutoRaise( true );
+
+  QToolButton * sutraPopupZoomIndicator = new QToolButton( sutraPopupCornerTools );
+  sutraPopupZoomIndicator->setObjectName( sutraPopupZoomIndicatorObjectName() );
+  sutraPopupZoomIndicator->setMinimumWidth( 46 );
+  sutraPopupZoomIndicator->setToolTip( tr( "Reset zoom to 100% (Ctrl+0)" ) );
+  sutraPopupZoomIndicator->setAutoRaise( true );
+
+  QToolButton * sutraPopupZoomInButton = new QToolButton( sutraPopupCornerTools );
+  sutraPopupZoomInButton->setText( QStringLiteral( "+" ) );
+  sutraPopupZoomInButton->setToolTip( tr( "Zoom in (Ctrl++)" ) );
+  sutraPopupZoomInButton->setAutoRaise( true );
+
   QToolButton * sutraPopupOptionsButton = new QToolButton( sutraPopupCornerTools );
   sutraPopupOptionsButton->setText( QStringLiteral( "⚙" ) );
   sutraPopupOptionsButton->setToolTip( tr( "Popup settings" ) );
@@ -3068,9 +3193,23 @@ ScanPopup::ScanPopup( QWidget * parent,
   sutraPopupQuickFitButton->setToolTip( tr( "Fit window size to results" ) );
   sutraPopupQuickFitButton->setAutoRaise( true );
 
+  sutraPopupCornerLayout->addWidget( sutraPopupZoomOutButton );
+  sutraPopupCornerLayout->addWidget( sutraPopupZoomIndicator );
+  sutraPopupCornerLayout->addWidget( sutraPopupZoomInButton );
   sutraPopupCornerLayout->addWidget( sutraPopupOptionsButton );
   sutraPopupCornerLayout->addWidget( sutraPopupQuickFixButton );
   sutraPopupCornerLayout->addWidget( sutraPopupQuickFitButton );
+
+  connect( sutraPopupZoomOutButton, &QToolButton::clicked, sutraPopupZoomOutAction, &QAction::trigger );
+  connect( sutraPopupZoomIndicator, &QToolButton::clicked, sutraPopupZoomResetAction, &QAction::trigger );
+  connect( sutraPopupZoomInButton, &QToolButton::clicked, sutraPopupZoomInAction, &QAction::trigger );
+
+  // Receive Ctrl + mouse-wheel events from every widget inside the popup,
+  // including the article view, custom Definition/Web tabs and their scroll areas.
+  // New descendants are covered by the ChildAdded branch in eventFilter().
+  for ( QObject * popupObject : findChildren< QObject * >() ) {
+    popupObject->installEventFilter( this );
+  }
 
   connect( sutraPopupOptionsButton, &QToolButton::clicked, this, [ = ] {
     updateSutraPopupLayoutMenu();
@@ -3089,6 +3228,7 @@ ScanPopup::ScanPopup( QWidget * parent,
     positionSutraPopupCornerTools( this );
   } );
 
+  updateSutraPopupZoomIndicator( this );
   sutraPopupCornerTools->show();
   positionSutraPopupCornerTools( this );
 
@@ -3281,6 +3421,7 @@ ScanPopup::ScanPopup( QWidget * parent,
   }
 #endif
   applyZoomFactor();
+  applySutraPopupFontSizeToTabs( tabWidget );
 }
 
 void ScanPopup::onActionTriggered()
@@ -3819,6 +3960,71 @@ void ScanPopup::typingEvent( const QString & t )
 
 bool ScanPopup::eventFilter( QObject * watched, QEvent * event )
 {
+  const auto belongsToThisPopup = [ this ]( QObject * object ) {
+    for ( ; object; object = object->parent() ) {
+      if ( object == this ) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  // Keep the popup-scoped event filter attached to widgets created later
+  // (for example internal web/article view children). Guarding by ancestry
+  // is important because this filter is briefly installed on qApp by the
+  // existing mouse-interception flow.
+  if ( event->type() == QEvent::ChildAdded && belongsToThisPopup( watched ) ) {
+    const QChildEvent * childEvent = static_cast< QChildEvent * >( event );
+    QObject * child               = childEvent->child();
+
+    if ( child ) {
+      child->installEventFilter( this );
+      for ( QObject * descendant : child->findChildren< QObject * >() ) {
+        descendant->installEventFilter( this );
+      }
+    }
+  }
+
+  if ( event->type() == QEvent::Wheel && belongsToThisPopup( watched ) ) {
+    QWheelEvent * wheelEvent = static_cast< QWheelEvent * >( event );
+
+    if ( wheelEvent->modifiers().testFlag( Qt::ControlModifier ) ) {
+      int delta     = wheelEvent->angleDelta().y();
+      int threshold = 120;
+
+      // Precision touchpads can report pixel deltas instead of classic
+      // 120-unit wheel steps. Accumulate them to avoid over-sensitive zoom.
+      if ( delta == 0 ) {
+        delta     = wheelEvent->pixelDelta().y();
+        threshold = 40;
+      }
+
+      int accumulatedDelta = property( "sutraPopupWheelZoomDelta" ).toInt() + delta;
+      QAction * zoomAction = nullptr;
+
+      if ( accumulatedDelta >= threshold ) {
+        zoomAction = findChild< QAction * >( QStringLiteral( "sutraPopupZoomInAction" ) );
+        accumulatedDelta %= threshold;
+      }
+      else if ( accumulatedDelta <= -threshold ) {
+        zoomAction = findChild< QAction * >( QStringLiteral( "sutraPopupZoomOutAction" ) );
+        accumulatedDelta = -( ( -accumulatedDelta ) % threshold );
+      }
+
+      setProperty( "sutraPopupWheelZoomDelta", accumulatedDelta );
+
+      if ( zoomAction ) {
+        zoomAction->trigger();
+      }
+
+      wheelEvent->accept();
+      return true;
+    }
+
+    // Do not carry a partial touchpad delta into a later Ctrl+wheel gesture.
+    setProperty( "sutraPopupWheelZoomDelta", 0 );
+  }
+
   if ( watched == translateBox->translateLine() && event->type() == QEvent::FocusIn ) {
     const QFocusEvent * focusEvent = static_cast< QFocusEvent * >( event );
 
