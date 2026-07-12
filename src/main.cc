@@ -34,6 +34,7 @@
 #include <QPoint>
 #include <QProcess>
 #include <QSettings>
+#include <QSet>
 #include <QTimer>
 
 #ifdef Q_OS_WIN
@@ -51,6 +52,7 @@
 #include <QtWebEngineCore/QWebEngineUrlScheme>
 #include <algorithm>
 #include <limits>
+#include <functional>
 #include <stdio.h>
 #if defined( Q_OS_UNIX )
   #include "unix/ksignalhandler.hh"
@@ -310,11 +312,18 @@ enum class SutraMouseLookupButton
   Middle = 3
 };
 
+enum class SutraMouseLookupCaptureMode
+{
+  Automatic    = 0,
+  SelectedText = 1
+};
+
 struct SutraMouseLookupSettings
 {
   bool enabled = true;
   int modifiers = SutraMouseLookupCtrl;
   SutraMouseLookupButton button = SutraMouseLookupButton::Right;
+  SutraMouseLookupCaptureMode captureMode = SutraMouseLookupCaptureMode::Automatic;
 };
 
 QString sutraMouseLookupLegacyModeSettingsKey()
@@ -337,12 +346,18 @@ QString sutraMouseLookupButtonSettingsKey()
   return QStringLiteral( "SutraEdition/MouseLookupButton" );
 }
 
+QString sutraMouseLookupCaptureModeSettingsKey()
+{
+  return QStringLiteral( "SutraEdition/MouseLookupCaptureMode" );
+}
+
 void saveSutraMouseLookupSettings( const SutraMouseLookupSettings & value )
 {
   QSettings settings;
   settings.setValue( sutraMouseLookupEnabledSettingsKey(), value.enabled );
   settings.setValue( sutraMouseLookupModifiersSettingsKey(), value.modifiers );
   settings.setValue( sutraMouseLookupButtonSettingsKey(), static_cast< int >( value.button ) );
+  settings.setValue( sutraMouseLookupCaptureModeSettingsKey(), static_cast< int >( value.captureMode ) );
 
   // Keep the old popup preset setting compatible with earlier Sutra builds.
   if ( !value.enabled ) {
@@ -408,6 +423,12 @@ SutraMouseLookupSettings loadSutraMouseLookupSettings()
                     ? static_cast< SutraMouseLookupButton >( button )
                     : SutraMouseLookupButton::Right;
 
+  const int captureMode = settings.value( sutraMouseLookupCaptureModeSettingsKey(),
+                                          static_cast< int >( SutraMouseLookupCaptureMode::Automatic ) ).toInt();
+  result.captureMode = captureMode == static_cast< int >( SutraMouseLookupCaptureMode::SelectedText )
+                         ? SutraMouseLookupCaptureMode::SelectedText
+                         : SutraMouseLookupCaptureMode::Automatic;
+
   return result;
 }
 
@@ -439,14 +460,23 @@ QString sutraMouseLookupButtonLabel( SutraMouseLookupButton button )
   }
 }
 
+QString sutraMouseLookupCaptureModeLabel( SutraMouseLookupCaptureMode mode )
+{
+  return mode == SutraMouseLookupCaptureMode::SelectedText
+           ? QStringLiteral( "Selected text only" )
+           : QStringLiteral( "Automatic phrase detection" );
+}
+
 QString sutraMouseLookupSettingsLabel( const SutraMouseLookupSettings & value )
 {
   if ( !value.enabled ) {
     return QStringLiteral( "Disabled" );
   }
 
-  return QStringLiteral( "%1 + %2" )
-    .arg( sutraMouseLookupModifiersLabel( value.modifiers ), sutraMouseLookupButtonLabel( value.button ) );
+  return QStringLiteral( "%1 + %2 - %3" )
+    .arg( sutraMouseLookupModifiersLabel( value.modifiers ),
+          sutraMouseLookupButtonLabel( value.button ),
+          sutraMouseLookupCaptureModeLabel( value.captureMode ) );
 }
 
 void sendSutraStartupVirtualKey( WORD virtualKey, bool down )
@@ -584,6 +614,14 @@ static bool sutraStartupIsCjkChar( const QChar & ch )
       || ( u >= 0x3000 && u <= 0x303F )   // CJK Symbols and Punctuation
       || ( u >= 0x2E80 && u <= 0x2EFF )   // CJK Radicals Supplement
       || ( u >= 0x2F00 && u <= 0x2FDF );  // Kangxi Radicals
+}
+
+static bool sutraStartupIsCjkIdeograph( const QChar & ch )
+{
+  const uint u = ch.unicode();
+  return ( u >= 0x3400 && u <= 0x4DBF )
+      || ( u >= 0x4E00 && u <= 0x9FFF )
+      || ( u >= 0xF900 && u <= 0xFAFF );
 }
 
 bool sutraStartupIsTooShortCjkLookupText( const QString & text )
@@ -833,6 +871,174 @@ const QList< SutraStartupVietnameseAlias > & sutraStartupVietnameseGlossaryAlias
   return aliases;
 }
 
+const QStringList & sutraStartupCjkGlossaryTerms()
+{
+  static const QStringList terms = [] {
+    QStringList result;
+    QSet< QString > seen;
+
+    QFile file( QCoreApplication::applicationDirPath() + QStringLiteral( "/buddhist_terms.json" ) );
+    if ( !file.open( QIODevice::ReadOnly | QIODevice::Text ) ) {
+      return result;
+    }
+
+    QJsonParseError parseError;
+    const QJsonDocument document = QJsonDocument::fromJson( file.readAll(), &parseError );
+    if ( parseError.error != QJsonParseError::NoError ) {
+      return result;
+    }
+
+    const QJsonArray entries = document.isArray()
+                               ? document.array()
+                               : document.object().value( QStringLiteral( "terms" ) ).toArray();
+
+    for ( const QJsonValue & value : entries ) {
+      if ( !value.isObject() ) {
+        continue;
+      }
+
+      const QString term = value.toObject().value( QStringLiteral( "term" ) ).toString().trimmed();
+      if ( term.isEmpty() || term.size() > 80 || seen.contains( term ) ) {
+        continue;
+      }
+
+      bool hasIdeograph = false;
+      for ( const QChar & ch : term ) {
+        if ( sutraStartupIsCjkIdeograph( ch ) ) {
+          hasIdeograph = true;
+          break;
+        }
+      }
+
+      if ( hasIdeograph ) {
+        seen.insert( term );
+        result << term;
+      }
+    }
+
+    std::sort( result.begin(), result.end(), []( const QString & left, const QString & right ) {
+      return left.size() > right.size();
+    } );
+
+    return result;
+  }();
+
+  return terms;
+}
+
+struct SutraStartupCompactCjkText
+{
+  QString text;
+  QList< int > originalOffsets;
+};
+
+SutraStartupCompactCjkText sutraStartupCompactCjkText( const QString & source )
+{
+  SutraStartupCompactCjkText result;
+  result.text.reserve( source.size() );
+  result.originalOffsets.reserve( source.size() );
+
+  for ( int i = 0; i < source.size(); ++i ) {
+    if ( sutraStartupIsCjkIdeograph( source.at( i ) ) ) {
+      result.text += source.at( i );
+      result.originalOffsets << i;
+    }
+  }
+
+  return result;
+}
+
+QString sutraStartupBestCjkGlossaryTermAtOffset( const QString & context, int clickOffset )
+{
+  const SutraStartupCompactCjkText compact = sutraStartupCompactCjkText( context );
+  if ( compact.text.isEmpty() || compact.originalOffsets.isEmpty() ) {
+    return {};
+  }
+
+  int compactAnchor = 0;
+  int nearestDistance = ( std::numeric_limits< int >::max )();
+  for ( int i = 0; i < compact.originalOffsets.size(); ++i ) {
+    const int distance = qAbs( compact.originalOffsets.at( i ) - clickOffset );
+    if ( distance < nearestDistance ) {
+      nearestDistance = distance;
+      compactAnchor = i;
+    }
+  }
+
+  QString bestTerm;
+  int bestTermLength = -1;
+  int bestDistance = ( std::numeric_limits< int >::max )();
+  bool foundContainingTerm = false;
+
+  for ( const QString & term : sutraStartupCjkGlossaryTerms() ) {
+    const SutraStartupCompactCjkText compactTerm = sutraStartupCompactCjkText( term );
+    if ( compactTerm.text.isEmpty() || compactTerm.text.size() > compact.text.size() ) {
+      continue;
+    }
+
+    int occurrence = compact.text.indexOf( compactTerm.text );
+    while ( occurrence >= 0 ) {
+      const int end = occurrence + compactTerm.text.size() - 1;
+      const bool containsAnchor = compactAnchor >= occurrence && compactAnchor <= end;
+      const int distance = containsAnchor ? 0 : qMin( qAbs( compactAnchor - occurrence ), qAbs( compactAnchor - end ) );
+
+      if ( containsAnchor ) {
+        if ( !foundContainingTerm || compactTerm.text.size() > bestTermLength ) {
+          bestTerm = term;
+          bestTermLength = compactTerm.text.size();
+          bestDistance = 0;
+          foundContainingTerm = true;
+        }
+      }
+      else if ( !foundContainingTerm
+                && ( distance < bestDistance
+                     || ( distance == bestDistance && compactTerm.text.size() > bestTermLength ) ) ) {
+        bestTerm = term;
+        bestTermLength = compactTerm.text.size();
+        bestDistance = distance;
+      }
+
+      occurrence = compact.text.indexOf( compactTerm.text, occurrence + 1 );
+    }
+  }
+
+  if ( !bestTerm.isEmpty() && bestDistance <= 2 ) {
+    return bestTerm;
+  }
+
+  return {};
+}
+
+QString sutraStartupBestKnownCjkTermInText( const QString & text, const QString & anchorText = QString() )
+{
+  const SutraStartupCompactCjkText compactText = sutraStartupCompactCjkText( text );
+  const SutraStartupCompactCjkText compactAnchor = sutraStartupCompactCjkText( anchorText );
+
+  if ( compactText.text.isEmpty() ) {
+    return {};
+  }
+
+  QString best;
+  for ( const QString & term : sutraStartupCjkGlossaryTerms() ) {
+    const QString compactTerm = sutraStartupCompactCjkText( term ).text;
+    if ( compactTerm.isEmpty() || !compactText.text.contains( compactTerm ) ) {
+      continue;
+    }
+
+    if ( !compactAnchor.text.isEmpty()
+      && !compactTerm.contains( compactAnchor.text )
+      && !compactAnchor.text.contains( compactTerm ) ) {
+      continue;
+    }
+
+    if ( best.isEmpty() || compactTerm.size() > sutraStartupCompactCjkText( best ).text.size() ) {
+      best = term;
+    }
+  }
+
+  return best;
+}
+
 int sutraStartupTokenIndexAtOffset( const QList< SutraStartupTextToken > & tokens, int offset )
 {
   if ( tokens.isEmpty() ) {
@@ -1065,15 +1271,135 @@ bool sutraStartupIsCjkPhraseSeparator( const QChar & ch )
   }
 }
 
+QString sutraStartupSmallCjkWindowAtOffset( const QString & text, int clickOffset )
+{
+  if ( text.isEmpty() ) {
+    return {};
+  }
+
+  int anchor = qBound( 0, clickOffset, text.size() - 1 );
+  while ( anchor < text.size() && !sutraStartupIsCjkIdeograph( text.at( anchor ) ) ) {
+    ++anchor;
+  }
+  if ( anchor >= text.size() ) {
+    anchor = qBound( 0, clickOffset - 1, text.size() - 1 );
+    while ( anchor >= 0 && !sutraStartupIsCjkIdeograph( text.at( anchor ) ) ) {
+      --anchor;
+    }
+  }
+
+  if ( anchor < 0 || anchor >= text.size() ) {
+    return {};
+  }
+
+  int clauseStart = anchor;
+  while ( clauseStart > 0 && !sutraStartupIsCjkPhraseSeparator( text.at( clauseStart - 1 ) ) ) {
+    --clauseStart;
+  }
+
+  int clauseEnd = anchor + 1;
+  while ( clauseEnd < text.size() && !sutraStartupIsCjkPhraseSeparator( text.at( clauseEnd ) ) ) {
+    ++clauseEnd;
+  }
+
+  constexpr int maxWindowChars = 16;
+  if ( clauseEnd - clauseStart > maxWindowChars ) {
+    clauseStart = qMax( clauseStart, anchor - maxWindowChars / 2 );
+    clauseEnd = qMin( clauseEnd, clauseStart + maxWindowChars );
+    if ( clauseEnd - clauseStart < maxWindowChars ) {
+      clauseStart = qMax( 0, clauseEnd - maxWindowChars );
+    }
+  }
+
+  return text.mid( clauseStart, clauseEnd - clauseStart ).trimmed();
+}
+
+bool sutraStartupCenteredUiAutomationContext( IUIAutomationTextRange * pointRange,
+                                               QString * contextText,
+                                               int * clickOffset )
+{
+  if ( !pointRange || !contextText || !clickOffset ) {
+    return false;
+  }
+
+  IUIAutomationTextRange * contextRange = nullptr;
+  if ( FAILED( pointRange->Clone( &contextRange ) ) || !contextRange ) {
+    return false;
+  }
+
+  int movedStart = 0;
+  int movedEnd = 0;
+  contextRange->MoveEndpointByUnit( TextPatternRangeEndpoint_Start, TextUnit_Character, -120, &movedStart );
+  contextRange->MoveEndpointByUnit( TextPatternRangeEndpoint_End, TextUnit_Character, 120, &movedEnd );
+  Q_UNUSED( movedEnd );
+
+  BSTR contextBstr = nullptr;
+  if ( FAILED( contextRange->GetText( 260, &contextBstr ) ) ) {
+    contextRange->Release();
+    return false;
+  }
+
+  const QString text = sutraStartupTextFromBstr( contextBstr );
+  if ( text.isEmpty() ) {
+    contextRange->Release();
+    return false;
+  }
+
+  // MoveEndpointByUnit reports the number of characters moved even on some
+  // Office proxies where MoveEndpointByRange later fails. Use it as a safe
+  // cross-bitness fallback for the pointer offset.
+  int offset = qAbs( movedStart );
+  IUIAutomationTextRange * leftRange = nullptr;
+  if ( SUCCEEDED( contextRange->Clone( &leftRange ) ) && leftRange ) {
+    if ( SUCCEEDED( leftRange->MoveEndpointByRange( TextPatternRangeEndpoint_End,
+                                                    pointRange,
+                                                    TextPatternRangeEndpoint_Start ) ) ) {
+      BSTR leftBstr = nullptr;
+      if ( SUCCEEDED( leftRange->GetText( 260, &leftBstr ) ) ) {
+        offset = sutraStartupTextFromBstr( leftBstr ).size();
+      }
+    }
+    leftRange->Release();
+  }
+
+  contextRange->Release();
+
+  if ( offset < 0 ) {
+    return false;
+  }
+
+  *contextText = text;
+  *clickOffset = qBound( 0, offset, text.size() );
+  return true;
+}
+
 QString sutraStartupTextFromUiAutomationRange( IUIAutomationTextRange * range )
 {
   if ( !range ) {
     return {};
   }
 
-  // Keep the point range unchanged. Derive the enclosing line and the text
-  // from the line start to the clicked point so a CJK clause under the mouse
-  // can be selected instead of always returning the first term in the line.
+  // Office 365 may expose the whole punctuation-delimited clause as one word.
+  // Build a small character context centred on the pointer first, then choose
+  // the longest glossary entry that actually spans that pointer position.
+  QString centeredText;
+  int centeredOffset = -1;
+  if ( sutraStartupCenteredUiAutomationContext( range, &centeredText, &centeredOffset ) ) {
+    if ( sutraStartupHasLatinLetter( centeredText ) ) {
+      const QString vietnamesePhrase = sutraStartupBestVietnamesePhraseAtOffset( centeredText, centeredOffset );
+      if ( !vietnamesePhrase.isEmpty() && vietnamesePhrase.size() <= 160 ) {
+        return vietnamesePhrase;
+      }
+    }
+
+    const QString cjkTerm = sutraStartupBestCjkGlossaryTermAtOffset( centeredText, centeredOffset );
+    if ( !cjkTerm.isEmpty() ) {
+      return cjkTerm;
+    }
+  }
+
+  // Fall back to the enclosing line. Keep the original point range unchanged
+  // so we can calculate where the user clicked inside that line.
   IUIAutomationTextRange * lineRange = nullptr;
   if ( FAILED( range->Clone( &lineRange ) ) || !lineRange ) {
     return {};
@@ -1088,7 +1414,7 @@ QString sutraStartupTextFromUiAutomationRange( IUIAutomationTextRange * range )
   }
 
   const QString lineText = sutraStartupTextFromBstr( lineBstr );
-  int clickOffset        = -1;
+  int clickOffset = -1;
 
   IUIAutomationTextRange * prefixRange = nullptr;
   if ( SUCCEEDED( lineRange->Clone( &prefixRange ) ) && prefixRange ) {
@@ -1100,88 +1426,52 @@ QString sutraStartupTextFromUiAutomationRange( IUIAutomationTextRange * range )
         clickOffset = sutraStartupTextFromBstr( prefixBstr ).size();
       }
     }
-
     prefixRange->Release();
   }
 
   lineRange->Release();
 
-  if ( clickOffset >= 0 && !lineText.isEmpty() && sutraStartupHasLatinLetter( lineText ) ) {
-    const QString vietnamesePhrase = sutraStartupBestVietnamesePhraseAtOffset( lineText, clickOffset );
-    if ( !vietnamesePhrase.isEmpty() && vietnamesePhrase.size() <= 120 ) {
-      return vietnamesePhrase;
-    }
-  }
-
   if ( clickOffset >= 0 && !lineText.isEmpty() ) {
-    clickOffset = qBound( 0, clickOffset, lineText.size() );
-
-    int anchor = clickOffset;
-    if ( anchor >= lineText.size() ) {
-      anchor = lineText.size() - 1;
-    }
-
-    if ( anchor >= 0 && sutraStartupIsCjkPhraseSeparator( lineText.at( anchor ) ) ) {
-      int right = anchor + 1;
-      while ( right < lineText.size()
-              && ( sutraStartupIsCjkPhraseSeparator( lineText.at( right ) ) || lineText.at( right ).isSpace() ) ) {
-        ++right;
-      }
-
-      int left = anchor - 1;
-      while ( left >= 0
-              && ( sutraStartupIsCjkPhraseSeparator( lineText.at( left ) ) || lineText.at( left ).isSpace() ) ) {
-        --left;
-      }
-
-      if ( right < lineText.size() ) {
-        anchor = right;
-      }
-      else if ( left >= 0 ) {
-        anchor = left;
+    if ( sutraStartupHasLatinLetter( lineText ) ) {
+      const QString vietnamesePhrase = sutraStartupBestVietnamesePhraseAtOffset( lineText, clickOffset );
+      if ( !vietnamesePhrase.isEmpty() && vietnamesePhrase.size() <= 160 ) {
+        return vietnamesePhrase;
       }
     }
 
-    if ( anchor >= 0 ) {
-      int start = anchor;
-      while ( start > 0 && !sutraStartupIsCjkPhraseSeparator( lineText.at( start - 1 ) ) ) {
-        --start;
-      }
-
-      int end = anchor + 1;
-      while ( end < lineText.size() && !sutraStartupIsCjkPhraseSeparator( lineText.at( end ) ) ) {
-        ++end;
-      }
-
-      const QString clause = lineText.mid( start, end - start ).trimmed();
-
-      bool clauseHasCjk = false;
-      for ( const QChar & ch : clause ) {
-        if ( sutraStartupIsCjkChar( ch ) ) {
-          clauseHasCjk = true;
-          break;
-        }
-      }
-
-      if ( clauseHasCjk && !clause.isEmpty() && clause.size() <= 80 ) {
-        return clause;
-      }
+    const QString cjkTerm = sutraStartupBestCjkGlossaryTermAtOffset( lineText, clickOffset );
+    if ( !cjkTerm.isEmpty() ) {
+      return cjkTerm;
     }
   }
 
-  // Some controls expose a useful word boundary even when punctuation-based
-  // extraction is unavailable.
+  // Some controls expose a useful word boundary even when line offsets are
+  // unreliable across a 64-bit app and 32-bit Office UI Automation proxy.
   IUIAutomationTextRange * wordRange = nullptr;
   if ( SUCCEEDED( range->Clone( &wordRange ) ) && wordRange ) {
     wordRange->ExpandToEnclosingUnit( TextUnit_Word );
 
     BSTR wordBstr = nullptr;
-    if ( SUCCEEDED( wordRange->GetText( 120, &wordBstr ) ) ) {
+    if ( SUCCEEDED( wordRange->GetText( 180, &wordBstr ) ) ) {
       const QString wordText = sutraStartupTextFromBstr( wordBstr ).trimmed();
       wordRange->Release();
 
-      if ( !wordText.isEmpty() && wordText.size() <= 80 ) {
-        return wordText;
+      if ( !wordText.isEmpty() ) {
+        if ( sutraStartupHasLatinLetter( wordText ) ) {
+          const QString phrase = sutraStartupBestVietnamesePhraseFromLine( wordText, wordText );
+          if ( !phrase.isEmpty() ) {
+            return phrase;
+          }
+        }
+
+        const QString knownTerm = sutraStartupBestKnownCjkTermInText( wordText );
+        if ( !knownTerm.isEmpty() ) {
+          return knownTerm;
+        }
+
+        if ( wordText.size() <= 80 ) {
+          return wordText;
+        }
       }
     }
     else {
@@ -1189,7 +1479,16 @@ QString sutraStartupTextFromUiAutomationRange( IUIAutomationTextRange * range )
     }
   }
 
-  return lineText.trimmed();
+  if ( clickOffset >= 0 ) {
+    const QString smallWindow = sutraStartupSmallCjkWindowAtOffset( lineText, clickOffset );
+    if ( !smallWindow.isEmpty() ) {
+      return smallWindow;
+    }
+  }
+
+  // Never return an unbounded Office paragraph. A compact fallback gives the
+  // downstream glossary matcher a useful candidate instead of a whole clause.
+  return lineText.trimmed().left( 80 );
 }
 
 QString sutraStartupUiAutomationTextAtPoint( const QPoint & globalPos )
@@ -1287,6 +1586,123 @@ QString sutraStartupUiAutomationTextAtPoint( const QPoint & globalPos )
 
   return result.trimmed();
 }
+
+QString sutraStartupSelectedTextFromPattern( IUIAutomationTextPattern * textPattern )
+{
+  if ( !textPattern ) {
+    return {};
+  }
+
+  IUIAutomationTextRangeArray * ranges = nullptr;
+  if ( FAILED( textPattern->GetSelection( &ranges ) ) || !ranges ) {
+    return {};
+  }
+
+  int length = 0;
+  ranges->get_Length( &length );
+
+  QStringList selectedParts;
+  for ( int i = 0; i < length; ++i ) {
+    IUIAutomationTextRange * range = nullptr;
+    if ( FAILED( ranges->GetElement( i, &range ) ) || !range ) {
+      continue;
+    }
+
+    BSTR text = nullptr;
+    if ( SUCCEEDED( range->GetText( 600, &text ) ) ) {
+      const QString part = sutraStartupTextFromBstr( text ).trimmed();
+      if ( !part.isEmpty() ) {
+        selectedParts << part;
+      }
+    }
+
+    range->Release();
+  }
+
+  ranges->Release();
+  return selectedParts.join( QLatin1Char( ' ' ) ).trimmed();
+}
+
+QString sutraStartupUiAutomationSelectedTextAtPoint( const QPoint & globalPos )
+{
+  HRESULT coInitResult = CoInitializeEx( nullptr, COINIT_APARTMENTTHREADED );
+  const bool shouldUninitializeCom = SUCCEEDED( coInitResult );
+
+  IUIAutomation * automation = nullptr;
+  HRESULT hr = CoCreateInstance( CLSID_CUIAutomation,
+                                 nullptr,
+                                 CLSCTX_INPROC_SERVER,
+                                 IID_PPV_ARGS( &automation ) );
+
+  if ( FAILED( hr ) || !automation ) {
+    if ( shouldUninitializeCom ) {
+      CoUninitialize();
+    }
+    return {};
+  }
+
+  POINT point;
+  point.x = globalPos.x();
+  point.y = globalPos.y();
+
+  IUIAutomationElement * element = nullptr;
+  hr = automation->ElementFromPoint( point, &element );
+
+  if ( FAILED( hr ) || !element ) {
+    automation->Release();
+    if ( shouldUninitializeCom ) {
+      CoUninitialize();
+    }
+    return {};
+  }
+
+  IUIAutomationTreeWalker * walker = nullptr;
+  automation->get_ControlViewWalker( &walker );
+
+  QString result;
+  IUIAutomationElement * currentElement = element;
+
+  for ( int depth = 0; currentElement && depth < 8 && result.isEmpty(); ++depth ) {
+    IUIAutomationTextPattern * textPattern = nullptr;
+    hr = currentElement->GetCurrentPatternAs( UIA_TextPatternId, IID_PPV_ARGS( &textPattern ) );
+
+    if ( SUCCEEDED( hr ) && textPattern ) {
+      result = sutraStartupSelectedTextFromPattern( textPattern );
+      textPattern->Release();
+    }
+
+    if ( !result.isEmpty() || !walker ) {
+      break;
+    }
+
+    IUIAutomationElement * parentElement = nullptr;
+    hr = walker->GetParentElement( currentElement, &parentElement );
+    if ( FAILED( hr ) || !parentElement ) {
+      break;
+    }
+
+    if ( currentElement != element ) {
+      currentElement->Release();
+    }
+    currentElement = parentElement;
+  }
+
+  if ( currentElement && currentElement != element ) {
+    currentElement->Release();
+  }
+  if ( walker ) {
+    walker->Release();
+  }
+  element->Release();
+  automation->Release();
+
+  if ( shouldUninitializeCom ) {
+    CoUninitialize();
+  }
+
+  return result.trimmed();
+}
+
 QString sutraStartupCleanLookupText( const QString & text )
 {
   QString result = text.trimmed();
@@ -1315,6 +1731,63 @@ QString sutraStartupCleanLookupText( const QString & text )
 
   const int start = qMax( 0, firstCjk - 60 );
   return result.mid( start, 220 ).trimmed();
+}
+
+QString sutraStartupBestAutomaticLookupText( const QString & capturedText, const QString & contextText )
+{
+  const QString captured = sutraStartupCleanLookupText( capturedText );
+  const QString context = sutraStartupCleanLookupText( contextText );
+  const QString combined = !captured.isEmpty() ? captured : context;
+  if ( combined.isEmpty() ) {
+    return {};
+  }
+
+  bool hasCjk = false;
+  for ( const QChar & ch : combined ) {
+    if ( sutraStartupIsCjkIdeograph( ch ) ) {
+      hasCjk = true;
+      break;
+    }
+  }
+
+  if ( hasCjk ) {
+    QString known = sutraStartupBestKnownCjkTermInText( combined, context );
+    if ( known.isEmpty() ) {
+      known = sutraStartupBestKnownCjkTermInText( combined, captured.size() <= 8 ? captured : QString() );
+    }
+    if ( !known.isEmpty() ) {
+      return known;
+    }
+
+    // Last-resort longest-subphrase reduction for Office controls that expose
+    // the entire clause as both the point context and the selected "word".
+    // This mirrors progressively shortening the clause until a known glossary
+    // phrase remains, without returning an unbounded paragraph to the popup.
+    known = sutraStartupBestKnownCjkTermInText( combined );
+    if ( !known.isEmpty() ) {
+      return known;
+    }
+
+    if ( combined.size() > 16 ) {
+      const QString window = sutraStartupSmallCjkWindowAtOffset( combined, combined.size() / 2 );
+      if ( !window.isEmpty() ) {
+        return window;
+      }
+    }
+  }
+
+  if ( sutraStartupHasLatinLetter( combined ) ) {
+    const QString phrase = sutraStartupBestVietnamesePhraseFromLine( combined, context );
+    if ( !phrase.isEmpty() ) {
+      return phrase;
+    }
+  }
+
+  if ( !context.isEmpty() && !sutraStartupShouldUseLineFallbackForPhrase( context ) ) {
+    return context.left( 160 ).trimmed();
+  }
+
+  return combined.left( 160 ).trimmed();
 }
 
 
@@ -1469,6 +1942,14 @@ private:
     combo->addItem( QObject::tr( "Middle Click" ), static_cast< int >( SutraMouseLookupButton::Middle ) );
   }
 
+  static void populateCaptureModeCombo( QComboBox * combo )
+  {
+    combo->addItem( QObject::tr( "Automatic - detect phrase under pointer" ),
+                    static_cast< int >( SutraMouseLookupCaptureMode::Automatic ) );
+    combo->addItem( QObject::tr( "Manual - use selected text only" ),
+                    static_cast< int >( SutraMouseLookupCaptureMode::SelectedText ) );
+  }
+
   void enhanceMouseLookupSettings( QDialog * dialog )
   {
     QWidget * hotkeyTab = dialog->findChild< QWidget * >( QStringLiteral( "tab_hotkey" ) );
@@ -1508,6 +1989,17 @@ private:
     selectorLayout->addWidget( buttonCombo, 1 );
     groupLayout->addLayout( selectorLayout );
 
+    QHBoxLayout * captureLayout = new QHBoxLayout;
+    QLabel * captureLabel = new QLabel( QObject::tr( "Text capture:" ), group );
+    QComboBox * captureCombo = new QComboBox( group );
+    captureCombo->setObjectName( QStringLiteral( "sutraMouseLookupCaptureMode" ) );
+    populateCaptureModeCombo( captureCombo );
+    captureCombo->setToolTip( QObject::tr(
+      "Automatic detects the phrase under the pointer. Manual keeps your existing selection and translates only the highlighted text." ) );
+    captureLayout->addWidget( captureLabel );
+    captureLayout->addWidget( captureCombo, 1 );
+    groupLayout->addLayout( captureLayout );
+
     QLabel * currentLabel = new QLabel( group );
     currentLabel->setObjectName( QStringLiteral( "sutraMouseLookupCurrent" ) );
     currentLabel->setWordWrap( true );
@@ -1522,20 +2014,26 @@ private:
     int buttonIndex = buttonCombo->findData( static_cast< int >( current.button ) );
     buttonCombo->setCurrentIndex( buttonIndex >= 0 ? buttonIndex : 1 );
 
-    auto updateControls = [ enabled, modifierCombo, buttonCombo, currentLabel ] {
+    int captureIndex = captureCombo->findData( static_cast< int >( current.captureMode ) );
+    captureCombo->setCurrentIndex( captureIndex >= 0 ? captureIndex : 0 );
+
+    auto updateControls = [ enabled, modifierCombo, buttonCombo, captureCombo, currentLabel ] {
       modifierCombo->setEnabled( enabled->isChecked() );
       buttonCombo->setEnabled( enabled->isChecked() );
+      captureCombo->setEnabled( enabled->isChecked() );
 
       SutraMouseLookupSettings value;
       value.enabled = enabled->isChecked();
       value.modifiers = modifierCombo->currentData().toInt();
       value.button = static_cast< SutraMouseLookupButton >( buttonCombo->currentData().toInt() );
-      currentLabel->setText( QObject::tr( "Current combination: %1" ).arg( sutraMouseLookupSettingsLabel( value ) ) );
+      value.captureMode = static_cast< SutraMouseLookupCaptureMode >( captureCombo->currentData().toInt() );
+      currentLabel->setText( QObject::tr( "Current mouse lookup: %1" ).arg( sutraMouseLookupSettingsLabel( value ) ) );
     };
 
     QObject::connect( enabled, &QCheckBox::toggled, dialog, [ updateControls ] { updateControls(); } );
     QObject::connect( modifierCombo, &QComboBox::currentIndexChanged, dialog, [ updateControls ] { updateControls(); } );
     QObject::connect( buttonCombo, &QComboBox::currentIndexChanged, dialog, [ updateControls ] { updateControls(); } );
+    QObject::connect( captureCombo, &QComboBox::currentIndexChanged, dialog, [ updateControls ] { updateControls(); } );
     updateControls();
 
     const int insertionIndex = qMax( 0, tabLayout->count() - 1 );
@@ -1543,11 +2041,12 @@ private:
 
     if ( QDialogButtonBox * buttons = dialog->findChild< QDialogButtonBox * >( QStringLiteral( "buttonBox" ) ) ) {
       QObject::connect( buttons, &QDialogButtonBox::accepted, dialog,
-                        [ enabled, modifierCombo, buttonCombo ] {
+                        [ enabled, modifierCombo, buttonCombo, captureCombo ] {
         SutraMouseLookupSettings value;
         value.enabled = enabled->isChecked();
         value.modifiers = modifierCombo->currentData().toInt();
         value.button = static_cast< SutraMouseLookupButton >( buttonCombo->currentData().toInt() );
+        value.captureMode = static_cast< SutraMouseLookupCaptureMode >( captureCombo->currentData().toInt() );
         saveSutraMouseLookupSettings( value );
       } );
     }
@@ -1679,23 +2178,50 @@ private:
     }
   }
 
+  static bool isConfiguredButtonUpEvent( SutraMouseLookupButton button, WPARAM wParam )
+  {
+    switch ( button ) {
+      case SutraMouseLookupButton::Left:
+        return wParam == WM_LBUTTONUP;
+      case SutraMouseLookupButton::Middle:
+        return wParam == WM_MBUTTONUP;
+      case SutraMouseLookupButton::Right:
+      default:
+        return wParam == WM_RBUTTONUP;
+    }
+  }
+
   static LRESULT CALLBACK mouseProc( int code, WPARAM wParam, LPARAM lParam )
   {
     if ( code == HC_ACTION && instance ) {
+      // Once the configured DOWN event is consumed, also consume its matching
+      // UP event even if the user releases Ctrl/Alt/Shift first. Otherwise
+      // Office can receive half of a right click and open a context menu.
+      if ( instance->suppressButtonRelease
+        && isConfiguredButtonUpEvent( instance->suppressedButton, wParam ) ) {
+        instance->suppressButtonRelease = false;
+        return 1;
+      }
+
       const SutraMouseLookupSettings settings = loadSutraMouseLookupSettings();
 
       if ( settings.enabled
         && modifiersMatch( settings.modifiers )
         && isConfiguredButtonEvent( settings.button, wParam ) ) {
-        if ( isConfiguredButtonDownEvent( settings.button, wParam ) && !instance->lookupInProgress ) {
-          const MSLLHOOKSTRUCT * mouseInfo = reinterpret_cast< const MSLLHOOKSTRUCT * >( lParam );
-          const QPoint globalPos( mouseInfo->pt.x, mouseInfo->pt.y );
+        if ( isConfiguredButtonDownEvent( settings.button, wParam ) ) {
+          instance->suppressButtonRelease = true;
+          instance->suppressedButton = settings.button;
 
-          QTimer::singleShot( 0, instance, [ globalPos ] {
-            if ( instance ) {
-              instance->lookupAt( globalPos );
-            }
-          } );
+          if ( !instance->lookupInProgress ) {
+            const MSLLHOOKSTRUCT * mouseInfo = reinterpret_cast< const MSLLHOOKSTRUCT * >( lParam );
+            const QPoint globalPos( mouseInfo->pt.x, mouseInfo->pt.y );
+
+            QTimer::singleShot( 0, instance, [ globalPos ] {
+              if ( instance ) {
+                instance->lookupAt( globalPos );
+              }
+            } );
+          }
         }
 
         return 1;
@@ -1717,104 +2243,149 @@ private:
                               QStringList() << QStringLiteral( "--scanpopup" ) << lookupText );
   }
 
-  void lookupAt( const QPoint & globalPos )
+  void restoreClipboardAndFinish( const QString & previousClipboardText )
   {
-    lookupInProgress = true;
-
-    const QString contextText = sutraStartupUiAutomationTextAtPoint( globalPos );
-
-    if ( !contextText.trimmed().isEmpty()
-      && !sutraStartupShouldUseLineFallbackForPhrase( contextText ) ) {
-      openLookup( sutraStartupBestLineLookupText( contextText, QString() ) );
-      lookupInProgress = false;
-      return;
+    if ( QClipboard * clipboard = QApplication::clipboard() ) {
+      clipboard->setText( previousClipboardText, QClipboard::Clipboard );
     }
+    lookupInProgress = false;
+  }
 
+  void waitForClipboardText( const std::function< void( const QString & ) > & callback, int attempt = 0 )
+  {
     QClipboard * clipboard = QApplication::clipboard();
-
     if ( !clipboard ) {
-      lookupInProgress = false;
+      callback( QString() );
       return;
     }
 
-    const QString previousClipboardText = clipboard->text( QClipboard::Clipboard );
+    const QString text = clipboard->text( QClipboard::Clipboard );
+    if ( !text.trimmed().isEmpty() || attempt >= 15 ) {
+      callback( text );
+      return;
+    }
+
+    QTimer::singleShot( 70, this, [ this, callback, attempt ] {
+      waitForClipboardText( callback, attempt + 1 );
+    } );
+  }
+
+  void copyCurrentSelection( const std::function< void( const QString & ) > & callback )
+  {
+    QClipboard * clipboard = QApplication::clipboard();
+    if ( !clipboard ) {
+      callback( QString() );
+      return;
+    }
+
+    clipboard->clear( QClipboard::Clipboard );
+    sendSutraStartupCtrlC();
+    waitForClipboardText( callback );
+  }
+
+  void lookupSelectedText( const QPoint & globalPos, const QString & previousClipboardText )
+  {
+    releaseSutraStartupControlKeys();
+    releaseSutraStartupAltKeys();
+    releaseSutraStartupShiftKeys();
+
+    // The configured mouse click is suppressed by the low-level hook, so the
+    // user's highlighted selection remains intact. UI Automation avoids any
+    // visible Ctrl+C operation when Office exposes GetSelection correctly.
+    const QString selectedByUiAutomation = sutraStartupUiAutomationSelectedTextAtPoint( globalPos );
+    if ( !selectedByUiAutomation.trimmed().isEmpty() ) {
+      openLookup( selectedByUiAutomation );
+      restoreClipboardAndFinish( previousClipboardText );
+      return;
+    }
+
+    copyCurrentSelection( [ this, previousClipboardText ]( const QString & selectedText ) {
+      if ( !selectedText.trimmed().isEmpty() ) {
+        openLookup( selectedText );
+      }
+      restoreClipboardAndFinish( previousClipboardText );
+    } );
+  }
+
+  void lookupAutomaticText( const QPoint & globalPos, const QString & previousClipboardText )
+  {
+    const QString contextText = sutraStartupUiAutomationTextAtPoint( globalPos );
+    const QString directLookup = sutraStartupBestAutomaticLookupText( QString(), contextText );
+
+    if ( !directLookup.trimmed().isEmpty()
+      && !sutraStartupShouldUseLineFallbackForPhrase( directLookup ) ) {
+      openLookup( directLookup );
+      restoreClipboardAndFinish( previousClipboardText );
+      return;
+    }
 
     releaseSutraStartupControlKeys();
     releaseSutraStartupAltKeys();
     releaseSutraStartupShiftKeys();
     sendSutraStartupLeftDoubleClickAt( globalPos );
 
-    QTimer::singleShot( 140, this, [ this, previousClipboardText, globalPos ] {
-      QClipboard * clipboard = QApplication::clipboard();
+    // Office 365 can take noticeably longer than Office 2010 to publish the
+    // selection to the clipboard, especially across 64-bit/32-bit boundaries.
+    QTimer::singleShot( 220, this, [ this, previousClipboardText, globalPos, contextText ] {
+      copyCurrentSelection( [ this, previousClipboardText, globalPos, contextText ]( const QString & capturedText ) {
+        const QString lookupText = sutraStartupBestAutomaticLookupText( capturedText, contextText );
 
-      if ( !clipboard ) {
-        lookupInProgress = false;
-        return;
-      }
-
-      clipboard->clear( QClipboard::Clipboard );
-      sendSutraStartupCtrlC();
-
-      QTimer::singleShot( 220, this, [ this, previousClipboardText, globalPos ] {
-        QClipboard * clipboard = QApplication::clipboard();
-
-        if ( !clipboard ) {
-          lookupInProgress = false;
+        if ( !lookupText.trimmed().isEmpty()
+          && !sutraStartupShouldUseLineFallbackForPhrase( lookupText ) ) {
+          openLookup( lookupText );
+          restoreClipboardAndFinish( previousClipboardText );
           return;
         }
 
-        const QString capturedText = clipboard->text( QClipboard::Clipboard );
-
-        if ( !sutraStartupShouldUseLineFallbackForPhrase( capturedText ) ) {
-          if ( !capturedText.trimmed().isEmpty() ) {
-            openLookup( capturedText );
-          }
-
-          clipboard->setText( previousClipboardText, QClipboard::Clipboard );
-          lookupInProgress = false;
-          return;
-        }
-
+        // Last compatibility fallback for controls that expose only one CJK
+        // character or one Latin word at the point. Select the visual line,
+        // then reduce it back to the longest known phrase around the anchor.
         sendSutraStartupLineSelectionAt( globalPos );
-
-        QTimer::singleShot( 120, this, [ this, previousClipboardText, capturedText ] {
-          QClipboard * clipboard = QApplication::clipboard();
-
-          if ( !clipboard ) {
-            lookupInProgress = false;
-            return;
-          }
-
-          clipboard->clear( QClipboard::Clipboard );
-          sendSutraStartupCtrlC();
-
-          QTimer::singleShot( 220, this, [ this, previousClipboardText, capturedText ] {
-            QClipboard * clipboard = QApplication::clipboard();
-
-            if ( !clipboard ) {
-              lookupInProgress = false;
-              return;
+        QTimer::singleShot( 180, this, [ this, previousClipboardText, capturedText, contextText ] {
+          copyCurrentSelection( [ this, previousClipboardText, capturedText, contextText ]( const QString & lineText ) {
+            QString finalLookup = sutraStartupBestAutomaticLookupText( lineText,
+                                                                       !capturedText.trimmed().isEmpty()
+                                                                         ? capturedText
+                                                                         : contextText );
+            if ( finalLookup.trimmed().isEmpty() ) {
+              finalLookup = !capturedText.trimmed().isEmpty() ? capturedText : contextText;
             }
 
-            const QString lineText = clipboard->text( QClipboard::Clipboard ).trimmed();
-
-            if ( !lineText.isEmpty() && lineText != capturedText.trimmed() ) {
-              openLookup( sutraStartupBestLineLookupText( lineText, capturedText ) );
+            if ( !finalLookup.trimmed().isEmpty() ) {
+              openLookup( finalLookup );
             }
-            else if ( !capturedText.trimmed().isEmpty() ) {
-              openLookup( capturedText );
-            }
-
-            clipboard->setText( previousClipboardText, QClipboard::Clipboard );
-            lookupInProgress = false;
+            restoreClipboardAndFinish( previousClipboardText );
           } );
         } );
       } );
     } );
   }
 
+  void lookupAt( const QPoint & globalPos )
+  {
+    lookupInProgress = true;
+
+    QClipboard * clipboard = QApplication::clipboard();
+    if ( !clipboard ) {
+      lookupInProgress = false;
+      return;
+    }
+
+    const QString previousClipboardText = clipboard->text( QClipboard::Clipboard );
+    const SutraMouseLookupSettings settings = loadSutraMouseLookupSettings();
+
+    if ( settings.captureMode == SutraMouseLookupCaptureMode::SelectedText ) {
+      lookupSelectedText( globalPos, previousClipboardText );
+    }
+    else {
+      lookupAutomaticText( globalPos, previousClipboardText );
+    }
+  }
+
   HHOOK hook = nullptr;
   bool lookupInProgress = false;
+  bool suppressButtonRelease = false;
+  SutraMouseLookupButton suppressedButton = SutraMouseLookupButton::Right;
 
   static SutraStartupMouseLookupHook * instance;
 };
