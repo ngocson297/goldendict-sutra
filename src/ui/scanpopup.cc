@@ -39,6 +39,7 @@
   #pragma comment( lib, "oleaut32.lib" )
 #endif
 #include <QHBoxLayout>
+#include <QFrame>
 #include <QUrl>
 #include <algorithm>
 #include "scanpopup.hh"
@@ -617,6 +618,78 @@ QIcon sutraPopupThemeToggleIcon( SutraPopupThemeMode mode, const QColor & color 
   return QIcon( pixmap );
 }
 
+
+QColor sutraPopupToolbarIconColor( bool enabled )
+{
+  if ( enabled ) {
+    return sutraPopupActiveTextColor();
+  }
+  return sutraPopupBorderColor( sutraPopupActiveBackgroundColor(), sutraPopupActiveTextColor() );
+}
+
+QIcon sutraPopupNavigationIcon( bool forward, const QColor & color )
+{
+  QPixmap pixmap( 18, 18 );
+  pixmap.fill( Qt::transparent );
+
+  QPainter painter( &pixmap );
+  painter.setRenderHint( QPainter::Antialiasing, true );
+  painter.setPen( QPen( color, 1.8, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin ) );
+
+  const qreal direction = forward ? 1.0 : -1.0;
+  const QPointF tip( 9.0 + direction * 4.0, 9.0 );
+  painter.drawLine( QPointF( 9.0 - direction * 4.0, 9.0 ), tip );
+  painter.drawLine( tip, QPointF( 9.0 + direction * 0.5, 4.8 ) );
+  painter.drawLine( tip, QPointF( 9.0 + direction * 0.5, 13.2 ) );
+  return QIcon( pixmap );
+}
+
+QIcon sutraPopupHistoryIcon( const QColor & color )
+{
+  QPixmap pixmap( 18, 18 );
+  pixmap.fill( Qt::transparent );
+
+  QPainter painter( &pixmap );
+  painter.setRenderHint( QPainter::Antialiasing, true );
+  painter.setPen( QPen( color, 1.55, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin ) );
+  painter.setBrush( Qt::NoBrush );
+  painter.drawEllipse( QRectF( 3.0, 3.0, 12.0, 12.0 ) );
+  painter.drawLine( QPointF( 9.0, 5.7 ), QPointF( 9.0, 9.2 ) );
+  painter.drawLine( QPointF( 9.0, 9.2 ), QPointF( 11.7, 10.8 ) );
+  return QIcon( pixmap );
+}
+
+QIcon sutraPopupNoteIcon( const QColor & color, bool hasNote )
+{
+  QPixmap pixmap( 18, 18 );
+  pixmap.fill( Qt::transparent );
+
+  QPainter painter( &pixmap );
+  painter.setRenderHint( QPainter::Antialiasing, true );
+  painter.setPen( QPen( color, 1.45, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin ) );
+  painter.setBrush( Qt::NoBrush );
+
+  QPainterPath page;
+  page.moveTo( 4.0, 2.8 );
+  page.lineTo( 11.5, 2.8 );
+  page.lineTo( 14.0, 5.4 );
+  page.lineTo( 14.0, 15.0 );
+  page.lineTo( 4.0, 15.0 );
+  page.closeSubpath();
+  painter.drawPath( page );
+  painter.drawLine( QPointF( 11.5, 2.8 ), QPointF( 11.5, 5.5 ) );
+  painter.drawLine( QPointF( 11.5, 5.5 ), QPointF( 14.0, 5.5 ) );
+  painter.drawLine( QPointF( 6.2, 8.1 ), QPointF( 11.8, 8.1 ) );
+  painter.drawLine( QPointF( 6.2, 10.6 ), QPointF( 11.8, 10.6 ) );
+
+  if ( hasNote ) {
+    painter.setPen( Qt::NoPen );
+    painter.setBrush( color );
+    painter.drawEllipse( QRectF( 12.3, 12.3, 4.2, 4.2 ) );
+  }
+  return QIcon( pixmap );
+}
+
 QString sutraPopupThemeModeLabel( SutraPopupThemeMode mode )
 {
   switch ( mode ) {
@@ -642,6 +715,7 @@ QString sutraApplyPopupThemeToHtml( QString html )
     const QString customStyle = QStringLiteral(
       "<style id='sutra-popup-custom-colors'>"
       "html,body{background:%1!important;color:%2!important;}"
+      "body{padding-bottom:52px!important;box-sizing:border-box!important;}"
       "body *{color:%2!important;border-color:%2!important;}"
       "body div,body section,body article,body header,body footer,body main,body aside,"
       "body p,body span,body h1,body h2,body h3,body h4,body h5,body h6,body ul,body ol,body li,"
@@ -757,6 +831,8 @@ QString sutraPopupArticleThemeScript( bool dark, bool monochrome )
             }
             html[data-sutra-popup-theme="monochrome"] body {
               min-height: 100vh !important;
+              padding-bottom: 52px !important;
+              box-sizing: border-box !important;
               background-color: %1 !important;
               color: %2 !important;
               filter: none !important;
@@ -887,6 +963,8 @@ QString sutraPopupArticleThemeScript( bool dark, bool monochrome )
             }
             html[data-sutra-popup-theme="light"] body {
               min-height: 100vh !important;
+              padding-bottom: 52px !important;
+              box-sizing: border-box !important;
               background-color: #ffffff !important;
               color: #111827 !important;
               filter: none !important;
@@ -937,6 +1015,8 @@ QString sutraPopupArticleThemeScript( bool dark, bool monochrome )
         }
         html[data-sutra-popup-theme="dark"] body {
           min-height: 100vh !important;
+          padding-bottom: 52px !important;
+          box-sizing: border-box !important;
           background-color: #0b1220 !important;
           color: #e5e7eb !important;
         }
@@ -1054,6 +1134,12 @@ QString sutraPopupCornerToolsThemeStyleSheet()
       "QToolButton:hover {"
       "  background: %4;"
       "  border-radius: 3px;"
+      "}"
+      "QToolButton:pressed { background: %4; padding-top: 2px; }"
+      "QToolButton:focus { border: 1px solid %2; border-radius: 3px; }"
+      "QToolButton:disabled { color: %2; }"
+      "QFrame[sutraToolbarSeparator=\"true\"] {"
+      "  background: %2; border: 0; min-width: 1px; max-width: 1px; margin: 4px 2px;"
       "}" ).arg( background.name( QColor::HexRgb ),
                     border.name( QColor::HexRgb ),
                     text.name( QColor::HexRgb ),
@@ -1080,6 +1166,12 @@ QString sutraPopupCornerToolsThemeStyleSheet()
       "QToolButton:hover {"
       "  background: rgba(96, 165, 250, 70);"
       "  border-radius: 3px;"
+      "}"
+      "QToolButton:pressed { background: rgba(96, 165, 250, 105); padding-top: 2px; }"
+      "QToolButton:focus { border: 1px solid #60a5fa; border-radius: 3px; }"
+      "QToolButton:disabled { color: #64748b; }"
+      "QFrame[sutraToolbarSeparator=\"true\"] {"
+      "  background: #475569; border: 0; min-width: 1px; max-width: 1px; margin: 4px 2px;"
       "}" );
   }
 
@@ -1102,6 +1194,12 @@ QString sutraPopupCornerToolsThemeStyleSheet()
     "QToolButton:hover {"
     "  background: rgba(80, 140, 220, 60);"
     "  border-radius: 3px;"
+    "}"
+    "QToolButton:pressed { background: rgba(80, 140, 220, 95); padding-top: 2px; }"
+    "QToolButton:focus { border: 1px solid #2563eb; border-radius: 3px; }"
+    "QToolButton:disabled { color: #94a3b8; }"
+    "QFrame[sutraToolbarSeparator=\"true\"] {"
+    "  background: #cbd5e1; border: 0; min-width: 1px; max-width: 1px; margin: 4px 2px;"
     "}" );
 }
 
@@ -1223,6 +1321,31 @@ void updateSutraPopupThemeToggleButton( QWidget * popup )
          popup->findChild< QToolButton * >( sutraPopupColorsButtonObjectName() ) ) {
     colorsButton->setIcon( sutraPopupColorSwatchIcon( sutraPopupActiveBackgroundColor() ) );
     colorsButton->setToolTip( QObject::tr( "Popup text and background colors" ) );
+  }
+
+  const QColor iconColor = sutraPopupActiveTextColor();
+  if ( QToolButton * back = popup->findChild< QToolButton * >( QStringLiteral( "sutraHistoryBackButton" ) ) ) {
+    back->setText( QString() );
+    back->setIcon( sutraPopupNavigationIcon( false, sutraPopupToolbarIconColor( back->isEnabled() ) ) );
+    back->setIconSize( QSize( 18, 18 ) );
+  }
+  if ( QToolButton * forward = popup->findChild< QToolButton * >( QStringLiteral( "sutraHistoryForwardButton" ) ) ) {
+    forward->setText( QString() );
+    forward->setIcon( sutraPopupNavigationIcon( true, sutraPopupToolbarIconColor( forward->isEnabled() ) ) );
+    forward->setIconSize( QSize( 18, 18 ) );
+  }
+  if ( QToolButton * history = popup->findChild< QToolButton * >( QStringLiteral( "sutraHistoryButton" ) ) ) {
+    history->setText( QString() );
+    history->setIcon( sutraPopupHistoryIcon( iconColor ) );
+    history->setIconSize( QSize( 18, 18 ) );
+  }
+  if ( QToolButton * note = popup->findChild< QToolButton * >( QStringLiteral( "sutraNoteButton" ) ) ) {
+    const QString term = popup->property( "sutraCurrentLookupTerm" ).toString();
+    const QVariantMap notes = QSettings().value( QStringLiteral( "SutraEdition/PopupLookupNotes" ) ).toMap();
+    const bool hasNote = !term.isEmpty() && !notes.value( term ).toString().isEmpty();
+    note->setText( QString() );
+    note->setIcon( sutraPopupNoteIcon( sutraPopupToolbarIconColor( note->isEnabled() ), hasNote ) );
+    note->setIconSize( QSize( 18, 18 ) );
   }
 }
 
@@ -1852,6 +1975,42 @@ QString sutraPopupCornerToolsObjectName()
   return QStringLiteral( "sutraPopupCornerTools" );
 }
 
+void updateSutraPopupCornerToolsResponsive( QWidget * popup )
+{
+  if ( !popup ) {
+    return;
+  }
+
+  const int width = popup->width();
+  const bool showNavigation = width >= 430;
+  const bool showZoom = width >= 430;
+  const bool showExtended = width >= 620;
+
+  const auto setVisible = [ popup ]( const char * objectName, bool visible ) {
+    if ( QWidget * widget = popup->findChild< QWidget * >( QString::fromLatin1( objectName ) ) ) {
+      widget->setVisible( visible );
+    }
+  };
+
+  setVisible( "sutraHistoryBackButton", showNavigation );
+  setVisible( "sutraHistoryForwardButton", showNavigation );
+  setVisible( "sutraPopupZoomOutButton", showZoom );
+  setVisible( "sutraPopupZoomIndicator", showZoom );
+  setVisible( "sutraPopupZoomInButton", showZoom );
+  setVisible( "sutraPopupColorsButton", showExtended );
+  setVisible( "sutraPopupQuickFixButton", showExtended );
+  setVisible( "sutraPopupQuickFitButton", showExtended );
+
+  setVisible( "sutraSeparatorHistoryZoom", showZoom );
+  setVisible( "sutraSeparatorZoomAppearance", showZoom );
+  setVisible( "sutraSeparatorAppearanceLayout", showExtended );
+
+  if ( QToolButton * options = popup->findChild< QToolButton * >( QStringLiteral( "sutraPopupOptionsButton" ) ) ) {
+    options->setToolTip( showExtended ? QObject::tr( "Popup settings" )
+                                      : QObject::tr( "Popup settings and hidden compact controls" ) );
+  }
+}
+
 void positionSutraPopupCornerTools( QWidget * popup )
 {
   if ( !popup ) {
@@ -1863,6 +2022,7 @@ void positionSutraPopupCornerTools( QWidget * popup )
     return;
   }
 
+  updateSutraPopupCornerToolsResponsive( popup );
   tools->adjustSize();
 
   constexpr int margin = 10;
@@ -2821,7 +2981,7 @@ QString glossaryHtmlFinalUxBaseV6( const QString & primaryTerm, const QStringLis
   html += QStringLiteral( "<html><head><meta charset='utf-8'>" );
   html += QStringLiteral(
     "<style>"
-    "body{font-family:'Segoe UI','Noto Sans','Arial',sans-serif;font-size:%1px;line-height:1.58;margin:0;padding:14px;background:#f6f8fb;color:#1f2937;}"
+    "body{font-family:'Segoe UI','Noto Sans','Arial',sans-serif;font-size:%1px;line-height:1.58;margin:0;padding:14px 14px 56px;background:#f6f8fb;color:#1f2937;}"
     ".wrap{max-width:980px;margin:0 auto;}"
     ".hero{background:linear-gradient(135deg,#eef6ff 0%,#f8fbff 100%);border:1px solid #d7e7fb;border-radius:14px;padding:14px 16px;margin-bottom:12px;}"
     ".hero-title{font-size:%2px;font-weight:800;color:#111827;margin:0 0 4px 0;}"
@@ -3551,7 +3711,7 @@ QString webReferenceHtml( const QString & primaryTerm, const QStringList & detec
   html += QStringLiteral( "<html><head><meta charset='utf-8'>" );
   html += QStringLiteral(
     "<style>"
-    "body{font-family:'Segoe UI','Noto Sans','Arial',sans-serif;font-size:%1px;line-height:1.55;margin:0;padding:14px;background:#f6f8fb;color:#1f2937;}"
+    "body{font-family:'Segoe UI','Noto Sans','Arial',sans-serif;font-size:%1px;line-height:1.55;margin:0;padding:14px 14px 56px;background:#f6f8fb;color:#1f2937;}"
     ".wrap{max-width:980px;margin:0 auto;}"
     ".hero{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:14px 16px;margin-bottom:12px;box-shadow:0 4px 14px rgba(15,23,42,.05);}"
     ".title{font-size:%2px;font-weight:850;margin-bottom:4px;color:#111827;}"
@@ -4041,12 +4201,19 @@ void updateSutraLookupFeatureControls( QWidget * popup, const QString & term = Q
 
   if ( QToolButton * back = popup->findChild< QToolButton * >( sutraHistoryBackButtonObjectName() ) ) {
     back->setEnabled( historyIndex > 0 );
+    back->setIcon( sutraPopupNavigationIcon( false, sutraPopupToolbarIconColor( back->isEnabled() ) ) );
   }
   if ( QToolButton * forward = popup->findChild< QToolButton * >( sutraHistoryForwardButtonObjectName() ) ) {
     forward->setEnabled( historyIndex >= 0 && historyIndex + 1 < history.size() );
+    forward->setIcon( sutraPopupNavigationIcon( true, sutraPopupToolbarIconColor( forward->isEnabled() ) ) );
   }
   if ( QToolButton * historyButton = popup->findChild< QToolButton * >( sutraHistoryButtonObjectName() ) ) {
-    historyButton->setToolTip( QObject::tr( "Lookup history and favorites (%1)" ).arg( history.size() ) );
+    const QString label = QObject::tr( "Lookup history and favorites (%1)" ).arg( history.size() );
+    historyButton->setToolTip( label );
+    historyButton->setAccessibleName( label );
+    historyButton->setText( QString() );
+    historyButton->setIcon( sutraPopupHistoryIcon( sutraPopupActiveTextColor() ) );
+    historyButton->setIconSize( QSize( 18, 18 ) );
   }
 
   const bool favorite = !currentTerm.isEmpty() && loadSutraLookupFavorites().contains( currentTerm );
@@ -4059,9 +4226,13 @@ void updateSutraLookupFeatureControls( QWidget * popup, const QString & term = Q
 
   if ( QToolButton * noteButton = popup->findChild< QToolButton * >( sutraNoteButtonObjectName() ) ) {
     const bool hasNote = !currentTerm.isEmpty() && !sutraNoteForTerm( currentTerm ).isEmpty();
-    noteButton->setText( hasNote ? QStringLiteral( "N*" ) : QStringLiteral( "N" ) );
-    noteButton->setToolTip( hasNote ? QObject::tr( "Edit personal note" ) : QObject::tr( "Add personal note" ) );
     noteButton->setEnabled( !currentTerm.isEmpty() );
+    noteButton->setText( QString() );
+    noteButton->setIcon( sutraPopupNoteIcon( sutraPopupToolbarIconColor( noteButton->isEnabled() ), hasNote ) );
+    noteButton->setIconSize( QSize( 18, 18 ) );
+    noteButton->setToolTip( hasNote ? QObject::tr( "Edit personal note" ) : QObject::tr( "Add personal note" ) );
+    noteButton->setAccessibleName( hasNote ? QObject::tr( "Edit personal note" )
+                                           : QObject::tr( "Add personal note" ) );
   }
 }
 
@@ -4975,8 +5146,8 @@ ScanPopup::ScanPopup( QWidget * parent,
   sutraPopupCornerTools->setStyleSheet( sutraPopupCornerToolsThemeStyleSheet() );
 
   QHBoxLayout * sutraPopupCornerLayout = new QHBoxLayout( sutraPopupCornerTools );
-  sutraPopupCornerLayout->setContentsMargins( 4, 2, 4, 2 );
-  sutraPopupCornerLayout->setSpacing( 2 );
+  sutraPopupCornerLayout->setContentsMargins( 5, 3, 5, 3 );
+  sutraPopupCornerLayout->setSpacing( 3 );
 
   const auto openSutraHistoryTerm = [ this ]( const QString & term, bool preserveHistoryPosition ) {
     const QString normalized = normalizeSmartLookupInput( term );
@@ -5101,6 +5272,28 @@ ScanPopup::ScanPopup( QWidget * parent,
     const QStringList favorites = loadSutraLookupFavorites();
     const QString currentTerm   = sutraCurrentLookupTerm( this );
 
+    int historyIndex = property( "sutraLookupHistoryIndex" ).toInt();
+    if ( history.isEmpty() ) {
+      historyIndex = -1;
+    }
+    else if ( historyIndex < 0 || historyIndex >= history.size() ) {
+      historyIndex = history.size() - 1;
+    }
+
+    QAction * previousLookupAction = sutraLookupLibraryMenu->addAction( tr( "Previous lookup" ) );
+    QAction * nextLookupAction = sutraLookupLibraryMenu->addAction( tr( "Next lookup" ) );
+    previousLookupAction->setShortcut( QKeySequence( Qt::ALT | Qt::Key_Left ) );
+    nextLookupAction->setShortcut( QKeySequence( Qt::ALT | Qt::Key_Right ) );
+    previousLookupAction->setEnabled( historyIndex > 0 );
+    nextLookupAction->setEnabled( historyIndex >= 0 && historyIndex + 1 < history.size() );
+    connect( previousLookupAction, &QAction::triggered, this, [ navigateSutraLookupHistory ] {
+      navigateSutraLookupHistory( -1 );
+    } );
+    connect( nextLookupAction, &QAction::triggered, this, [ navigateSutraLookupHistory ] {
+      navigateSutraLookupHistory( 1 );
+    } );
+    sutraLookupLibraryMenu->addSeparator();
+
     // Keep productivity features available without occupying permanent space
     // in the compact bottom toolbar.
     sutraLookupLibraryMenu->addMenu( sutraQuickCopyMenu );
@@ -5204,26 +5397,35 @@ ScanPopup::ScanPopup( QWidget * parent,
 
   QToolButton * sutraHistoryBackButton = new QToolButton( sutraPopupCornerTools );
   sutraHistoryBackButton->setObjectName( sutraHistoryBackButtonObjectName() );
-  sutraHistoryBackButton->setText( QStringLiteral( "<" ) );
+  sutraHistoryBackButton->setIcon( sutraPopupNavigationIcon( false, sutraPopupActiveTextColor() ) );
+  sutraHistoryBackButton->setIconSize( QSize( 18, 18 ) );
   sutraHistoryBackButton->setToolTip( tr( "Previous lookup (Alt+Left)" ) );
+  sutraHistoryBackButton->setAccessibleName( tr( "Previous lookup" ) );
   sutraHistoryBackButton->setAutoRaise( true );
 
   QToolButton * sutraHistoryForwardButton = new QToolButton( sutraPopupCornerTools );
   sutraHistoryForwardButton->setObjectName( sutraHistoryForwardButtonObjectName() );
-  sutraHistoryForwardButton->setText( QStringLiteral( ">" ) );
+  sutraHistoryForwardButton->setIcon( sutraPopupNavigationIcon( true, sutraPopupActiveTextColor() ) );
+  sutraHistoryForwardButton->setIconSize( QSize( 18, 18 ) );
   sutraHistoryForwardButton->setToolTip( tr( "Next lookup (Alt+Right)" ) );
+  sutraHistoryForwardButton->setAccessibleName( tr( "Next lookup" ) );
   sutraHistoryForwardButton->setAutoRaise( true );
 
   QToolButton * sutraHistoryButton = new QToolButton( sutraPopupCornerTools );
   sutraHistoryButton->setObjectName( sutraHistoryButtonObjectName() );
-  sutraHistoryButton->setText( QStringLiteral( "H" ) );
+  sutraHistoryButton->setIcon( sutraPopupHistoryIcon( sutraPopupActiveTextColor() ) );
+  sutraHistoryButton->setIconSize( QSize( 18, 18 ) );
+  sutraHistoryButton->setToolTip( tr( "Lookup history and favorites" ) );
+  sutraHistoryButton->setAccessibleName( tr( "Lookup history and favorites" ) );
   sutraHistoryButton->setMenu( sutraLookupLibraryMenu );
   sutraHistoryButton->setPopupMode( QToolButton::InstantPopup );
   sutraHistoryButton->setAutoRaise( true );
 
   QToolButton * sutraNoteButton = new QToolButton( sutraPopupCornerTools );
   sutraNoteButton->setObjectName( sutraNoteButtonObjectName() );
-  sutraNoteButton->setText( QStringLiteral( "N" ) );
+  sutraNoteButton->setIcon( sutraPopupNoteIcon( sutraPopupActiveTextColor(), false ) );
+  sutraNoteButton->setIconSize( QSize( 18, 18 ) );
+  sutraNoteButton->setAccessibleName( tr( "Personal note" ) );
   sutraNoteButton->setAutoRaise( true );
 
   connect( sutraHistoryBackButton, &QToolButton::clicked, this, [ navigateSutraLookupHistory ] {
@@ -5318,23 +5520,29 @@ ScanPopup::ScanPopup( QWidget * parent,
   } );
 
   QToolButton * sutraPopupZoomOutButton = new QToolButton( sutraPopupCornerTools );
+  sutraPopupZoomOutButton->setObjectName( QStringLiteral( "sutraPopupZoomOutButton" ) );
   sutraPopupZoomOutButton->setText( QStringLiteral( "-" ) );
+  sutraPopupZoomOutButton->setAccessibleName( tr( "Zoom out" ) );
   sutraPopupZoomOutButton->setToolTip( tr( "Zoom out (Ctrl+-)" ) );
   sutraPopupZoomOutButton->setAutoRaise( true );
 
   QToolButton * sutraPopupZoomIndicator = new QToolButton( sutraPopupCornerTools );
   sutraPopupZoomIndicator->setObjectName( sutraPopupZoomIndicatorObjectName() );
+  sutraPopupZoomIndicator->setAccessibleName( tr( "Reset popup zoom" ) );
   sutraPopupZoomIndicator->setMinimumWidth( 46 );
   sutraPopupZoomIndicator->setToolTip( tr( "Reset zoom to 100% (Ctrl+0)" ) );
   sutraPopupZoomIndicator->setAutoRaise( true );
 
   QToolButton * sutraPopupZoomInButton = new QToolButton( sutraPopupCornerTools );
+  sutraPopupZoomInButton->setObjectName( QStringLiteral( "sutraPopupZoomInButton" ) );
   sutraPopupZoomInButton->setText( QStringLiteral( "+" ) );
+  sutraPopupZoomInButton->setAccessibleName( tr( "Zoom in" ) );
   sutraPopupZoomInButton->setToolTip( tr( "Zoom in (Ctrl++)" ) );
   sutraPopupZoomInButton->setAutoRaise( true );
 
   QToolButton * sutraPopupThemeToggleButton = new QToolButton( sutraPopupCornerTools );
   sutraPopupThemeToggleButton->setObjectName( sutraPopupThemeToggleButtonObjectName() );
+  sutraPopupThemeToggleButton->setAccessibleName( tr( "Toggle popup theme" ) );
   sutraPopupThemeToggleButton->setMinimumWidth( 26 );
   sutraPopupThemeToggleButton->setIconSize( QSize( 20, 20 ) );
   sutraPopupThemeToggleButton->setToolButtonStyle( Qt::ToolButtonIconOnly );
@@ -5342,35 +5550,62 @@ ScanPopup::ScanPopup( QWidget * parent,
 
   QToolButton * sutraPopupColorsButton = new QToolButton( sutraPopupCornerTools );
   sutraPopupColorsButton->setObjectName( sutraPopupColorsButtonObjectName() );
+  sutraPopupColorsButton->setAccessibleName( tr( "Popup colors" ) );
   sutraPopupColorsButton->setMinimumWidth( 24 );
   sutraPopupColorsButton->setAutoRaise( true );
   sutraPopupColorsButton->setIcon( sutraPopupColorSwatchIcon( sutraPopupActiveBackgroundColor() ) );
   sutraPopupColorsButton->setToolTip( tr( "Popup text and background colors" ) );
 
   QToolButton * sutraPopupOptionsButton = new QToolButton( sutraPopupCornerTools );
+  sutraPopupOptionsButton->setObjectName( QStringLiteral( "sutraPopupOptionsButton" ) );
   sutraPopupOptionsButton->setText( QStringLiteral( "⚙" ) );
+  sutraPopupOptionsButton->setAccessibleName( tr( "Popup settings" ) );
   sutraPopupOptionsButton->setToolTip( tr( "Popup settings" ) );
   sutraPopupOptionsButton->setAutoRaise( true );
 
   QToolButton * sutraPopupQuickFixButton = new QToolButton( sutraPopupCornerTools );
+  sutraPopupQuickFixButton->setObjectName( QStringLiteral( "sutraPopupQuickFixButton" ) );
   sutraPopupQuickFixButton->setText( QStringLiteral( "📌" ) );
+  sutraPopupQuickFixButton->setAccessibleName( tr( "Fix current size and position" ) );
   sutraPopupQuickFixButton->setToolTip( tr( "Fix current size and position" ) );
   sutraPopupQuickFixButton->setAutoRaise( true );
 
   QToolButton * sutraPopupQuickFitButton = new QToolButton( sutraPopupCornerTools );
+  sutraPopupQuickFitButton->setObjectName( QStringLiteral( "sutraPopupQuickFitButton" ) );
   sutraPopupQuickFitButton->setText( QStringLiteral( "▣" ) );
+  sutraPopupQuickFitButton->setAccessibleName( tr( "Fit window size to results" ) );
   sutraPopupQuickFitButton->setToolTip( tr( "Fit window size to results" ) );
   sutraPopupQuickFitButton->setAutoRaise( true );
+
+  const auto createSutraToolbarSeparator = [ sutraPopupCornerTools ]( const QString & objectName ) {
+    QFrame * separator = new QFrame( sutraPopupCornerTools );
+    separator->setObjectName( objectName );
+    separator->setProperty( "sutraToolbarSeparator", true );
+    separator->setFrameShape( QFrame::VLine );
+    separator->setFrameShadow( QFrame::Plain );
+    separator->setSizePolicy( QSizePolicy::Fixed, QSizePolicy::Expanding );
+    return separator;
+  };
+
+  QFrame * sutraSeparatorHistoryZoom =
+    createSutraToolbarSeparator( QStringLiteral( "sutraSeparatorHistoryZoom" ) );
+  QFrame * sutraSeparatorZoomAppearance =
+    createSutraToolbarSeparator( QStringLiteral( "sutraSeparatorZoomAppearance" ) );
+  QFrame * sutraSeparatorAppearanceLayout =
+    createSutraToolbarSeparator( QStringLiteral( "sutraSeparatorAppearanceLayout" ) );
 
   sutraPopupCornerLayout->addWidget( sutraHistoryBackButton );
   sutraPopupCornerLayout->addWidget( sutraHistoryForwardButton );
   sutraPopupCornerLayout->addWidget( sutraHistoryButton );
   sutraPopupCornerLayout->addWidget( sutraNoteButton );
+  sutraPopupCornerLayout->addWidget( sutraSeparatorHistoryZoom );
   sutraPopupCornerLayout->addWidget( sutraPopupZoomOutButton );
   sutraPopupCornerLayout->addWidget( sutraPopupZoomIndicator );
   sutraPopupCornerLayout->addWidget( sutraPopupZoomInButton );
+  sutraPopupCornerLayout->addWidget( sutraSeparatorZoomAppearance );
   sutraPopupCornerLayout->addWidget( sutraPopupThemeToggleButton );
   sutraPopupCornerLayout->addWidget( sutraPopupColorsButton );
+  sutraPopupCornerLayout->addWidget( sutraSeparatorAppearanceLayout );
   sutraPopupCornerLayout->addWidget( sutraPopupOptionsButton );
   sutraPopupCornerLayout->addWidget( sutraPopupQuickFixButton );
   sutraPopupCornerLayout->addWidget( sutraPopupQuickFitButton );
