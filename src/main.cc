@@ -6,8 +6,31 @@
 #include "mainwindow.hh"
 #include "version.hh"
 #include <QClipboard>
+#include <QApplication>
+#include <QBoxLayout>
+#include <QCheckBox>
+#include <QComboBox>
+#include <QDialog>
+#include <QDialogButtonBox>
+#include <QEvent>
+#include <QGroupBox>
+#include <QHBoxLayout>
+#include <QLabel>
+#include <QPalette>
+#include <QPointer>
+#include <QStyle>
+#include <QStyleHints>
+#include <QTabWidget>
+#include <QVBoxLayout>
+#include <QWidget>
 #include <QDateTime>
 #include <QElapsedTimer>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonValue>
+#include <QRegularExpression>
+#include <QStringList>
 #include <QPoint>
 #include <QProcess>
 #include <QSettings>
@@ -26,6 +49,8 @@
 #include <QSessionManager>
 #include <QString>
 #include <QtWebEngineCore/QWebEngineUrlScheme>
+#include <algorithm>
+#include <limits>
 #include <stdio.h>
 #if defined( Q_OS_UNIX )
   #include "unix/ksignalhandler.hh"
@@ -271,26 +296,157 @@ void processCommandLine( QCoreApplication * app, GDOptions * result )
 #include <uiautomation.h>
 namespace {
 
-enum class SutraStartupMouseLookupMode
+enum SutraMouseLookupModifierFlag
 {
-  Disabled       = 0,
-  CtrlRightClick = 1,
-  CtrlLeftClick  = 2,
-  AltRightClick  = 3
+  SutraMouseLookupCtrl  = 0x01,
+  SutraMouseLookupAlt   = 0x02,
+  SutraMouseLookupShift = 0x04
 };
 
-QString sutraStartupMouseLookupModeSettingsKey()
+enum class SutraMouseLookupButton
+{
+  Left   = 1,
+  Right  = 2,
+  Middle = 3
+};
+
+struct SutraMouseLookupSettings
+{
+  bool enabled = true;
+  int modifiers = SutraMouseLookupCtrl;
+  SutraMouseLookupButton button = SutraMouseLookupButton::Right;
+};
+
+QString sutraMouseLookupLegacyModeSettingsKey()
 {
   return QStringLiteral( "SutraEdition/MouseLookupMode" );
 }
 
-SutraStartupMouseLookupMode loadSutraStartupMouseLookupMode()
+QString sutraMouseLookupEnabledSettingsKey()
+{
+  return QStringLiteral( "SutraEdition/MouseLookupEnabled" );
+}
+
+QString sutraMouseLookupModifiersSettingsKey()
+{
+  return QStringLiteral( "SutraEdition/MouseLookupModifiers" );
+}
+
+QString sutraMouseLookupButtonSettingsKey()
+{
+  return QStringLiteral( "SutraEdition/MouseLookupButton" );
+}
+
+void saveSutraMouseLookupSettings( const SutraMouseLookupSettings & value )
 {
   QSettings settings;
-  const int value = qBound( 0,
-                            settings.value( sutraStartupMouseLookupModeSettingsKey(), 1 ).toInt(),
-                            3 );
-  return static_cast< SutraStartupMouseLookupMode >( value );
+  settings.setValue( sutraMouseLookupEnabledSettingsKey(), value.enabled );
+  settings.setValue( sutraMouseLookupModifiersSettingsKey(), value.modifiers );
+  settings.setValue( sutraMouseLookupButtonSettingsKey(), static_cast< int >( value.button ) );
+
+  // Keep the old popup preset setting compatible with earlier Sutra builds.
+  if ( !value.enabled ) {
+    settings.setValue( sutraMouseLookupLegacyModeSettingsKey(), 0 );
+  }
+  else if ( value.modifiers == SutraMouseLookupCtrl && value.button == SutraMouseLookupButton::Right ) {
+    settings.setValue( sutraMouseLookupLegacyModeSettingsKey(), 1 );
+  }
+  else if ( value.modifiers == SutraMouseLookupCtrl && value.button == SutraMouseLookupButton::Left ) {
+    settings.setValue( sutraMouseLookupLegacyModeSettingsKey(), 2 );
+  }
+  else if ( value.modifiers == SutraMouseLookupAlt && value.button == SutraMouseLookupButton::Right ) {
+    settings.setValue( sutraMouseLookupLegacyModeSettingsKey(), 3 );
+  }
+  else {
+    settings.remove( sutraMouseLookupLegacyModeSettingsKey() );
+  }
+}
+
+SutraMouseLookupSettings loadSutraMouseLookupSettings()
+{
+  QSettings settings;
+
+  if ( !settings.contains( sutraMouseLookupEnabledSettingsKey() ) ) {
+    const int legacyMode = qBound( 0, settings.value( sutraMouseLookupLegacyModeSettingsKey(), 1 ).toInt(), 3 );
+
+    SutraMouseLookupSettings migrated;
+    migrated.enabled = legacyMode != 0;
+
+    switch ( legacyMode ) {
+      case 2:
+        migrated.modifiers = SutraMouseLookupCtrl;
+        migrated.button = SutraMouseLookupButton::Left;
+        break;
+      case 3:
+        migrated.modifiers = SutraMouseLookupAlt;
+        migrated.button = SutraMouseLookupButton::Right;
+        break;
+      case 0:
+      case 1:
+      default:
+        migrated.modifiers = SutraMouseLookupCtrl;
+        migrated.button = SutraMouseLookupButton::Right;
+        break;
+    }
+
+    saveSutraMouseLookupSettings( migrated );
+    return migrated;
+  }
+
+  SutraMouseLookupSettings result;
+  result.enabled = settings.value( sutraMouseLookupEnabledSettingsKey(), true ).toBool();
+
+  const int modifiers = settings.value( sutraMouseLookupModifiersSettingsKey(), SutraMouseLookupCtrl ).toInt();
+  result.modifiers = modifiers >= SutraMouseLookupCtrl && modifiers <= ( SutraMouseLookupCtrl | SutraMouseLookupAlt | SutraMouseLookupShift )
+                       ? modifiers
+                       : SutraMouseLookupCtrl;
+
+  const int button = settings.value( sutraMouseLookupButtonSettingsKey(),
+                                     static_cast< int >( SutraMouseLookupButton::Right ) ).toInt();
+  result.button = button >= static_cast< int >( SutraMouseLookupButton::Left )
+                       && button <= static_cast< int >( SutraMouseLookupButton::Middle )
+                    ? static_cast< SutraMouseLookupButton >( button )
+                    : SutraMouseLookupButton::Right;
+
+  return result;
+}
+
+QString sutraMouseLookupModifiersLabel( int modifiers )
+{
+  QStringList parts;
+  if ( modifiers & SutraMouseLookupCtrl ) {
+    parts << QStringLiteral( "Ctrl" );
+  }
+  if ( modifiers & SutraMouseLookupAlt ) {
+    parts << QStringLiteral( "Alt" );
+  }
+  if ( modifiers & SutraMouseLookupShift ) {
+    parts << QStringLiteral( "Shift" );
+  }
+  return parts.join( QStringLiteral( "+" ) );
+}
+
+QString sutraMouseLookupButtonLabel( SutraMouseLookupButton button )
+{
+  switch ( button ) {
+    case SutraMouseLookupButton::Left:
+      return QStringLiteral( "Left Click" );
+    case SutraMouseLookupButton::Middle:
+      return QStringLiteral( "Middle Click" );
+    case SutraMouseLookupButton::Right:
+    default:
+      return QStringLiteral( "Right Click" );
+  }
+}
+
+QString sutraMouseLookupSettingsLabel( const SutraMouseLookupSettings & value )
+{
+  if ( !value.enabled ) {
+    return QStringLiteral( "Disabled" );
+  }
+
+  return QStringLiteral( "%1 + %2" )
+    .arg( sutraMouseLookupModifiersLabel( value.modifiers ), sutraMouseLookupButtonLabel( value.button ) );
 }
 
 void sendSutraStartupVirtualKey( WORD virtualKey, bool down )
@@ -318,6 +474,13 @@ void releaseSutraStartupAltKeys()
   sendSutraStartupVirtualKey( VK_MENU, false );
   sendSutraStartupVirtualKey( VK_LMENU, false );
   sendSutraStartupVirtualKey( VK_RMENU, false );
+}
+
+void releaseSutraStartupShiftKeys()
+{
+  sendSutraStartupVirtualKey( VK_SHIFT, false );
+  sendSutraStartupVirtualKey( VK_LSHIFT, false );
+  sendSutraStartupVirtualKey( VK_RSHIFT, false );
 }
 
 void sendSutraStartupCtrlC()
@@ -520,184 +683,353 @@ bool sutraStartupShouldUseLineFallbackForPhrase( const QString & text )
       || sutraStartupIsSingleLatinWord( text );
 }
 
-QStringList sutraStartupVietnameseBuddhistPhrases()
+struct SutraStartupTextToken
 {
-  return QStringList{
-    QStringLiteral( "A Di ÄÃ  Pháº­t" ),
-    QStringLiteral( "BÃ¡t chÃ¡nh Ä‘áº¡o" ),
-    QStringLiteral( "BÃ¡t-nhÃ£ Ba-la-máº­t-Ä‘a" ),
-    QStringLiteral( "BÃ¡t-nhÃ£ Ba-la-máº­t" ),
-    QStringLiteral( "Bá»“ Äá» Äáº¡t Ma" ),
-    QStringLiteral( "Bá»“ Ä‘á» tÃ¢m" ),
-    QStringLiteral( "Bá»“ TÃ¡t" ),
-    QStringLiteral( "Bá»‘ thÃ­" ),
-    QStringLiteral( "ChÃ¡nh Ä‘á»‹nh" ),
-    QStringLiteral( "ChÃ¡nh kiáº¿n" ),
-    QStringLiteral( "ChÃ¡nh máº¡ng" ),
-    QStringLiteral( "ChÃ¡nh ngá»¯" ),
-    QStringLiteral( "ChÃ¡nh nghiá»‡p" ),
-    QStringLiteral( "ChÃ¡nh niá»‡m" ),
-    QStringLiteral( "ChÃ¡nh tinh táº¥n" ),
-    QStringLiteral( "ChÃ¡nh tÆ° duy" ),
-    QStringLiteral( "ChÃ¢n nhÆ°" ),
-    QStringLiteral( "ChÃºng sinh" ),
-    QStringLiteral( "Diá»‡u Ä‘áº¿" ),
-    QStringLiteral( "DuyÃªn khá»Ÿi" ),
-    QStringLiteral( "GiÃ¡c ngá»™" ),
-    QStringLiteral( "Giá»›i Ä‘á»‹nh tuá»‡" ),
-    QStringLiteral( "Há»¯u tÃ¬nh" ),
-    QStringLiteral( "Khá»• Ä‘áº¿" ),
-    QStringLiteral( "KhÃ´ng tá»©c thá»‹ sáº¯c" ),
-    QStringLiteral( "Lá»¥c Ä‘á»™" ),
-    QStringLiteral( "LuÃ¢n há»“i" ),
-    QStringLiteral( "Niáº¿t bÃ n" ),
-    QStringLiteral( "NgÅ© uáº©n" ),
-    QStringLiteral( "PhÃ¡p thÃ¢n" ),
-    QStringLiteral( "Pháº­t phÃ¡p" ),
-    QStringLiteral( "Pháº­t tÃ¡nh" ),
-    QStringLiteral( "Pháº­t tÃ­nh" ),
-    QStringLiteral( "QuÃ¡n Tháº¿ Ã‚m" ),
-    QStringLiteral( "QuÃ¡n Tháº¿ Ã‚m Bá»“ TÃ¡t" ),
-    QStringLiteral( "QuÃ¡n Tá»± Táº¡i" ),
-    QStringLiteral( "QuÃ¡n Tá»± Táº¡i Bá»“ TÃ¡t" ),
-    QStringLiteral( "Sáº¯c tá»©c thá»‹ khÃ´ng" ),
-    QStringLiteral( "Tam báº£o" ),
-    QStringLiteral( "Tam Ä‘á»™c" ),
-    QStringLiteral( "Tam há»c" ),
-    QStringLiteral( "TÃ¡nh khÃ´ng" ),
-    QStringLiteral( "TÃ¢m vÃ´ quÃ¡i ngáº¡i" ),
-    QStringLiteral( "Thiá»n Ä‘á»‹nh" ),
-    QStringLiteral( "Tá»© diá»‡u Ä‘áº¿" ),
-    QStringLiteral( "Tá»© niá»‡m xá»©" ),
-    QStringLiteral( "Tá»© thÃ¡nh Ä‘áº¿" ),
-    QStringLiteral( "Tá»« bi" ),
-    QStringLiteral( "VÃ´ minh" ),
-    QStringLiteral( "VÃ´ ngÃ£" ),
-    QStringLiteral( "VÃ´ thÆ°á»ng" ),
-    QStringLiteral( "VÃ´ thÆ°á»£ng chÃ¡nh Ä‘áº³ng chÃ¡nh giÃ¡c" )
+  int start = 0;
+  int end   = 0;
+  QString normalized;
+  bool hasLatin = false;
+};
+
+QList< SutraStartupTextToken > sutraStartupTokenizePhraseText( const QString & text )
+{
+  QList< SutraStartupTextToken > tokens;
+  int tokenStart = -1;
+  bool tokenHasLatin = false;
+
+  const auto flushToken = [ & ]( int tokenEnd ) {
+    if ( tokenStart < 0 || tokenEnd <= tokenStart ) {
+      tokenStart = -1;
+      tokenHasLatin = false;
+      return;
+    }
+
+    const QString original = text.mid( tokenStart, tokenEnd - tokenStart );
+    const QString normalized = sutraStartupNormalizeVietnameseLookupText( original );
+
+    if ( !normalized.isEmpty() ) {
+      tokens.push_back( SutraStartupTextToken{ tokenStart, tokenEnd, normalized, tokenHasLatin } );
+    }
+
+    tokenStart = -1;
+    tokenHasLatin = false;
   };
+
+  for ( int i = 0; i < text.size(); ++i ) {
+    const QChar ch = text.at( i );
+    const QChar::Category category = ch.category();
+    const bool combiningMark = category == QChar::Mark_NonSpacing
+                            || category == QChar::Mark_SpacingCombining
+                            || category == QChar::Mark_Enclosing;
+    const bool wordCharacter = ch.isLetterOrNumber() || ( combiningMark && tokenStart >= 0 );
+
+    if ( wordCharacter ) {
+      if ( tokenStart < 0 ) {
+        tokenStart = i;
+      }
+
+      if ( ch.isLetter() && ch.unicode() < 0x024F ) {
+        tokenHasLatin = true;
+      }
+    }
+    else {
+      flushToken( i );
+    }
+  }
+
+  flushToken( text.size() );
+  return tokens;
 }
 
-QString sutraStartupVietnameseWindowAroundAnchor( const QString & lineText, const QString & anchorText )
+struct SutraStartupVietnameseAlias
 {
-  const QString anchor = sutraStartupNormalizeVietnameseLookupText( anchorText );
+  QStringList normalizedTokens;
+};
 
-  if ( anchor.isEmpty() ) {
-    return {};
+const QList< SutraStartupVietnameseAlias > & sutraStartupVietnameseGlossaryAliases()
+{
+  static const QList< SutraStartupVietnameseAlias > aliases = [] {
+    QList< SutraStartupVietnameseAlias > result;
+    QStringList seen;
+
+    QFile file( QCoreApplication::applicationDirPath() + QStringLiteral( "/buddhist_terms.json" ) );
+    if ( !file.open( QIODevice::ReadOnly | QIODevice::Text ) ) {
+      return result;
+    }
+
+    QJsonParseError parseError;
+    const QJsonDocument document = QJsonDocument::fromJson( file.readAll(), &parseError );
+    if ( parseError.error != QJsonParseError::NoError ) {
+      return result;
+    }
+
+    const QJsonArray terms = document.isArray()
+                           ? document.array()
+                           : document.object().value( QStringLiteral( "terms" ) ).toArray();
+
+    const auto appendAlias = [ &result, &seen ]( const QString & rawAlias ) {
+      const QList< SutraStartupTextToken > aliasTokens = sutraStartupTokenizePhraseText( rawAlias );
+      if ( aliasTokens.size() < 2 || aliasTokens.size() > 10 ) {
+        return;
+      }
+
+      QStringList normalizedTokens;
+      bool hasLatin = false;
+      for ( const SutraStartupTextToken & token : aliasTokens ) {
+        normalizedTokens << token.normalized;
+        hasLatin = hasLatin || token.hasLatin;
+      }
+
+      if ( !hasLatin ) {
+        return;
+      }
+
+      const QString key = normalizedTokens.join( QLatin1Char( ' ' ) );
+      if ( key.size() < 4 || key.size() > 120 || seen.contains( key ) ) {
+        return;
+      }
+
+      seen << key;
+      result.push_back( SutraStartupVietnameseAlias{ normalizedTokens } );
+    };
+
+    const auto appendJsonValue = [ &appendAlias ]( const QJsonValue & value ) {
+      if ( value.isString() ) {
+        appendAlias( value.toString() );
+      }
+      else if ( value.isArray() ) {
+        for ( const QJsonValue & item : value.toArray() ) {
+          if ( item.isString() ) {
+            appendAlias( item.toString() );
+          }
+        }
+      }
+    };
+
+    for ( const QJsonValue & termValue : terms ) {
+      if ( !termValue.isObject() ) {
+        continue;
+      }
+
+      const QJsonObject object = termValue.toObject();
+      appendJsonValue( object.value( QStringLiteral( "han_viet" ) ) );
+      appendJsonValue( object.value( QStringLiteral( "suggested_translation" ) ) );
+      appendJsonValue( object.value( QStringLiteral( "suggested_translations" ) ) );
+    }
+
+    std::sort( result.begin(), result.end(), []( const SutraStartupVietnameseAlias & left,
+                                                 const SutraStartupVietnameseAlias & right ) {
+      if ( left.normalizedTokens.size() != right.normalizedTokens.size() ) {
+        return left.normalizedTokens.size() > right.normalizedTokens.size();
+      }
+
+      return left.normalizedTokens.join( QLatin1Char( ' ' ) ).size()
+           > right.normalizedTokens.join( QLatin1Char( ' ' ) ).size();
+    } );
+
+    return result;
+  }();
+
+  return aliases;
+}
+
+int sutraStartupTokenIndexAtOffset( const QList< SutraStartupTextToken > & tokens, int offset )
+{
+  if ( tokens.isEmpty() ) {
+    return -1;
   }
 
-  QString simplifiedLine = lineText;
-  simplifiedLine.replace( QRegularExpression( QStringLiteral( "[\\r\\n\\t]+" ) ), QStringLiteral( " " ) );
-  simplifiedLine.replace( QRegularExpression( QStringLiteral( "[,.;:!?()\\[\\]{}<>\"â€œâ€'â€˜â€™]+" ) ), QStringLiteral( " " ) );
-
-#if QT_VERSION >= QT_VERSION_CHECK( 5, 14, 0 )
-  const QStringList words = simplifiedLine.split( QRegularExpression( QStringLiteral( "\\s+" ) ), Qt::SkipEmptyParts );
-#else
-  const QStringList words = simplifiedLine.split( QRegularExpression( QStringLiteral( "\\s+" ) ), QString::SkipEmptyParts );
-#endif
-
-  if ( words.isEmpty() ) {
-    return {};
-  }
-
-  int anchorIndex = -1;
-
-  for ( int i = 0; i < words.size(); ++i ) {
-    if ( sutraStartupNormalizeVietnameseLookupText( words.at( i ) ) == anchor ) {
-      anchorIndex = i;
-      break;
+  for ( int i = 0; i < tokens.size(); ++i ) {
+    if ( offset >= tokens.at( i ).start && offset < tokens.at( i ).end ) {
+      return i;
     }
   }
 
-  if ( anchorIndex < 0 ) {
-    return {};
-  }
+  int nearestIndex = 0;
+  int nearestDistance = ( std::numeric_limits< int >::max )();
 
-  // Prefer common Vietnamese compounds: previous + current, current + next, then 3-word windows.
-  QStringList candidates;
-
-  if ( anchorIndex > 0 ) {
-    candidates << QStringList{ words.at( anchorIndex - 1 ), words.at( anchorIndex ) }.join( QLatin1Char( ' ' ) );
-  }
-
-  if ( anchorIndex + 1 < words.size() ) {
-    candidates << QStringList{ words.at( anchorIndex ), words.at( anchorIndex + 1 ) }.join( QLatin1Char( ' ' ) );
-  }
-
-  if ( anchorIndex > 0 && anchorIndex + 1 < words.size() ) {
-    candidates << QStringList{ words.at( anchorIndex - 1 ), words.at( anchorIndex ), words.at( anchorIndex + 1 ) }.join( QLatin1Char( ' ' ) );
-  }
-
-  if ( anchorIndex + 2 < words.size() ) {
-    candidates << QStringList{ words.at( anchorIndex ), words.at( anchorIndex + 1 ), words.at( anchorIndex + 2 ) }.join( QLatin1Char( ' ' ) );
-  }
-
-  if ( anchorIndex > 1 ) {
-    candidates << QStringList{ words.at( anchorIndex - 2 ), words.at( anchorIndex - 1 ), words.at( anchorIndex ) }.join( QLatin1Char( ' ' ) );
-  }
-
-  for ( const QString & candidate : candidates ) {
-    if ( candidate.trimmed().size() >= anchorText.trimmed().size() ) {
-      return candidate.trimmed();
+  for ( int i = 0; i < tokens.size(); ++i ) {
+    const int distance = offset < tokens.at( i ).start
+                       ? tokens.at( i ).start - offset
+                       : offset - tokens.at( i ).end;
+    if ( distance < nearestDistance ) {
+      nearestDistance = distance;
+      nearestIndex = i;
     }
   }
 
-  return words.at( anchorIndex ).trimmed();
+  return nearestIndex;
+}
+
+bool sutraStartupTokenSequenceMatches( const QList< SutraStartupTextToken > & lineTokens,
+                                       int start,
+                                       const QStringList & aliasTokens )
+{
+  if ( start < 0 || start + aliasTokens.size() > lineTokens.size() ) {
+    return false;
+  }
+
+  for ( int i = 0; i < aliasTokens.size(); ++i ) {
+    if ( lineTokens.at( start + i ).normalized != aliasTokens.at( i ) ) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+QString sutraStartupFallbackVietnameseWindow( const QString & lineText,
+                                               const QList< SutraStartupTextToken > & tokens,
+                                               int anchorIndex )
+{
+  if ( anchorIndex < 0 || anchorIndex >= tokens.size() || !tokens.at( anchorIndex ).hasLatin ) {
+    return {};
+  }
+
+  int clauseStart = anchorIndex;
+  int clauseEnd = anchorIndex;
+
+  const auto containsStrongSeparator = [ &lineText ]( int from, int to ) {
+    for ( int i = qMax( 0, from ); i < qMin( to, lineText.size() ); ++i ) {
+      const QChar ch = lineText.at( i );
+      if ( ch == QLatin1Char( ',' ) || ch == QLatin1Char( '.' ) || ch == QLatin1Char( ';' )
+        || ch == QLatin1Char( ':' ) || ch == QLatin1Char( '!' ) || ch == QLatin1Char( '?' )
+        || ch == QLatin1Char( '\r' ) || ch == QLatin1Char( '\n' )
+        || ch == QChar( 0x2013 ) || ch == QChar( 0x2014 ) ) {
+        return true;
+      }
+    }
+
+    return false;
+  };
+
+  while ( clauseStart > 0
+       && !containsStrongSeparator( tokens.at( clauseStart - 1 ).end, tokens.at( clauseStart ).start ) ) {
+    --clauseStart;
+  }
+
+  while ( clauseEnd + 1 < tokens.size()
+       && !containsStrongSeparator( tokens.at( clauseEnd ).end, tokens.at( clauseEnd + 1 ).start ) ) {
+    ++clauseEnd;
+  }
+
+  const int clauseTokenCount = clauseEnd - clauseStart + 1;
+  if ( clauseTokenCount <= 4 ) {
+    return lineText.mid( tokens.at( clauseStart ).start,
+                         tokens.at( clauseEnd ).end - tokens.at( clauseStart ).start ).trimmed();
+  }
+
+  int windowStart = qMax( clauseStart, anchorIndex - 1 );
+  int windowEnd = qMin( clauseEnd, windowStart + 3 );
+  if ( windowEnd - windowStart < 3 ) {
+    windowStart = qMax( clauseStart, windowEnd - 3 );
+  }
+
+  return lineText.mid( tokens.at( windowStart ).start,
+                       tokens.at( windowEnd ).end - tokens.at( windowStart ).start ).trimmed();
+}
+
+QString sutraStartupBestVietnamesePhraseAtToken( const QString & lineText,
+                                                  const QList< SutraStartupTextToken > & lineTokens,
+                                                  int anchorIndex )
+{
+  if ( anchorIndex < 0 || anchorIndex >= lineTokens.size() || !lineTokens.at( anchorIndex ).hasLatin ) {
+    return {};
+  }
+
+  int bestStart = -1;
+  int bestEnd = -1;
+  int bestTokenCount = 0;
+  int bestCharacterCount = 0;
+
+  for ( const SutraStartupVietnameseAlias & alias : sutraStartupVietnameseGlossaryAliases() ) {
+    const int aliasTokenCount = alias.normalizedTokens.size();
+    if ( aliasTokenCount < bestTokenCount || aliasTokenCount > lineTokens.size() ) {
+      continue;
+    }
+
+    const int firstPossibleStart = qMax( 0, anchorIndex - aliasTokenCount + 1 );
+    const int lastPossibleStart = qMin( anchorIndex, lineTokens.size() - aliasTokenCount );
+
+    for ( int start = firstPossibleStart; start <= lastPossibleStart; ++start ) {
+      if ( !sutraStartupTokenSequenceMatches( lineTokens, start, alias.normalizedTokens ) ) {
+        continue;
+      }
+
+      const int end = start + aliasTokenCount - 1;
+      const int characterCount = lineTokens.at( end ).end - lineTokens.at( start ).start;
+      if ( aliasTokenCount > bestTokenCount
+        || ( aliasTokenCount == bestTokenCount && characterCount > bestCharacterCount ) ) {
+        bestStart = start;
+        bestEnd = end;
+        bestTokenCount = aliasTokenCount;
+        bestCharacterCount = characterCount;
+      }
+    }
+  }
+
+  if ( bestStart >= 0 && bestEnd >= bestStart ) {
+    return lineText.mid( lineTokens.at( bestStart ).start,
+                         lineTokens.at( bestEnd ).end - lineTokens.at( bestStart ).start ).trimmed();
+  }
+
+  return sutraStartupFallbackVietnameseWindow( lineText, lineTokens, anchorIndex );
+}
+
+QString sutraStartupBestVietnamesePhraseAtOffset( const QString & lineText, int clickOffset )
+{
+  const QList< SutraStartupTextToken > tokens = sutraStartupTokenizePhraseText( lineText );
+  const int anchorIndex = sutraStartupTokenIndexAtOffset( tokens, clickOffset );
+  return sutraStartupBestVietnamesePhraseAtToken( lineText, tokens, anchorIndex );
 }
 
 QString sutraStartupBestVietnamesePhraseFromLine( const QString & lineText, const QString & anchorText )
 {
-  const QString normalizedLine   = sutraStartupNormalizeVietnameseLookupText( lineText );
-  const QString normalizedAnchor = sutraStartupNormalizeVietnameseLookupText( anchorText );
+  const QList< SutraStartupTextToken > lineTokens = sutraStartupTokenizePhraseText( lineText );
+  const QList< SutraStartupTextToken > anchorTokens = sutraStartupTokenizePhraseText( anchorText );
 
-  if ( normalizedLine.isEmpty() ) {
+  if ( lineTokens.isEmpty() ) {
     return {};
   }
 
-  QString bestPhrase;
-  int bestScore = -1;
-
-  for ( const QString & phrase : sutraStartupVietnameseBuddhistPhrases() ) {
-    const QString normalizedPhrase = sutraStartupNormalizeVietnameseLookupText( phrase );
-
-    if ( normalizedPhrase.isEmpty() || !normalizedLine.contains( normalizedPhrase ) ) {
-      continue;
+  int anchorIndex = -1;
+  if ( !anchorTokens.isEmpty() ) {
+    QStringList normalizedAnchorTokens;
+    for ( const SutraStartupTextToken & token : anchorTokens ) {
+      normalizedAnchorTokens << token.normalized;
     }
 
-    if ( !normalizedAnchor.isEmpty() && !normalizedPhrase.contains( normalizedAnchor ) ) {
-      continue;
-    }
-
-    if ( normalizedPhrase.size() > bestScore ) {
-      bestScore = normalizedPhrase.size();
-      bestPhrase = phrase;
+    for ( int start = 0; start + normalizedAnchorTokens.size() <= lineTokens.size(); ++start ) {
+      if ( sutraStartupTokenSequenceMatches( lineTokens, start, normalizedAnchorTokens ) ) {
+        anchorIndex = start + normalizedAnchorTokens.size() / 2;
+        break;
+      }
     }
   }
 
-  if ( !bestPhrase.isEmpty() ) {
-    return bestPhrase;
-  }
-
-  if ( sutraStartupIsSingleLatinWord( anchorText ) ) {
-    const QString windowPhrase = sutraStartupVietnameseWindowAroundAnchor( lineText, anchorText );
-
-    if ( !windowPhrase.isEmpty() ) {
-      return windowPhrase;
+  if ( anchorIndex < 0 ) {
+    for ( int i = 0; i < lineTokens.size(); ++i ) {
+      if ( lineTokens.at( i ).hasLatin ) {
+        anchorIndex = i;
+        break;
+      }
     }
   }
 
-  return lineText.trimmed();
+  return sutraStartupBestVietnamesePhraseAtToken( lineText, lineTokens, anchorIndex );
 }
 
 QString sutraStartupBestLineLookupText( const QString & lineText, const QString & anchorText )
 {
   if ( sutraStartupHasLatinLetter( lineText ) || sutraStartupHasLatinLetter( anchorText ) ) {
-    return sutraStartupBestVietnamesePhraseFromLine( lineText, anchorText );
+    const QString phrase = sutraStartupBestVietnamesePhraseFromLine( lineText, anchorText );
+    if ( !phrase.isEmpty() ) {
+      return phrase;
+    }
   }
 
   return lineText.trimmed();
 }
-
 
 QString sutraStartupTextFromBstr( BSTR text )
 {
@@ -773,6 +1105,13 @@ QString sutraStartupTextFromUiAutomationRange( IUIAutomationTextRange * range )
   }
 
   lineRange->Release();
+
+  if ( clickOffset >= 0 && !lineText.isEmpty() && sutraStartupHasLatinLetter( lineText ) ) {
+    const QString vietnamesePhrase = sutraStartupBestVietnamesePhraseAtOffset( lineText, clickOffset );
+    if ( !vietnamesePhrase.isEmpty() && vietnamesePhrase.size() <= 120 ) {
+      return vietnamesePhrase;
+    }
+  }
 
   if ( clickOffset >= 0 && !lineText.isEmpty() ) {
     clickOffset = qBound( 0, clickOffset, lineText.size() );
@@ -978,6 +1317,287 @@ QString sutraStartupCleanLookupText( const QString & text )
   return result.mid( start, 220 ).trimmed();
 }
 
+
+struct SutraMainThemeBaseline
+{
+  bool initialized = false;
+  QPalette palette;
+  QString styleName;
+};
+
+SutraMainThemeBaseline & sutraMainThemeBaseline()
+{
+  static SutraMainThemeBaseline value;
+  return value;
+}
+
+Config::Dark & sutraCurrentMainThemeMode()
+{
+  static Config::Dark mode = Config::Dark::Off;
+  return mode;
+}
+
+void initializeSutraMainThemeBaseline( QApplication * app )
+{
+  if ( !app ) {
+    return;
+  }
+
+  SutraMainThemeBaseline & baseline = sutraMainThemeBaseline();
+  if ( baseline.initialized ) {
+    return;
+  }
+
+  baseline.palette = app->palette();
+  baseline.styleName = app->style() ? app->style()->objectName() : QString();
+  baseline.initialized = true;
+}
+
+bool sutraSystemUsesDarkTheme( QApplication * app )
+{
+#if QT_VERSION >= QT_VERSION_CHECK( 6, 5, 0 )
+  return app && app->styleHints() && app->styleHints()->colorScheme() == Qt::ColorScheme::Dark;
+#else
+  Q_UNUSED( app );
+  return false;
+#endif
+}
+
+QPalette sutraMainDarkPalette()
+{
+  QPalette palette;
+  palette.setColor( QPalette::Window, QColor( 30, 32, 36 ) );
+  palette.setColor( QPalette::WindowText, QColor( 238, 240, 244 ) );
+  palette.setColor( QPalette::Base, QColor( 20, 22, 26 ) );
+  palette.setColor( QPalette::AlternateBase, QColor( 39, 42, 48 ) );
+  palette.setColor( QPalette::ToolTipBase, QColor( 39, 42, 48 ) );
+  palette.setColor( QPalette::ToolTipText, QColor( 248, 249, 250 ) );
+  palette.setColor( QPalette::Text, QColor( 238, 240, 244 ) );
+  palette.setColor( QPalette::Button, QColor( 45, 48, 55 ) );
+  palette.setColor( QPalette::ButtonText, QColor( 238, 240, 244 ) );
+  palette.setColor( QPalette::BrightText, QColor( 255, 99, 99 ) );
+  palette.setColor( QPalette::Link, QColor( 112, 165, 255 ) );
+  palette.setColor( QPalette::Highlight, QColor( 58, 119, 255 ) );
+  palette.setColor( QPalette::HighlightedText, QColor( 255, 255, 255 ) );
+  palette.setColor( QPalette::PlaceholderText, QColor( 155, 160, 170 ) );
+  palette.setColor( QPalette::Disabled, QPalette::Text, QColor( 125, 130, 140 ) );
+  palette.setColor( QPalette::Disabled, QPalette::ButtonText, QColor( 125, 130, 140 ) );
+  return palette;
+}
+
+void applySutraMainApplicationTheme( QApplication * app, Config::Dark mode )
+{
+  if ( !app ) {
+    return;
+  }
+
+  initializeSutraMainThemeBaseline( app );
+  sutraCurrentMainThemeMode() = mode;
+
+  const bool dark = mode == Config::Dark::On
+                 || ( mode == Config::Dark::Auto && sutraSystemUsesDarkTheme( app ) );
+
+  SutraMainThemeBaseline & baseline = sutraMainThemeBaseline();
+
+  if ( dark ) {
+#ifdef Q_OS_WIN32
+    if ( QStyle * fusion = QStyleFactory::create( QStringLiteral( "Fusion" ) ) ) {
+      app->setStyle( fusion );
+    }
+#endif
+    app->setPalette( sutraMainDarkPalette() );
+  }
+  else {
+#ifdef Q_OS_WIN32
+    if ( !baseline.styleName.isEmpty() ) {
+      if ( QStyle * originalStyle = QStyleFactory::create( baseline.styleName ) ) {
+        app->setStyle( originalStyle );
+      }
+    }
+#endif
+    app->setPalette( baseline.palette );
+  }
+
+  for ( QWidget * widget : QApplication::topLevelWidgets() ) {
+    if ( widget ) {
+      widget->setProperty( "sutraMainDarkTheme", dark );
+      widget->style()->unpolish( widget );
+      widget->style()->polish( widget );
+      widget->update();
+    }
+  }
+}
+
+class SutraPreferencesEnhancer final : public QObject
+{
+public:
+  explicit SutraPreferencesEnhancer( QApplication * application ):
+    QObject( application ),
+    app( application )
+  {
+  }
+
+protected:
+  bool eventFilter( QObject * watched, QEvent * event ) override
+  {
+    if ( event && event->type() == QEvent::Show ) {
+      if ( QDialog * dialog = qobject_cast< QDialog * >( watched ) ) {
+        enhancePreferencesDialog( dialog );
+      }
+    }
+
+    return QObject::eventFilter( watched, event );
+  }
+
+private:
+  static void populateModifierCombo( QComboBox * combo )
+  {
+    combo->addItem( QStringLiteral( "Ctrl" ), SutraMouseLookupCtrl );
+    combo->addItem( QStringLiteral( "Alt" ), SutraMouseLookupAlt );
+    combo->addItem( QStringLiteral( "Shift" ), SutraMouseLookupShift );
+    combo->addItem( QStringLiteral( "Ctrl + Alt" ), SutraMouseLookupCtrl | SutraMouseLookupAlt );
+    combo->addItem( QStringLiteral( "Ctrl + Shift" ), SutraMouseLookupCtrl | SutraMouseLookupShift );
+    combo->addItem( QStringLiteral( "Alt + Shift" ), SutraMouseLookupAlt | SutraMouseLookupShift );
+    combo->addItem( QStringLiteral( "Ctrl + Alt + Shift" ),
+                    SutraMouseLookupCtrl | SutraMouseLookupAlt | SutraMouseLookupShift );
+  }
+
+  static void populateButtonCombo( QComboBox * combo )
+  {
+    combo->addItem( QObject::tr( "Left Click" ), static_cast< int >( SutraMouseLookupButton::Left ) );
+    combo->addItem( QObject::tr( "Right Click" ), static_cast< int >( SutraMouseLookupButton::Right ) );
+    combo->addItem( QObject::tr( "Middle Click" ), static_cast< int >( SutraMouseLookupButton::Middle ) );
+  }
+
+  void enhanceMouseLookupSettings( QDialog * dialog )
+  {
+    QWidget * hotkeyTab = dialog->findChild< QWidget * >( QStringLiteral( "tab_hotkey" ) );
+    if ( !hotkeyTab || hotkeyTab->findChild< QWidget * >( QStringLiteral( "sutraMouseLookupSettingsGroup" ) ) ) {
+      return;
+    }
+
+    QBoxLayout * tabLayout = qobject_cast< QBoxLayout * >( hotkeyTab->layout() );
+    if ( !tabLayout ) {
+      tabLayout = new QVBoxLayout( hotkeyTab );
+    }
+
+    QGroupBox * group = new QGroupBox( QObject::tr( "Mouse lookup" ), hotkeyTab );
+    group->setObjectName( QStringLiteral( "sutraMouseLookupSettingsGroup" ) );
+    group->setToolTip( QObject::tr( "Choose the keyboard modifiers and mouse button used to open the lookup popup." ) );
+
+    QVBoxLayout * groupLayout = new QVBoxLayout( group );
+    QCheckBox * enabled = new QCheckBox( QObject::tr( "Enable mouse lookup shortcut" ), group );
+    enabled->setObjectName( QStringLiteral( "sutraMouseLookupEnabled" ) );
+    groupLayout->addWidget( enabled );
+
+    QHBoxLayout * selectorLayout = new QHBoxLayout;
+    QLabel * modifierLabel = new QLabel( QObject::tr( "Modifier:" ), group );
+    QComboBox * modifierCombo = new QComboBox( group );
+    modifierCombo->setObjectName( QStringLiteral( "sutraMouseLookupModifier" ) );
+    populateModifierCombo( modifierCombo );
+
+    QLabel * buttonLabel = new QLabel( QObject::tr( "Mouse button:" ), group );
+    QComboBox * buttonCombo = new QComboBox( group );
+    buttonCombo->setObjectName( QStringLiteral( "sutraMouseLookupButton" ) );
+    populateButtonCombo( buttonCombo );
+
+    selectorLayout->addWidget( modifierLabel );
+    selectorLayout->addWidget( modifierCombo, 1 );
+    selectorLayout->addSpacing( 12 );
+    selectorLayout->addWidget( buttonLabel );
+    selectorLayout->addWidget( buttonCombo, 1 );
+    groupLayout->addLayout( selectorLayout );
+
+    QLabel * currentLabel = new QLabel( group );
+    currentLabel->setObjectName( QStringLiteral( "sutraMouseLookupCurrent" ) );
+    currentLabel->setWordWrap( true );
+    groupLayout->addWidget( currentLabel );
+
+    const SutraMouseLookupSettings current = loadSutraMouseLookupSettings();
+    enabled->setChecked( current.enabled );
+
+    int modifierIndex = modifierCombo->findData( current.modifiers );
+    modifierCombo->setCurrentIndex( modifierIndex >= 0 ? modifierIndex : 0 );
+
+    int buttonIndex = buttonCombo->findData( static_cast< int >( current.button ) );
+    buttonCombo->setCurrentIndex( buttonIndex >= 0 ? buttonIndex : 1 );
+
+    auto updateControls = [ enabled, modifierCombo, buttonCombo, currentLabel ] {
+      modifierCombo->setEnabled( enabled->isChecked() );
+      buttonCombo->setEnabled( enabled->isChecked() );
+
+      SutraMouseLookupSettings value;
+      value.enabled = enabled->isChecked();
+      value.modifiers = modifierCombo->currentData().toInt();
+      value.button = static_cast< SutraMouseLookupButton >( buttonCombo->currentData().toInt() );
+      currentLabel->setText( QObject::tr( "Current combination: %1" ).arg( sutraMouseLookupSettingsLabel( value ) ) );
+    };
+
+    QObject::connect( enabled, &QCheckBox::toggled, dialog, [ updateControls ] { updateControls(); } );
+    QObject::connect( modifierCombo, &QComboBox::currentIndexChanged, dialog, [ updateControls ] { updateControls(); } );
+    QObject::connect( buttonCombo, &QComboBox::currentIndexChanged, dialog, [ updateControls ] { updateControls(); } );
+    updateControls();
+
+    const int insertionIndex = qMax( 0, tabLayout->count() - 1 );
+    tabLayout->insertWidget( insertionIndex, group );
+
+    if ( QDialogButtonBox * buttons = dialog->findChild< QDialogButtonBox * >( QStringLiteral( "buttonBox" ) ) ) {
+      QObject::connect( buttons, &QDialogButtonBox::accepted, dialog,
+                        [ enabled, modifierCombo, buttonCombo ] {
+        SutraMouseLookupSettings value;
+        value.enabled = enabled->isChecked();
+        value.modifiers = modifierCombo->currentData().toInt();
+        value.button = static_cast< SutraMouseLookupButton >( buttonCombo->currentData().toInt() );
+        saveSutraMouseLookupSettings( value );
+      } );
+    }
+  }
+
+  void enhanceMainThemeSettings( QDialog * dialog )
+  {
+    QComboBox * darkMode = dialog->findChild< QComboBox * >( QStringLiteral( "darkMode" ) );
+    if ( !darkMode || darkMode->property( "sutraMainThemeEnhanced" ).toBool() ) {
+      return;
+    }
+
+    darkMode->setProperty( "sutraMainThemeEnhanced", true );
+    darkMode->setToolTip( QObject::tr( "Changes the theme of the main GoldenDict window. The popup theme remains independent." ) );
+
+    if ( QLabel * label = dialog->findChild< QLabel * >( QStringLiteral( "darkModeLabel" ) ) ) {
+      label->setText( QObject::tr( "Main application theme:" ) );
+      label->setToolTip( darkMode->toolTip() );
+    }
+
+    const Config::Dark originalMode = darkMode->currentData().value< Config::Dark >();
+
+    QObject::connect( darkMode, &QComboBox::currentIndexChanged, dialog, [ this, darkMode ] {
+      applySutraMainApplicationTheme( app, darkMode->currentData().value< Config::Dark >() );
+    } );
+
+    QObject::connect( dialog, &QDialog::rejected, dialog, [ this, originalMode ] {
+      applySutraMainApplicationTheme( app, originalMode );
+    } );
+  }
+
+  void enhancePreferencesDialog( QDialog * dialog )
+  {
+    if ( !dialog || !dialog->findChild< QTabWidget * >() ) {
+      return;
+    }
+
+    // Only the GoldenDict Preferences dialog contains both of these controls.
+    if ( !dialog->findChild< QWidget * >( QStringLiteral( "tab_hotkey" ) )
+      || !dialog->findChild< QDialogButtonBox * >( QStringLiteral( "buttonBox" ) ) ) {
+      return;
+    }
+
+    enhanceMouseLookupSettings( dialog );
+    enhanceMainThemeSettings( dialog );
+  }
+
+  QApplication * app = nullptr;
+};
+
 class SutraStartupMouseLookupHook final : public QObject
 {
 public:
@@ -1017,56 +1637,57 @@ public:
   }
 
 private:
-  static bool isControlPressed()
+  static bool keyPressed( int virtualKey )
   {
-    return ( GetAsyncKeyState( VK_CONTROL ) & 0x8000 )
-        || ( GetAsyncKeyState( VK_LCONTROL ) & 0x8000 )
-        || ( GetAsyncKeyState( VK_RCONTROL ) & 0x8000 );
+    return ( GetAsyncKeyState( virtualKey ) & 0x8000 ) != 0;
   }
 
-  static bool isAltPressed()
+  static bool modifiersMatch( int expectedModifiers )
   {
-    return ( GetAsyncKeyState( VK_MENU ) & 0x8000 )
-        || ( GetAsyncKeyState( VK_LMENU ) & 0x8000 )
-        || ( GetAsyncKeyState( VK_RMENU ) & 0x8000 );
+    const bool ctrlPressed = keyPressed( VK_CONTROL ) || keyPressed( VK_LCONTROL ) || keyPressed( VK_RCONTROL );
+    const bool altPressed = keyPressed( VK_MENU ) || keyPressed( VK_LMENU ) || keyPressed( VK_RMENU );
+    const bool shiftPressed = keyPressed( VK_SHIFT ) || keyPressed( VK_LSHIFT ) || keyPressed( VK_RSHIFT );
+
+    return ctrlPressed == bool( expectedModifiers & SutraMouseLookupCtrl )
+        && altPressed == bool( expectedModifiers & SutraMouseLookupAlt )
+        && shiftPressed == bool( expectedModifiers & SutraMouseLookupShift );
   }
 
-  static bool shouldHandleMouseLookupEvent( SutraStartupMouseLookupMode mode, WPARAM wParam )
+  static bool isConfiguredButtonEvent( SutraMouseLookupButton button, WPARAM wParam )
   {
-    switch ( mode ) {
-      case SutraStartupMouseLookupMode::CtrlRightClick:
-        return isControlPressed() && ( wParam == WM_RBUTTONDOWN || wParam == WM_RBUTTONUP );
-      case SutraStartupMouseLookupMode::CtrlLeftClick:
-        return isControlPressed() && ( wParam == WM_LBUTTONDOWN || wParam == WM_LBUTTONUP );
-      case SutraStartupMouseLookupMode::AltRightClick:
-        return isAltPressed() && ( wParam == WM_RBUTTONDOWN || wParam == WM_RBUTTONUP );
-      case SutraStartupMouseLookupMode::Disabled:
+    switch ( button ) {
+      case SutraMouseLookupButton::Left:
+        return wParam == WM_LBUTTONDOWN || wParam == WM_LBUTTONUP;
+      case SutraMouseLookupButton::Middle:
+        return wParam == WM_MBUTTONDOWN || wParam == WM_MBUTTONUP;
+      case SutraMouseLookupButton::Right:
       default:
-        return false;
+        return wParam == WM_RBUTTONDOWN || wParam == WM_RBUTTONUP;
     }
   }
 
-  static bool isMouseLookupDownEvent( SutraStartupMouseLookupMode mode, WPARAM wParam )
+  static bool isConfiguredButtonDownEvent( SutraMouseLookupButton button, WPARAM wParam )
   {
-    switch ( mode ) {
-      case SutraStartupMouseLookupMode::CtrlLeftClick:
+    switch ( button ) {
+      case SutraMouseLookupButton::Left:
         return wParam == WM_LBUTTONDOWN;
-      case SutraStartupMouseLookupMode::AltRightClick:
-      case SutraStartupMouseLookupMode::CtrlRightClick:
-        return wParam == WM_RBUTTONDOWN;
-      case SutraStartupMouseLookupMode::Disabled:
+      case SutraMouseLookupButton::Middle:
+        return wParam == WM_MBUTTONDOWN;
+      case SutraMouseLookupButton::Right:
       default:
-        return false;
+        return wParam == WM_RBUTTONDOWN;
     }
   }
 
   static LRESULT CALLBACK mouseProc( int code, WPARAM wParam, LPARAM lParam )
   {
     if ( code == HC_ACTION && instance ) {
-      const SutraStartupMouseLookupMode mode = loadSutraStartupMouseLookupMode();
+      const SutraMouseLookupSettings settings = loadSutraMouseLookupSettings();
 
-      if ( shouldHandleMouseLookupEvent( mode, wParam ) ) {
-        if ( isMouseLookupDownEvent( mode, wParam ) && !instance->lookupInProgress ) {
+      if ( settings.enabled
+        && modifiersMatch( settings.modifiers )
+        && isConfiguredButtonEvent( settings.button, wParam ) ) {
+        if ( isConfiguredButtonDownEvent( settings.button, wParam ) && !instance->lookupInProgress ) {
           const MSLLHOOKSTRUCT * mouseInfo = reinterpret_cast< const MSLLHOOKSTRUCT * >( lParam );
           const QPoint globalPos( mouseInfo->pt.x, mouseInfo->pt.y );
 
@@ -1120,6 +1741,7 @@ private:
 
     releaseSutraStartupControlKeys();
     releaseSutraStartupAltKeys();
+    releaseSutraStartupShiftKeys();
     sendSutraStartupLeftDoubleClickAt( globalPos );
 
     QTimer::singleShot( 140, this, [ this, previousClipboardText, globalPos ] {
@@ -1241,7 +1863,7 @@ int main( int argc, char ** argv )
 #endif
   // High DPI screen support
   QGuiApplication::setHighDpiScaleFactorRoundingPolicy( Qt::HighDpiScaleFactorRoundingPolicy::PassThrough );
-  
+
   // Registration of custom URL schemes must be done before QCoreApplication/QApplication is created.
   const QStringList localSchemes =
     { "gdlookup", "gdau", "gico", "qrcx", "bres", "bword", "gdprg", "gdvideo", "gdtts", "gdinternal", "entry" };
@@ -1259,6 +1881,9 @@ int main( int argc, char ** argv )
   app.setDesktopFileName( "io.github.xiaoyifang.goldendict_ng" );
   GD_QApplication::setApplicationName( "GoldenDict-ng" );
   GD_QApplication::setOrganizationDomain( "xiaoyifang.github.io" );
+#ifdef Q_OS_WIN
+  initializeSutraMainThemeBaseline( &app );
+#endif
 #ifndef Q_OS_MACOS
   // macOS icon is defined in Info.plist
   GD_QApplication::setWindowIcon( QIcon( ":/icons/programicon.png" ) );
@@ -1390,6 +2015,10 @@ int main( int argc, char ** argv )
 
   cfg.resetState = gdcl.resetState;
 
+#ifdef Q_OS_WIN
+  applySutraMainApplicationTheme( &app, cfg.preferences.darkMode );
+#endif
+
   // Log to file enabled through command line or preference
   Logger::switchLoggingMethod( gdcl.logFile || cfg.preferences.enableApplicationLog );
 
@@ -1482,16 +2111,27 @@ int main( int argc, char ** argv )
   app.setQuitOnLastWindowClosed( false );
 
 #ifdef Q_OS_WIN
-#include <windows.h>
-#include <oleauto.h>
-#include <uiautomation.h>
-#include <QRegularExpression>
-#include <QStringList>
+  SutraPreferencesEnhancer sutraPreferencesEnhancer( &app );
+  app.installEventFilter( &sutraPreferencesEnhancer );
+
+#if QT_VERSION >= QT_VERSION_CHECK( 6, 5, 0 )
+  QObject::connect( app.styleHints(), &QStyleHints::colorSchemeChanged, &app, [ &app ]( Qt::ColorScheme ) {
+    if ( sutraCurrentMainThemeMode() == Config::Dark::Auto ) {
+      applySutraMainApplicationTheme( &app, Config::Dark::Auto );
+    }
+  } );
+#endif
+
   SutraStartupMouseLookupHook sutraStartupMouseLookupHook( &app );
   sutraStartupMouseLookupHook.ensureInstalled();
 #endif
 
   MainWindow m( cfg );
+
+#ifdef Q_OS_WIN
+  // MainWindow construction may apply its own style; enforce the selected main theme once more.
+  applySutraMainApplicationTheme( &app, cfg.preferences.darkMode );
+#endif
 
   /// Session manager things.
   // Redirect commit data request to Mainwindow's handler.

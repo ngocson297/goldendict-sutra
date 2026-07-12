@@ -19,6 +19,8 @@
 #include <QApplication>
 #include <QClipboard>
 #include <QActionGroup>
+#include <QPalette>
+#include <QColor>
 #include <QPointer>
 #include <functional>
 #ifdef Q_OS_WIN
@@ -257,6 +259,8 @@ void updateSutraPopupZoomIndicator( QWidget * popup )
 }
 
 
+bool sutraPopupUsesDarkTheme();
+
 double sutraPopupFontZoomFactor()
 {
   return qBound( 0.70,
@@ -280,8 +284,12 @@ void applySutraPopupTextBrowserFont( QTextBrowser * browser )
     browser->document()->setDefaultFont( font );
   }
 
+  const QString browserTheme = sutraPopupUsesDarkTheme()
+                                 ? QStringLiteral( "background:#0b1220;color:#e5e7eb;" )
+                                 : QStringLiteral( "background:#ffffff;color:#0f172a;" );
+
   browser->setStyleSheet(
-    QStringLiteral( "QTextBrowser { font-size: %1px; }" ).arg( fontSize ) );
+    QStringLiteral( "QTextBrowser { font-size: %1px; %2 }" ).arg( fontSize ).arg( browserTheme ) );
 }
 
 void applySutraPopupFontSizeToTabs( QTabWidget * tabs )
@@ -326,11 +334,274 @@ void saveSutraPopupOpacityPercent( int opacityPercent )
 }
 
 
+enum class SutraPopupThemeMode {
+  Light = 0,
+  Dark  = 1
+};
+
+QString sutraPopupThemeSettingsKey()
+{
+  return QStringLiteral( "SutraEdition/PopupThemeMode" );
+}
+
+QString sutraPopupThemeToggleButtonObjectName()
+{
+  return QStringLiteral( "sutraPopupThemeToggleButton" );
+}
+
+constexpr int sutraPopupDefaultThemeMode = static_cast< int >( SutraPopupThemeMode::Light );
+
+SutraPopupThemeMode loadSutraPopupThemeMode()
+{
+  QSettings settings;
+  const int value = qBound( 0,
+                            settings.value( sutraPopupThemeSettingsKey(), sutraPopupDefaultThemeMode ).toInt(),
+                            1 );
+  return static_cast< SutraPopupThemeMode >( value );
+}
+
+void saveSutraPopupThemeMode( SutraPopupThemeMode mode )
+{
+  QSettings settings;
+  settings.setValue( sutraPopupThemeSettingsKey(), static_cast< int >( mode ) );
+}
+
+bool sutraPopupUsesDarkTheme()
+{
+  return loadSutraPopupThemeMode() == SutraPopupThemeMode::Dark;
+}
+
+QString sutraPopupThemeModeLabel( SutraPopupThemeMode mode )
+{
+  return mode == SutraPopupThemeMode::Dark ? QStringLiteral( "Dark" ) : QStringLiteral( "Light" );
+}
+
+QString sutraApplyPopupThemeToHtml( QString html )
+{
+  if ( !sutraPopupUsesDarkTheme() || html.isEmpty() ) {
+    return html;
+  }
+
+  struct ThemeColorReplacement {
+    const char * lightColor;
+    const char * darkColor;
+  };
+
+  // Use temporary tokens first so replacements cannot cascade into one another.
+  const ThemeColorReplacement replacements[] = {
+    { "#ffffff", "#111827" }, { "#f8fafc", "#0b1220" }, { "#f6f8fb", "#0b1220" },
+    { "#f1f5f9", "#1e293b" }, { "#ecfdf5", "#063c35" }, { "#eff6ff", "#172554" },
+    { "#fff7ed", "#431407" }, { "#fffdf8", "#2b1609" }, { "#f0fdf4", "#052e16" },
+    { "#e2e8f0", "#334155" }, { "#cbd5e1", "#475569" }, { "#dbeafe", "#1e3a5f" },
+    { "#bfdbfe", "#1e40af" }, { "#bbf7d0", "#166534" }, { "#fed7aa", "#9a3412" },
+    { "#fdba74", "#c2410c" }, { "#0f172a", "#e5e7eb" }, { "#020617", "#f8fafc" },
+    { "#111827", "#f1f5f9" }, { "#334155", "#cbd5e1" }, { "#475569", "#cbd5e1" },
+    { "#64748b", "#94a3b8" }, { "#94a3b8", "#64748b" }, { "#0f766e", "#5eead4" },
+    { "#047857", "#6ee7b7" }, { "#1d4ed8", "#93c5fd" }, { "#2563eb", "#60a5fa" },
+    { "#3b82f6", "#60a5fa" }, { "#7c2d12", "#fdba74" }, { "#9a3412", "#fdba74" },
+    { "#c2410c", "#fb923c" }, { "#f97316", "#fb923c" }
+  };
+
+  for ( qsizetype i = 0; i < static_cast< qsizetype >( sizeof( replacements ) / sizeof( replacements[ 0 ] ) ); ++i ) {
+    html.replace( QString::fromLatin1( replacements[ i ].lightColor ),
+                  QStringLiteral( "__SUTRA_THEME_COLOR_%1__" ).arg( i ),
+                  Qt::CaseInsensitive );
+  }
+
+  for ( qsizetype i = 0; i < static_cast< qsizetype >( sizeof( replacements ) / sizeof( replacements[ 0 ] ) ); ++i ) {
+    html.replace( QStringLiteral( "__SUTRA_THEME_COLOR_%1__" ).arg( i ),
+                  QString::fromLatin1( replacements[ i ].darkColor ) );
+  }
+
+  return html;
+}
+
+QString sutraPopupCornerToolsThemeStyleSheet()
+{
+  if ( sutraPopupUsesDarkTheme() ) {
+    return QStringLiteral(
+      "QWidget#sutraPopupCornerTools {"
+      "  background: rgba(15, 23, 42, 235);"
+      "  border: 1px solid rgba(100, 116, 139, 210);"
+      "  border-radius: 4px;"
+      "  color: #e5e7eb;"
+      "}"
+      "QToolButton {"
+      "  min-width: 22px;"
+      "  min-height: 20px;"
+      "  padding: 1px;"
+      "  border: 0;"
+      "  background: transparent;"
+      "  color: #e5e7eb;"
+      "  font-weight: bold;"
+      "}"
+      "QToolButton:hover {"
+      "  background: rgba(96, 165, 250, 70);"
+      "  border-radius: 3px;"
+      "}" );
+  }
+
+  return QStringLiteral(
+    "QWidget#sutraPopupCornerTools {"
+    "  background: rgba(245, 248, 252, 225);"
+    "  border: 1px solid rgba(120, 120, 120, 170);"
+    "  border-radius: 4px;"
+    "  color: #0f172a;"
+    "}"
+    "QToolButton {"
+    "  min-width: 22px;"
+    "  min-height: 20px;"
+    "  padding: 1px;"
+    "  border: 0;"
+    "  background: transparent;"
+    "  color: #0f172a;"
+    "  font-weight: bold;"
+    "}"
+    "QToolButton:hover {"
+    "  background: rgba(80, 140, 220, 60);"
+    "  border-radius: 3px;"
+    "}" );
+}
+
+QString sutraPopupThemeStyleSheet()
+{
+  if ( sutraPopupUsesDarkTheme() ) {
+    return QStringLiteral(
+      "QMainWindow { background: #0b1220; color: #e5e7eb; }"
+      "QToolBar, QStatusBar { background: #111827; color: #e5e7eb; border-color: #334155; }"
+      "QTabWidget::pane { background: #0b1220; border: 1px solid #334155; top: -1px; }"
+      "QTabWidget::tab-bar { left: 6px; }"
+      "QTabBar { qproperty-drawBase: 0; }"
+      "QTabBar::tab {"
+      "  background: #1e293b; color: #cbd5e1; border: 1px solid #334155; border-bottom: 0;"
+      "  border-top-left-radius: 5px; border-top-right-radius: 5px;"
+      "  padding: 6px 12px; margin-right: 4px; min-width: 72px; min-height: 22px;"
+      "}"
+      "QTabBar::tab:selected { background: #0f172a; color: #f8fafc; margin-bottom: -1px; }"
+      "QTabBar::tab:hover:!selected { background: #263449; }"
+      "QTabBar::close-button { margin-left: 7px; subcontrol-position: right; }"
+      "QLineEdit, QComboBox, QListView, QTreeView, QTableView, QTextEdit, QTextBrowser {"
+      "  background: #111827; color: #e5e7eb; border: 1px solid #334155; selection-background-color: #1d4ed8;"
+      "  selection-color: #ffffff; }"
+      "QToolButton, QPushButton { color: #e5e7eb; background: transparent; }"
+      "QToolButton:hover, QPushButton:hover { background: #1e293b; }"
+      "QMenu { background: #111827; color: #e5e7eb; border: 1px solid #475569; }"
+      "QMenu::item:selected { background: #1e3a5f; color: #ffffff; }"
+      "QMenu::separator { background: #334155; }"
+      "QScrollBar:vertical, QScrollBar:horizontal { background: #0f172a; border: 0; }"
+      "QScrollBar::handle:vertical, QScrollBar::handle:horizontal { background: #475569; border-radius: 4px; }"
+      "QScrollBar::handle:vertical:hover, QScrollBar::handle:horizontal:hover { background: #64748b; }"
+      "QToolTip { background: #111827; color: #f8fafc; border: 1px solid #475569; }" );
+  }
+
+  return QStringLiteral(
+    "QMainWindow { background: #f8fafc; color: #0f172a; }"
+    "QToolBar, QStatusBar { background: #f8fafc; color: #0f172a; }"
+    "QTabWidget::pane { background: #ffffff; border: 1px solid #cbd5e1; top: -1px; }"
+    "QTabWidget::tab-bar { left: 6px; }"
+    "QTabBar { qproperty-drawBase: 0; }"
+    "QTabBar::tab {"
+    "  background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; border-bottom: 0;"
+    "  border-top-left-radius: 5px; border-top-right-radius: 5px;"
+    "  padding: 6px 12px; margin-right: 4px; min-width: 72px; min-height: 22px;"
+    "}"
+    "QTabBar::tab:selected { background: #ffffff; color: #0f172a; margin-bottom: -1px; }"
+    "QTabBar::tab:hover:!selected { background: #e2e8f0; }"
+    "QTabBar::close-button { margin-left: 7px; subcontrol-position: right; }"
+    "QLineEdit, QComboBox, QListView, QTreeView, QTableView, QTextEdit, QTextBrowser {"
+    "  background: #ffffff; color: #0f172a; border: 1px solid #cbd5e1; selection-background-color: #2563eb;"
+    "  selection-color: #ffffff; }"
+    "QMenu { background: #ffffff; color: #0f172a; border: 1px solid #cbd5e1; }"
+    "QMenu::item:selected { background: #dbeafe; color: #0f172a; }"
+    "QMenu::separator { background: #e2e8f0; }" );
+}
+
+void updateSutraPopupThemeToggleButton( QWidget * popup )
+{
+  if ( !popup ) {
+    return;
+  }
+
+  if ( QToolButton * button =
+         popup->findChild< QToolButton * >( sutraPopupThemeToggleButtonObjectName() ) ) {
+    const bool dark = sutraPopupUsesDarkTheme();
+    button->setText( dark ? QStringLiteral( "L" ) : QStringLiteral( "D" ) );
+    button->setToolTip( dark ? QObject::tr( "Switch popup to Light mode (Ctrl+Shift+L)" )
+                             : QObject::tr( "Switch popup to Dark mode (Ctrl+Shift+L)" ) );
+  }
+}
+
+void applySutraPopupTheme( QWidget * popup, QTabWidget * tabs )
+{
+  if ( !popup ) {
+    return;
+  }
+
+  const char * baseStyleProperty = "sutraPopupBaseStyleSheet";
+  if ( !popup->property( baseStyleProperty ).isValid() ) {
+    popup->setProperty( baseStyleProperty, popup->styleSheet() );
+  }
+
+  const bool dark = sutraPopupUsesDarkTheme();
+  popup->setProperty( "sutraPopupDarkTheme", dark );
+
+  QPalette palette = QApplication::palette();
+  if ( dark ) {
+    palette.setColor( QPalette::Window, QColor( 11, 18, 32 ) );
+    palette.setColor( QPalette::WindowText, QColor( 229, 231, 235 ) );
+    palette.setColor( QPalette::Base, QColor( 17, 24, 39 ) );
+    palette.setColor( QPalette::AlternateBase, QColor( 30, 41, 59 ) );
+    palette.setColor( QPalette::Text, QColor( 229, 231, 235 ) );
+    palette.setColor( QPalette::Button, QColor( 30, 41, 59 ) );
+    palette.setColor( QPalette::ButtonText, QColor( 229, 231, 235 ) );
+    palette.setColor( QPalette::Highlight, QColor( 37, 99, 235 ) );
+    palette.setColor( QPalette::HighlightedText, QColor( 255, 255, 255 ) );
+    palette.setColor( QPalette::ToolTipBase, QColor( 17, 24, 39 ) );
+    palette.setColor( QPalette::ToolTipText, QColor( 248, 250, 252 ) );
+  }
+  else {
+    // Keep popup Light mode independent when the main application uses Dark mode.
+    palette.setColor( QPalette::Window, QColor( 248, 250, 252 ) );
+    palette.setColor( QPalette::WindowText, QColor( 15, 23, 42 ) );
+    palette.setColor( QPalette::Base, QColor( 255, 255, 255 ) );
+    palette.setColor( QPalette::AlternateBase, QColor( 241, 245, 249 ) );
+    palette.setColor( QPalette::Text, QColor( 15, 23, 42 ) );
+    palette.setColor( QPalette::Button, QColor( 248, 250, 252 ) );
+    palette.setColor( QPalette::ButtonText, QColor( 15, 23, 42 ) );
+    palette.setColor( QPalette::Highlight, QColor( 37, 99, 235 ) );
+    palette.setColor( QPalette::HighlightedText, QColor( 255, 255, 255 ) );
+    palette.setColor( QPalette::ToolTipBase, QColor( 255, 255, 255 ) );
+    palette.setColor( QPalette::ToolTipText, QColor( 15, 23, 42 ) );
+  }
+
+  popup->setPalette( palette );
+  popup->setAutoFillBackground( true );
+  popup->setStyleSheet( popup->property( baseStyleProperty ).toString() + sutraPopupThemeStyleSheet() );
+
+  if ( QWidget * tools = popup->findChild< QWidget * >( QStringLiteral( "sutraPopupCornerTools" ) ) ) {
+    tools->setStyleSheet( sutraPopupCornerToolsThemeStyleSheet() );
+  }
+
+  updateSutraPopupThemeToggleButton( popup );
+
+  if ( tabs ) {
+    for ( int i = 0; i < tabs->count(); ++i ) {
+      if ( QTextBrowser * browser = qobject_cast< QTextBrowser * >( tabs->widget( i ) ) ) {
+        applySutraPopupTextBrowserFont( browser );
+      }
+    }
+  }
+
+  popup->update();
+}
+
+
 enum class SutraMouseLookupMode {
   Disabled       = 0,
   CtrlRightClick = 1,
   CtrlLeftClick  = 2,
-  AltRightClick  = 3
+  AltRightClick  = 3,
+  Custom         = 4
 };
 
 QString sutraMouseLookupModeSettingsKey()
@@ -338,11 +609,51 @@ QString sutraMouseLookupModeSettingsKey()
   return QStringLiteral( "SutraEdition/MouseLookupMode" );
 }
 
+QString sutraMouseLookupEnabledSettingsKey()
+{
+  return QStringLiteral( "SutraEdition/MouseLookupEnabled" );
+}
+
+QString sutraMouseLookupModifiersSettingsKey()
+{
+  return QStringLiteral( "SutraEdition/MouseLookupModifiers" );
+}
+
+QString sutraMouseLookupButtonSettingsKey()
+{
+  return QStringLiteral( "SutraEdition/MouseLookupButton" );
+}
+
 constexpr int sutraMouseLookupDefaultMode = static_cast< int >( SutraMouseLookupMode::CtrlRightClick );
+constexpr int sutraMouseLookupCtrlModifier = 0x01;
+constexpr int sutraMouseLookupAltModifier = 0x02;
 
 SutraMouseLookupMode loadSutraMouseLookupMode()
 {
   QSettings settings;
+
+  if ( settings.contains( sutraMouseLookupEnabledSettingsKey() ) ) {
+    if ( !settings.value( sutraMouseLookupEnabledSettingsKey(), true ).toBool() ) {
+      return SutraMouseLookupMode::Disabled;
+    }
+
+    const int modifiers = settings.value( sutraMouseLookupModifiersSettingsKey(),
+                                          sutraMouseLookupCtrlModifier ).toInt();
+    const int button = settings.value( sutraMouseLookupButtonSettingsKey(), 2 ).toInt();
+
+    if ( modifiers == sutraMouseLookupCtrlModifier && button == 2 ) {
+      return SutraMouseLookupMode::CtrlRightClick;
+    }
+    if ( modifiers == sutraMouseLookupCtrlModifier && button == 1 ) {
+      return SutraMouseLookupMode::CtrlLeftClick;
+    }
+    if ( modifiers == sutraMouseLookupAltModifier && button == 2 ) {
+      return SutraMouseLookupMode::AltRightClick;
+    }
+
+    return SutraMouseLookupMode::Custom;
+  }
+
   const int value =
     qBound( 0, settings.value( sutraMouseLookupModeSettingsKey(), sutraMouseLookupDefaultMode ).toInt(), 3 );
   return static_cast< SutraMouseLookupMode >( value );
@@ -352,6 +663,30 @@ void saveSutraMouseLookupMode( SutraMouseLookupMode mode )
 {
   QSettings settings;
   settings.setValue( sutraMouseLookupModeSettingsKey(), static_cast< int >( mode ) );
+
+  switch ( mode ) {
+    case SutraMouseLookupMode::Disabled:
+      settings.setValue( sutraMouseLookupEnabledSettingsKey(), false );
+      settings.setValue( sutraMouseLookupModifiersSettingsKey(), sutraMouseLookupCtrlModifier );
+      settings.setValue( sutraMouseLookupButtonSettingsKey(), 2 );
+      break;
+    case SutraMouseLookupMode::CtrlLeftClick:
+      settings.setValue( sutraMouseLookupEnabledSettingsKey(), true );
+      settings.setValue( sutraMouseLookupModifiersSettingsKey(), sutraMouseLookupCtrlModifier );
+      settings.setValue( sutraMouseLookupButtonSettingsKey(), 1 );
+      break;
+    case SutraMouseLookupMode::AltRightClick:
+      settings.setValue( sutraMouseLookupEnabledSettingsKey(), true );
+      settings.setValue( sutraMouseLookupModifiersSettingsKey(), sutraMouseLookupAltModifier );
+      settings.setValue( sutraMouseLookupButtonSettingsKey(), 2 );
+      break;
+    case SutraMouseLookupMode::CtrlRightClick:
+    default:
+      settings.setValue( sutraMouseLookupEnabledSettingsKey(), true );
+      settings.setValue( sutraMouseLookupModifiersSettingsKey(), sutraMouseLookupCtrlModifier );
+      settings.setValue( sutraMouseLookupButtonSettingsKey(), 2 );
+      break;
+  }
 }
 
 QString sutraMouseLookupModeLabel( SutraMouseLookupMode mode )
@@ -363,6 +698,8 @@ QString sutraMouseLookupModeLabel( SutraMouseLookupMode mode )
       return QStringLiteral( "Ctrl + Left Click" );
     case SutraMouseLookupMode::AltRightClick:
       return QStringLiteral( "Alt + Right Click" );
+    case SutraMouseLookupMode::Custom:
+      return QStringLiteral( "Custom - Preferences > Hotkeys" );
     case SutraMouseLookupMode::CtrlRightClick:
     default:
       return QStringLiteral( "Ctrl + Right Click" );
@@ -376,7 +713,11 @@ void resetSutraPopupAppearanceDefaults()
   settings.remove( sutraPopupFixedGeometrySettingsKey() );
   settings.setValue( sutraPopupFontSizeSettingsKey(), sutraPopupDefaultFontSize );
   settings.setValue( sutraPopupOpacitySettingsKey(), sutraPopupDefaultOpacityPercent );
+  settings.setValue( sutraPopupThemeSettingsKey(), sutraPopupDefaultThemeMode );
   settings.setValue( sutraMouseLookupModeSettingsKey(), sutraMouseLookupDefaultMode );
+  settings.setValue( sutraMouseLookupEnabledSettingsKey(), true );
+  settings.setValue( sutraMouseLookupModifiersSettingsKey(), sutraMouseLookupCtrlModifier );
+  settings.setValue( sutraMouseLookupButtonSettingsKey(), 2 );
 }
 
 void applySutraPopupOpacity( QWidget * popup )
@@ -2370,7 +2711,7 @@ void updateBuddhistGlossaryTab( QTabWidget * tabs, const QString & primaryTerm, 
     tabs->addTab( browser, QString::fromUtf8( "\x47" "\x69" "\xe1" "\xba" "\xa3" "\x69" "\x20" "\x6e" "\x67" "\x68" "\xc4" "\xa9" "\x61" ) ); // sutraForceGlossaryTabTitleV8
   }
 
-  browser->setHtml( glossaryHtmlStableV16( primaryTerm, detectedTerms ) );
+  browser->setHtml( sutraApplyPopupThemeToHtml( glossaryHtmlStableV16( primaryTerm, detectedTerms ) ) );
   applySutraPopupTextBrowserFont( browser );
 }
 
@@ -2522,7 +2863,8 @@ void updateWebReferenceTab( QTabWidget * tabs, const QString & primaryTerm, cons
     tabs->addTab( browser, QStringLiteral( "Web" ) );
   }
 
-  browser->setHtml( sutraSafeWebReferenceV13( webReferenceHtml( primaryTerm, detectedTerms ) ) );
+  browser->setHtml( sutraApplyPopupThemeToHtml(
+    sutraSafeWebReferenceV13( webReferenceHtml( primaryTerm, detectedTerms ) ) ) );
   applySutraPopupTextBrowserFont( browser );
 }
 
@@ -2750,6 +3092,10 @@ ScanPopup::ScanPopup( QWidget * parent,
   tabWidget->setTabsClosable( true );
   tabWidget->setHideSingleTab( true );
   tabWidget->setSizePolicy( QSizePolicy::Preferred, QSizePolicy::Expanding );
+  tabWidget->tabBar()->setExpanding( false );
+  tabWidget->tabBar()->setUsesScrollButtons( true );
+  tabWidget->tabBar()->setElideMode( Qt::ElideRight );
+  tabWidget->tabBar()->setMovable( false );
   connect( tabWidget, &QTabWidget::tabCloseRequested, this, [ this ]( int index ) {
     if ( index > 0 ) {
       auto widget = tabWidget->widget( index );
@@ -2899,10 +3245,24 @@ ScanPopup::ScanPopup( QWidget * parent,
   QAction * sutraPopupFixedAction = sutraPopupLayoutMenu->addAction( tr( "Fix current size and position" ) );
   QAction * sutraPopupFitAction   = sutraPopupLayoutMenu->addAction( tr( "Fit window size to results" ) );
 
+  sutraPopupLayoutGroup->setExclusive( true );
   for ( QAction * action : { sutraPopupAutoAction, sutraPopupFixedAction, sutraPopupFitAction } ) {
     action->setCheckable( true );
     sutraPopupLayoutGroup->addAction( action );
   }
+
+  const auto syncSutraPopupLayoutActions = [ sutraPopupLayoutGroup,
+                                              sutraPopupAutoAction,
+                                              sutraPopupFixedAction,
+                                              sutraPopupFitAction ]( SutraPopupLayoutMode mode ) {
+    // Clear the old mark first. This avoids a stale checked action when the
+    // selected layout mode is changed programmatically or through QSettings.
+    sutraPopupLayoutGroup->setExclusive( false );
+    sutraPopupAutoAction->setChecked( mode == SutraPopupLayoutMode::Auto );
+    sutraPopupFixedAction->setChecked( mode == SutraPopupLayoutMode::Fixed );
+    sutraPopupFitAction->setChecked( mode == SutraPopupLayoutMode::FitToResults );
+    sutraPopupLayoutGroup->setExclusive( true );
+  };
 
   sutraPopupLayoutMenu->addSeparator();
 
@@ -3003,7 +3363,75 @@ ScanPopup::ScanPopup( QWidget * parent,
     } );
   }
 
-  sutraPopupLayoutMenu->addSeparator();
+  const auto applySutraPopupThemeMode = [ this ]( SutraPopupThemeMode mode ) {
+    if ( mode == loadSutraPopupThemeMode() ) {
+      applySutraPopupTheme( this, tabWidget );
+      return;
+    }
+
+    QPointer< QWidget > previousCurrentTab = tabWidget ? tabWidget->currentWidget() : nullptr;
+
+    saveSutraPopupThemeMode( mode );
+    applySutraPopupTheme( this, tabWidget );
+
+    // Re-render only the custom presentation HTML. Lookup detection, selected word,
+    // glossary data and translation logic are not changed.
+    refreshSutraCustomTabs( tabWidget, pendingWord, translateBox->translateLine()->text() );
+    applySutraPopupFontSizeToTabs( tabWidget );
+    applySutraPopupTheme( this, tabWidget );
+
+    if ( previousCurrentTab && tabWidget && tabWidget->indexOf( previousCurrentTab ) >= 0 ) {
+      tabWidget->setCurrentWidget( previousCurrentTab );
+    }
+
+    if ( loadSutraPopupLayoutMode() == SutraPopupLayoutMode::FitToResults ) {
+      QTimer::singleShot( 0, this, [ this ] {
+        fitSutraPopupToResults( this, tabWidget );
+        positionSutraPopupCornerTools( this );
+      } );
+    }
+
+    showStatusBarMessage( tr( "Popup theme: %1" ).arg( sutraPopupThemeModeLabel( mode ) ), 3500 );
+  };
+
+  QMenu * sutraPopupThemeMenu         = sutraPopupLayoutMenu->addMenu( tr( "Theme" ) );
+  QActionGroup * sutraPopupThemeGroup = new QActionGroup( sutraPopupThemeMenu );
+  QList< QAction * > sutraPopupThemeActions;
+
+  QAction * sutraPopupLightThemeAction = sutraPopupThemeMenu->addAction( tr( "Light" ) );
+  sutraPopupLightThemeAction->setCheckable( true );
+  sutraPopupLightThemeAction->setData( static_cast< int >( SutraPopupThemeMode::Light ) );
+  sutraPopupThemeGroup->addAction( sutraPopupLightThemeAction );
+  sutraPopupThemeActions << sutraPopupLightThemeAction;
+
+  QAction * sutraPopupDarkThemeAction = sutraPopupThemeMenu->addAction( tr( "Dark" ) );
+  sutraPopupDarkThemeAction->setCheckable( true );
+  sutraPopupDarkThemeAction->setData( static_cast< int >( SutraPopupThemeMode::Dark ) );
+  sutraPopupThemeGroup->addAction( sutraPopupDarkThemeAction );
+  sutraPopupThemeActions << sutraPopupDarkThemeAction;
+
+  connect( sutraPopupLightThemeAction, &QAction::triggered, this, [ applySutraPopupThemeMode ] {
+    applySutraPopupThemeMode( SutraPopupThemeMode::Light );
+  } );
+  connect( sutraPopupDarkThemeAction, &QAction::triggered, this, [ applySutraPopupThemeMode ] {
+    applySutraPopupThemeMode( SutraPopupThemeMode::Dark );
+  } );
+
+  sutraPopupThemeMenu->addSeparator();
+
+  QAction * sutraPopupThemeToggleAction = new QAction( tr( "Toggle Light / Dark" ), this );
+  sutraPopupThemeToggleAction->setObjectName( QStringLiteral( "sutraPopupThemeToggleAction" ) );
+  sutraPopupThemeToggleAction->setShortcutContext( Qt::WidgetWithChildrenShortcut );
+  sutraPopupThemeToggleAction->setShortcut( QKeySequence( Qt::CTRL | Qt::SHIFT | Qt::Key_L ) );
+  addAction( sutraPopupThemeToggleAction );
+  sutraPopupThemeMenu->addAction( sutraPopupThemeToggleAction );
+
+  connect( sutraPopupThemeToggleAction, &QAction::triggered, this, [ applySutraPopupThemeMode ] {
+    const SutraPopupThemeMode nextMode = sutraPopupUsesDarkTheme()
+                                               ? SutraPopupThemeMode::Light
+                                               : SutraPopupThemeMode::Dark;
+    applySutraPopupThemeMode( nextMode );
+  } );
 
   sutraPopupLayoutMenu->addSeparator();
 
@@ -3044,8 +3472,10 @@ ScanPopup::ScanPopup( QWidget * parent,
                                             sutraPopupAutoAction,
                                             sutraPopupFixedAction,
                                             sutraPopupFitAction,
+                                            syncSutraPopupLayoutActions,
                                             sutraPopupFontSizeActions,
                                             sutraPopupTransparencyActions,
+                                            sutraPopupThemeActions,
                                             sutraMouseLookupActions,
                                             sutraMouseLookupInfoAction ] {
     sutraPopupPinAction->setChecked( ui.pinButton->isChecked() );
@@ -3060,6 +3490,11 @@ ScanPopup::ScanPopup( QWidget * parent,
       opacityAction->setChecked( opacityAction->data().toInt() == currentOpacityPercent );
     }
 
+    const SutraPopupThemeMode currentThemeMode = loadSutraPopupThemeMode();
+    for ( QAction * themeAction : sutraPopupThemeActions ) {
+      themeAction->setChecked( themeAction->data().toInt() == static_cast< int >( currentThemeMode ) );
+    }
+
     const SutraMouseLookupMode currentMouseLookupMode = loadSutraMouseLookupMode();
     for ( QAction * mouseLookupAction : sutraMouseLookupActions ) {
       mouseLookupAction->setChecked( mouseLookupAction->data().toInt()
@@ -3068,18 +3503,7 @@ ScanPopup::ScanPopup( QWidget * parent,
     sutraMouseLookupInfoAction->setText(
       tr( "Current mouse lookup: %1" ).arg( sutraMouseLookupModeLabel( currentMouseLookupMode ) ) );
 
-    switch ( loadSutraPopupLayoutMode() ) {
-      case SutraPopupLayoutMode::Fixed:
-        sutraPopupFixedAction->setChecked( true );
-        break;
-      case SutraPopupLayoutMode::FitToResults:
-        sutraPopupFitAction->setChecked( true );
-        break;
-      case SutraPopupLayoutMode::Auto:
-      default:
-        sutraPopupAutoAction->setChecked( true );
-        break;
-    }
+    syncSutraPopupLayoutActions( loadSutraPopupLayoutMode() );
   };
 
   connect( sutraPopupLayoutMenu, &QMenu::aboutToShow, this, updateSutraPopupLayoutMenu );
@@ -3090,18 +3514,21 @@ ScanPopup::ScanPopup( QWidget * parent,
     showStatusBarMessage( checked ? tr( "Popup pinned" ) : tr( "Popup unpinned" ), 4000 );
   } );
 
-  connect( sutraPopupAutoAction, &QAction::triggered, this, [ this ] {
+  connect( sutraPopupAutoAction, &QAction::triggered, this, [ this, syncSutraPopupLayoutActions ] {
     saveSutraPopupLayoutMode( SutraPopupLayoutMode::Auto );
+    syncSutraPopupLayoutActions( SutraPopupLayoutMode::Auto );
     showStatusBarMessage( tr( "Popup layout: Auto" ), 4000 );
   } );
 
-  connect( sutraPopupFixedAction, &QAction::triggered, this, [ this ] {
+  connect( sutraPopupFixedAction, &QAction::triggered, this, [ this, syncSutraPopupLayoutActions ] {
     saveSutraPopupFixedGeometry( this );
+    syncSutraPopupLayoutActions( SutraPopupLayoutMode::Fixed );
     showStatusBarMessage( tr( "Popup layout: fixed current size and position" ), 5000 );
   } );
 
-  connect( sutraPopupFitAction, &QAction::triggered, this, [ this ] {
+  connect( sutraPopupFitAction, &QAction::triggered, this, [ this, syncSutraPopupLayoutActions ] {
     saveSutraPopupLayoutMode( SutraPopupLayoutMode::FitToResults );
+    syncSutraPopupLayoutActions( SutraPopupLayoutMode::FitToResults );
     fitSutraPopupToResults( this, tabWidget );
     showStatusBarMessage( tr( "Popup layout: fit to results" ), 4000 );
   } );
@@ -3109,9 +3536,11 @@ ScanPopup::ScanPopup( QWidget * parent,
   connect( sutraPopupRestoreDefaultsAction, &QAction::triggered, this, [ this ] {
     resetSutraPopupAppearanceDefaults();
     applySutraPopupOpacity( this );
+    applySutraPopupTheme( this, tabWidget );
     applyZoomFactor();
     refreshSutraCustomTabs( tabWidget, pendingWord, translateBox->translateLine()->text() );
     applySutraPopupFontSizeToTabs( tabWidget );
+    applySutraPopupTheme( this, tabWidget );
     updateSutraPopupZoomIndicator( this );
     applySutraPopupLayoutMode( this, tabWidget );
 
@@ -3120,7 +3549,7 @@ ScanPopup::ScanPopup( QWidget * parent,
     } );
 
     showStatusBarMessage(
-      tr( "Popup defaults restored: Auto layout, 100% zoom, 100% opacity, Ctrl + Right Click" ),
+      tr( "Popup defaults restored: Light theme, Auto layout, 100% zoom, 100% opacity, Ctrl + Right Click" ),
       5000 );
   } );
 
@@ -3139,24 +3568,7 @@ ScanPopup::ScanPopup( QWidget * parent,
   sutraPopupCornerTools->setObjectName( sutraPopupCornerToolsObjectName() );
   sutraPopupCornerTools->setAttribute( Qt::WA_TranslucentBackground );
   sutraPopupCornerTools->setToolTip( tr( "Popup quick settings" ) );
-  sutraPopupCornerTools->setStyleSheet(
-    QStringLiteral( "QWidget#sutraPopupCornerTools {"
-                    "  background: rgba(245, 248, 252, 225);"
-                    "  border: 1px solid rgba(120, 120, 120, 170);"
-                    "  border-radius: 4px;"
-                    "}"
-                    "QToolButton {"
-                    "  min-width: 22px;"
-                    "  min-height: 20px;"
-                    "  padding: 1px;"
-                    "  border: 0;"
-                    "  background: transparent;"
-                    "  font-weight: bold;"
-                    "}"
-                    "QToolButton:hover {"
-                    "  background: rgba(80, 140, 220, 60);"
-                    "  border-radius: 3px;"
-                    "}" ) );
+  sutraPopupCornerTools->setStyleSheet( sutraPopupCornerToolsThemeStyleSheet() );
 
   QHBoxLayout * sutraPopupCornerLayout = new QHBoxLayout( sutraPopupCornerTools );
   sutraPopupCornerLayout->setContentsMargins( 4, 2, 4, 2 );
@@ -3178,6 +3590,11 @@ ScanPopup::ScanPopup( QWidget * parent,
   sutraPopupZoomInButton->setToolTip( tr( "Zoom in (Ctrl++)" ) );
   sutraPopupZoomInButton->setAutoRaise( true );
 
+  QToolButton * sutraPopupThemeToggleButton = new QToolButton( sutraPopupCornerTools );
+  sutraPopupThemeToggleButton->setObjectName( sutraPopupThemeToggleButtonObjectName() );
+  sutraPopupThemeToggleButton->setMinimumWidth( 24 );
+  sutraPopupThemeToggleButton->setAutoRaise( true );
+
   QToolButton * sutraPopupOptionsButton = new QToolButton( sutraPopupCornerTools );
   sutraPopupOptionsButton->setText( QStringLiteral( "⚙" ) );
   sutraPopupOptionsButton->setToolTip( tr( "Popup settings" ) );
@@ -3196,6 +3613,7 @@ ScanPopup::ScanPopup( QWidget * parent,
   sutraPopupCornerLayout->addWidget( sutraPopupZoomOutButton );
   sutraPopupCornerLayout->addWidget( sutraPopupZoomIndicator );
   sutraPopupCornerLayout->addWidget( sutraPopupZoomInButton );
+  sutraPopupCornerLayout->addWidget( sutraPopupThemeToggleButton );
   sutraPopupCornerLayout->addWidget( sutraPopupOptionsButton );
   sutraPopupCornerLayout->addWidget( sutraPopupQuickFixButton );
   sutraPopupCornerLayout->addWidget( sutraPopupQuickFitButton );
@@ -3203,6 +3621,7 @@ ScanPopup::ScanPopup( QWidget * parent,
   connect( sutraPopupZoomOutButton, &QToolButton::clicked, sutraPopupZoomOutAction, &QAction::trigger );
   connect( sutraPopupZoomIndicator, &QToolButton::clicked, sutraPopupZoomResetAction, &QAction::trigger );
   connect( sutraPopupZoomInButton, &QToolButton::clicked, sutraPopupZoomInAction, &QAction::trigger );
+  connect( sutraPopupThemeToggleButton, &QToolButton::clicked, sutraPopupThemeToggleAction, &QAction::trigger );
 
   // Receive Ctrl + mouse-wheel events from every widget inside the popup,
   // including the article view, custom Definition/Web tabs and their scroll areas.
@@ -3232,6 +3651,7 @@ ScanPopup::ScanPopup( QWidget * parent,
   sutraPopupCornerTools->show();
   positionSutraPopupCornerTools( this );
 
+  applySutraPopupTheme( this, tabWidget );
   applySutraPopupLayoutMode( this, tabWidget );
   applySutraPopupOpacity( this );
 
