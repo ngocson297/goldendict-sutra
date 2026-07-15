@@ -11,6 +11,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QTextBrowser>
+#include <QScrollBar>
 #include <QTabWidget>
 #include <QToolButton>
 #include <QAbstractButton>
@@ -690,6 +691,63 @@ QIcon sutraPopupNoteIcon( const QColor & color, bool hasNote )
   return QIcon( pixmap );
 }
 
+
+QIcon sutraPopupSettingsIcon( const QColor & color )
+{
+  QPixmap pixmap( 20, 20 );
+  pixmap.fill( Qt::transparent );
+
+  QPainter painter( &pixmap );
+  painter.setRenderHint( QPainter::Antialiasing, true );
+  painter.setPen( QPen( color, 1.7, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin ) );
+  painter.setBrush( Qt::NoBrush );
+
+  const QPointF center( 10.0, 10.0 );
+  painter.drawEllipse( QRectF( 7.0, 7.0, 6.0, 6.0 ) );
+  painter.drawEllipse( QRectF( 4.3, 4.3, 11.4, 11.4 ) );
+  for ( int i = 0; i < 8; ++i ) {
+    const qreal angle = qDegreesToRadians( static_cast< qreal >( i * 45 ) );
+    const QPointF inner( center.x() + std::cos( angle ) * 6.0,
+                         center.y() + std::sin( angle ) * 6.0 );
+    const QPointF outer( center.x() + std::cos( angle ) * 8.0,
+                         center.y() + std::sin( angle ) * 8.0 );
+    painter.drawLine( inner, outer );
+  }
+  return QIcon( pixmap );
+}
+
+QIcon sutraPopupBackToTopIcon( const QColor & color )
+{
+  QPixmap pixmap( 18, 18 );
+  pixmap.fill( Qt::transparent );
+
+  QPainter painter( &pixmap );
+  painter.setRenderHint( QPainter::Antialiasing, true );
+  painter.setPen( QPen( color, 1.8, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin ) );
+  painter.drawLine( QPointF( 4.0, 3.5 ), QPointF( 14.0, 3.5 ) );
+  painter.drawLine( QPointF( 9.0, 14.5 ), QPointF( 9.0, 6.0 ) );
+  painter.drawLine( QPointF( 9.0, 6.0 ), QPointF( 5.5, 9.5 ) );
+  painter.drawLine( QPointF( 9.0, 6.0 ), QPointF( 12.5, 9.5 ) );
+  return QIcon( pixmap );
+}
+
+QIcon sutraPopupFixedLayoutIcon( const QColor & color )
+{
+  QPixmap pixmap( 18, 18 );
+  pixmap.fill( Qt::transparent );
+
+  QPainter painter( &pixmap );
+  painter.setRenderHint( QPainter::Antialiasing, true );
+  painter.setPen( QPen( color, 1.55, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin ) );
+  painter.setBrush( Qt::NoBrush );
+  painter.drawRoundedRect( QRectF( 2.8, 3.2, 12.4, 10.8 ), 1.5, 1.5 );
+  painter.drawLine( QPointF( 5.0, 6.0 ), QPointF( 13.0, 6.0 ) );
+  painter.drawLine( QPointF( 11.0, 11.0 ), QPointF( 14.8, 14.8 ) );
+  painter.drawLine( QPointF( 14.8, 14.8 ), QPointF( 14.8, 11.8 ) );
+  painter.drawLine( QPointF( 14.8, 14.8 ), QPointF( 11.8, 14.8 ) );
+  return QIcon( pixmap );
+}
+
 QString sutraPopupThemeModeLabel( SutraPopupThemeMode mode )
 {
   switch ( mode ) {
@@ -1347,6 +1405,26 @@ void updateSutraPopupThemeToggleButton( QWidget * popup )
     note->setIcon( sutraPopupNoteIcon( sutraPopupToolbarIconColor( note->isEnabled() ), hasNote ) );
     note->setIconSize( QSize( 18, 18 ) );
   }
+  if ( QToolButton * backToTop = popup->findChild< QToolButton * >( QStringLiteral( "sutraPopupBackToTopButton" ) ) ) {
+    backToTop->setText( QString() );
+    backToTop->setIcon( sutraPopupBackToTopIcon( iconColor ) );
+    backToTop->setIconSize( QSize( 18, 18 ) );
+  }
+  if ( QToolButton * options = popup->findChild< QToolButton * >( QStringLiteral( "sutraPopupOptionsButton" ) ) ) {
+    options->setText( QString() );
+    options->setIcon( sutraPopupSettingsIcon( iconColor ) );
+    options->setIconSize( QSize( 20, 20 ) );
+  }
+  if ( QToolButton * quickFix = popup->findChild< QToolButton * >( QStringLiteral( "sutraPopupQuickFixButton" ) ) ) {
+    quickFix->setText( QString() );
+    quickFix->setIcon( sutraPopupFixedLayoutIcon( iconColor ) );
+    quickFix->setIconSize( QSize( 18, 18 ) );
+  }
+  if ( QAbstractButton * mainSettings = popup->findChild< QAbstractButton * >( QStringLiteral( "pinButton" ) ) ) {
+    mainSettings->setText( QString() );
+    mainSettings->setIcon( sutraPopupSettingsIcon( iconColor ) );
+    mainSettings->setIconSize( QSize( 20, 20 ) );
+  }
 }
 
 void applySutraPointingCursorToObject( QObject * object )
@@ -2003,7 +2081,7 @@ void updateSutraPopupCornerToolsResponsive( QWidget * popup )
 
   setVisible( "sutraSeparatorHistoryZoom", showZoom );
   setVisible( "sutraSeparatorZoomAppearance", showZoom );
-  setVisible( "sutraSeparatorAppearanceLayout", showExtended );
+  setVisible( "sutraSeparatorAppearanceLayout", true );
 
   if ( QToolButton * options = popup->findChild< QToolButton * >( QStringLiteral( "sutraPopupOptionsButton" ) ) ) {
     options->setToolTip( showExtended ? QObject::tr( "Popup settings" )
@@ -4624,9 +4702,13 @@ ScanPopup::ScanPopup( QWidget * parent,
   connect( ui.onTopButton, &QAbstractButton::clicked, this, &ScanPopup::alwaysOnTopClicked );
 
   ui.pinButton->setChecked( cfg.pinPopupWindow );
-
-
-  ui.pinButton->setToolTip( ui.pinButton->toolTip() + tr( "\nClick: popup options / tùy chọn popup" ) );
+  // This button now opens the popup settings menu. A gear avoids the old red
+  // pin icon suggesting that clicking it directly toggles pinning.
+  ui.pinButton->setText( QString() );
+  ui.pinButton->setIcon( sutraPopupSettingsIcon( sutraPopupActiveTextColor() ) );
+  ui.pinButton->setIconSize( QSize( 20, 20 ) );
+  ui.pinButton->setToolTip( tr( "Popup settings" ) );
+  ui.pinButton->setAccessibleName( tr( "Popup settings" ) );
 
   QMenu * sutraPopupLayoutMenu = new QMenu( tr( "Popup options" ), ui.pinButton );
 
@@ -5558,14 +5640,27 @@ ScanPopup::ScanPopup( QWidget * parent,
 
   QToolButton * sutraPopupOptionsButton = new QToolButton( sutraPopupCornerTools );
   sutraPopupOptionsButton->setObjectName( QStringLiteral( "sutraPopupOptionsButton" ) );
-  sutraPopupOptionsButton->setText( QStringLiteral( "⚙" ) );
+  sutraPopupOptionsButton->setText( QString() );
+  sutraPopupOptionsButton->setIcon( sutraPopupSettingsIcon( sutraPopupActiveTextColor() ) );
+  sutraPopupOptionsButton->setIconSize( QSize( 20, 20 ) );
   sutraPopupOptionsButton->setAccessibleName( tr( "Popup settings" ) );
   sutraPopupOptionsButton->setToolTip( tr( "Popup settings" ) );
   sutraPopupOptionsButton->setAutoRaise( true );
 
+  QToolButton * sutraPopupBackToTopButton = new QToolButton( sutraPopupCornerTools );
+  sutraPopupBackToTopButton->setObjectName( QStringLiteral( "sutraPopupBackToTopButton" ) );
+  sutraPopupBackToTopButton->setText( QString() );
+  sutraPopupBackToTopButton->setIcon( sutraPopupBackToTopIcon( sutraPopupActiveTextColor() ) );
+  sutraPopupBackToTopButton->setIconSize( QSize( 18, 18 ) );
+  sutraPopupBackToTopButton->setAccessibleName( tr( "Back to top" ) );
+  sutraPopupBackToTopButton->setToolTip( tr( "Back to top" ) );
+  sutraPopupBackToTopButton->setAutoRaise( true );
+
   QToolButton * sutraPopupQuickFixButton = new QToolButton( sutraPopupCornerTools );
   sutraPopupQuickFixButton->setObjectName( QStringLiteral( "sutraPopupQuickFixButton" ) );
-  sutraPopupQuickFixButton->setText( QStringLiteral( "📌" ) );
+  sutraPopupQuickFixButton->setText( QString() );
+  sutraPopupQuickFixButton->setIcon( sutraPopupFixedLayoutIcon( sutraPopupActiveTextColor() ) );
+  sutraPopupQuickFixButton->setIconSize( QSize( 18, 18 ) );
   sutraPopupQuickFixButton->setAccessibleName( tr( "Fix current size and position" ) );
   sutraPopupQuickFixButton->setToolTip( tr( "Fix current size and position" ) );
   sutraPopupQuickFixButton->setAutoRaise( true );
@@ -5606,6 +5701,7 @@ ScanPopup::ScanPopup( QWidget * parent,
   sutraPopupCornerLayout->addWidget( sutraPopupThemeToggleButton );
   sutraPopupCornerLayout->addWidget( sutraPopupColorsButton );
   sutraPopupCornerLayout->addWidget( sutraSeparatorAppearanceLayout );
+  sutraPopupCornerLayout->addWidget( sutraPopupBackToTopButton );
   sutraPopupCornerLayout->addWidget( sutraPopupOptionsButton );
   sutraPopupCornerLayout->addWidget( sutraPopupQuickFixButton );
   sutraPopupCornerLayout->addWidget( sutraPopupQuickFitButton );
@@ -5626,6 +5722,35 @@ ScanPopup::ScanPopup( QWidget * parent,
   for ( QObject * popupObject : findChildren< QObject * >() ) {
     popupObject->installEventFilter( this );
   }
+
+  connect( sutraPopupBackToTopButton, &QToolButton::clicked, this, [ this ] {
+    QWidget * currentTab = tabWidget ? tabWidget->currentWidget() : nullptr;
+    bool handled = false;
+
+    if ( ArticleView * article = qobject_cast< ArticleView * >( currentTab ) ) {
+      article->page()->runJavaScript( QStringLiteral(
+        "window.scrollTo(0,0);"
+        "document.documentElement.scrollTop=0;"
+        "if(document.body){document.body.scrollTop=0;}" ) );
+      handled = true;
+    }
+
+    if ( QTextBrowser * browser = qobject_cast< QTextBrowser * >( currentTab ) ) {
+      browser->verticalScrollBar()->setValue( browser->verticalScrollBar()->minimum() );
+      handled = true;
+    }
+    else if ( currentTab ) {
+      const QList< QTextBrowser * > browsers = currentTab->findChildren< QTextBrowser * >();
+      for ( QTextBrowser * browser : browsers ) {
+        browser->verticalScrollBar()->setValue( browser->verticalScrollBar()->minimum() );
+        handled = true;
+      }
+    }
+
+    if ( handled ) {
+      showStatusBarMessage( tr( "Back to top" ), 1800 );
+    }
+  } );
 
   connect( sutraPopupOptionsButton, &QToolButton::clicked, this, [ = ] {
     updateSutraPopupLayoutMenu();

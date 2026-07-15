@@ -1189,6 +1189,70 @@ QString sutraStartupBestVietnamesePhraseAtOffset( const QString & lineText, int 
   return sutraStartupBestVietnamesePhraseAtToken( lineText, tokens, anchorIndex );
 }
 
+enum class SutraStartupAnchorScript
+{
+  Unknown,
+  Latin,
+  Cjk
+};
+
+SutraStartupAnchorScript sutraStartupScriptNearOffset( const QString & text, int offset )
+{
+  if ( text.isEmpty() ) {
+    return SutraStartupAnchorScript::Unknown;
+  }
+
+  const int boundedOffset = qBound( 0, offset, text.size() - 1 );
+  for ( int distance = 0; distance <= 12; ++distance ) {
+    const int candidates[] = { boundedOffset - distance, boundedOffset + distance };
+    for ( const int index : candidates ) {
+      if ( index < 0 || index >= text.size() ) {
+        continue;
+      }
+
+      const QChar ch = text.at( index );
+      if ( sutraStartupIsCjkIdeograph( ch ) ) {
+        return SutraStartupAnchorScript::Cjk;
+      }
+      if ( ch.isLetter() && ch.unicode() < 0x024F ) {
+        return SutraStartupAnchorScript::Latin;
+      }
+    }
+  }
+
+  return SutraStartupAnchorScript::Unknown;
+}
+
+QString sutraStartupBestGlossaryPhraseAtOffset( const QString & text, int clickOffset )
+{
+  const SutraStartupAnchorScript script = sutraStartupScriptNearOffset( text, clickOffset );
+  const QString cjk = sutraStartupBestCjkGlossaryTermAtOffset( text, clickOffset );
+  const QString vietnamese = sutraStartupBestVietnamesePhraseAtOffset( text, clickOffset );
+
+  if ( script == SutraStartupAnchorScript::Cjk && !cjk.isEmpty() ) {
+    return cjk;
+  }
+  if ( script == SutraStartupAnchorScript::Latin && !vietnamese.isEmpty() ) {
+    return vietnamese;
+  }
+
+  if ( !cjk.isEmpty() && vietnamese.isEmpty() ) {
+    return cjk;
+  }
+  if ( cjk.isEmpty() && !vietnamese.isEmpty() ) {
+    return vietnamese;
+  }
+
+  // For punctuation or whitespace between scripts, prefer the more specific
+  // candidate rather than always preferring CJK merely because it is present.
+  if ( !cjk.isEmpty() && !vietnamese.isEmpty() ) {
+    const int vietnameseTokenCount = sutraStartupTokenizePhraseText( vietnamese ).size();
+    return vietnameseTokenCount >= 2 && vietnamese.size() > cjk.size() ? vietnamese : cjk;
+  }
+
+  return {};
+}
+
 QString sutraStartupBestVietnamesePhraseFromLine( const QString & lineText, const QString & anchorText )
 {
   const QList< SutraStartupTextToken > lineTokens = sutraStartupTokenizePhraseText( lineText );
@@ -1237,15 +1301,93 @@ QString sutraStartupBestLineLookupText( const QString & lineText, const QString 
   return lineText.trimmed();
 }
 
+QString sutraStartupNormalizeOfficeText( const QString & text )
+{
+  QString result;
+  result.reserve( text.size() );
+
+  bool lastWasSpace = false;
+  for ( const QChar & ch : text ) {
+    const ushort code = ch.unicode();
+
+    // Word/Office UI Automation may expose hidden document markers that make
+    // an otherwise correct phrase fail exact dictionary lookup. Remove those
+    // markers before calculating offsets or sending the query to the popup.
+    if ( code == 0x0007   // end-of-cell marker
+      || code == 0x000B   // vertical tab
+      || code == 0x000C   // form feed
+      || code == 0x00AD   // soft hyphen
+      || code == 0x200B   // zero-width space
+      || code == 0x200C   // zero-width non-joiner
+      || code == 0x200D   // zero-width joiner
+      || code == 0x200E   // left-to-right mark
+      || code == 0x200F   // right-to-left mark
+      || ( code >= 0x202A && code <= 0x202E ) // bidi embedding controls
+      || ( code >= 0x2060 && code <= 0x2069 ) // invisible word/bidi controls
+      || code == 0xFEFF   // BOM / zero-width no-break space
+      || code == 0xFFFC ) // object replacement character
+    {
+      continue;
+    }
+
+    if ( code == 0x2028 || code == 0x2029 ) {
+      result += QLatin1Char( '\n' );
+      lastWasSpace = false;
+      continue;
+    }
+
+    if ( code == 0x00A0 || code == 0x2007 || code == 0x202F || code == 0x3000
+      || ch == QLatin1Char( '\t' ) ) {
+      if ( !lastWasSpace ) {
+        result += QLatin1Char( ' ' );
+        lastWasSpace = true;
+      }
+      continue;
+    }
+
+    if ( ch == QLatin1Char( '\r' ) ) {
+      continue;
+    }
+
+    if ( ch == QLatin1Char( '\n' ) ) {
+      while ( result.endsWith( QLatin1Char( ' ' ) ) ) {
+        result.chop( 1 );
+      }
+      if ( !result.endsWith( QLatin1Char( '\n' ) ) ) {
+        result += QLatin1Char( '\n' );
+      }
+      lastWasSpace = false;
+      continue;
+    }
+
+    if ( ch.category() == QChar::Other_Control ) {
+      continue;
+    }
+
+    if ( ch.isSpace() ) {
+      if ( !lastWasSpace ) {
+        result += QLatin1Char( ' ' );
+        lastWasSpace = true;
+      }
+      continue;
+    }
+
+    result += ch;
+    lastWasSpace = false;
+  }
+
+  return result.normalized( QString::NormalizationForm_C ).trimmed();
+}
+
 QString sutraStartupTextFromBstr( BSTR text )
 {
   if ( !text ) {
     return {};
   }
 
-  QString result = QString::fromWCharArray( text, static_cast< int >( SysStringLen( text ) ) );
+  const QString raw = QString::fromWCharArray( text, static_cast< int >( SysStringLen( text ) ) );
   SysFreeString( text );
-  return result;
+  return sutraStartupNormalizeOfficeText( raw );
 }
 
 bool sutraStartupIsCjkPhraseSeparator( const QChar & ch )
@@ -1385,16 +1527,9 @@ QString sutraStartupTextFromUiAutomationRange( IUIAutomationTextRange * range )
   QString centeredText;
   int centeredOffset = -1;
   if ( sutraStartupCenteredUiAutomationContext( range, &centeredText, &centeredOffset ) ) {
-    if ( sutraStartupHasLatinLetter( centeredText ) ) {
-      const QString vietnamesePhrase = sutraStartupBestVietnamesePhraseAtOffset( centeredText, centeredOffset );
-      if ( !vietnamesePhrase.isEmpty() && vietnamesePhrase.size() <= 160 ) {
-        return vietnamesePhrase;
-      }
-    }
-
-    const QString cjkTerm = sutraStartupBestCjkGlossaryTermAtOffset( centeredText, centeredOffset );
-    if ( !cjkTerm.isEmpty() ) {
-      return cjkTerm;
+    const QString phrase = sutraStartupBestGlossaryPhraseAtOffset( centeredText, centeredOffset );
+    if ( !phrase.isEmpty() && phrase.size() <= 160 ) {
+      return phrase;
     }
   }
 
@@ -1432,16 +1567,9 @@ QString sutraStartupTextFromUiAutomationRange( IUIAutomationTextRange * range )
   lineRange->Release();
 
   if ( clickOffset >= 0 && !lineText.isEmpty() ) {
-    if ( sutraStartupHasLatinLetter( lineText ) ) {
-      const QString vietnamesePhrase = sutraStartupBestVietnamesePhraseAtOffset( lineText, clickOffset );
-      if ( !vietnamesePhrase.isEmpty() && vietnamesePhrase.size() <= 160 ) {
-        return vietnamesePhrase;
-      }
-    }
-
-    const QString cjkTerm = sutraStartupBestCjkGlossaryTermAtOffset( lineText, clickOffset );
-    if ( !cjkTerm.isEmpty() ) {
-      return cjkTerm;
+    const QString phrase = sutraStartupBestGlossaryPhraseAtOffset( lineText, clickOffset );
+    if ( !phrase.isEmpty() && phrase.size() <= 160 ) {
+      return phrase;
     }
   }
 
@@ -1705,8 +1833,7 @@ QString sutraStartupUiAutomationSelectedTextAtPoint( const QPoint & globalPos )
 
 QString sutraStartupCleanLookupText( const QString & text )
 {
-  QString result = text.trimmed();
-  result.replace( QChar( 0x3000 ), QLatin1Char( ' ' ) );
+  QString result = sutraStartupNormalizeOfficeText( text );
   result.replace( QLatin1Char( '\r' ), QLatin1Char( '\n' ) );
 
   while ( result.contains( QStringLiteral( "\n\n" ) ) ) {
@@ -1742,44 +1869,74 @@ QString sutraStartupBestAutomaticLookupText( const QString & capturedText, const
     return {};
   }
 
-  bool hasCjk = false;
-  for ( const QChar & ch : combined ) {
-    if ( sutraStartupIsCjkIdeograph( ch ) ) {
-      hasCjk = true;
-      break;
-    }
-  }
-
-  if ( hasCjk ) {
-    QString known = sutraStartupBestKnownCjkTermInText( combined, context );
-    if ( known.isEmpty() ) {
-      known = sutraStartupBestKnownCjkTermInText( combined, captured.size() <= 8 ? captured : QString() );
-    }
-    if ( !known.isEmpty() ) {
-      return known;
-    }
-
-    // Last-resort longest-subphrase reduction for Office controls that expose
-    // the entire clause as both the point context and the selected "word".
-    // This mirrors progressively shortening the clause until a known glossary
-    // phrase remains, without returning an unbounded paragraph to the popup.
-    known = sutraStartupBestKnownCjkTermInText( combined );
-    if ( !known.isEmpty() ) {
-      return known;
-    }
-
-    if ( combined.size() > 16 ) {
-      const QString window = sutraStartupSmallCjkWindowAtOffset( combined, combined.size() / 2 );
-      if ( !window.isEmpty() ) {
-        return window;
+  const auto containsCjk = []( const QString & value ) {
+    for ( const QChar & ch : value ) {
+      if ( sutraStartupIsCjkIdeograph( ch ) ) {
+        return true;
       }
     }
-  }
+    return false;
+  };
 
-  if ( sutraStartupHasLatinLetter( combined ) ) {
-    const QString phrase = sutraStartupBestVietnamesePhraseFromLine( combined, context );
+  const bool capturedHasCjk = containsCjk( captured );
+  const bool capturedHasLatin = sutraStartupHasLatinLetter( captured );
+  const bool combinedHasCjk = containsCjk( combined );
+  const bool combinedHasLatin = sutraStartupHasLatinLetter( combined );
+
+  // The double-click result is the strongest anchor. This is especially
+  // important for mixed Vietnamese + Chinese sentences returned by Office 365.
+  if ( capturedHasLatin && !capturedHasCjk ) {
+    const QString phrase = sutraStartupBestVietnamesePhraseFromLine(
+      !context.isEmpty() ? context : combined,
+      captured );
     if ( !phrase.isEmpty() ) {
       return phrase;
+    }
+  }
+
+  if ( capturedHasCjk ) {
+    QString known = sutraStartupBestKnownCjkTermInText(
+      !context.isEmpty() ? context : combined,
+      captured );
+    if ( known.isEmpty() ) {
+      known = sutraStartupBestKnownCjkTermInText( combined, captured );
+    }
+    if ( !known.isEmpty() ) {
+      return known;
+    }
+  }
+
+  if ( combinedHasLatin && !combinedHasCjk ) {
+    const QString phrase = sutraStartupBestVietnamesePhraseFromLine( combined, captured );
+    if ( !phrase.isEmpty() ) {
+      return phrase;
+    }
+  }
+
+  if ( combinedHasCjk ) {
+    QString known = sutraStartupBestKnownCjkTermInText( combined, captured );
+    if ( known.isEmpty() ) {
+      known = sutraStartupBestKnownCjkTermInText( combined, context );
+    }
+    if ( known.isEmpty() ) {
+      known = sutraStartupBestKnownCjkTermInText( combined );
+    }
+    if ( !known.isEmpty() ) {
+      return known;
+    }
+  }
+
+  if ( combinedHasLatin ) {
+    const QString phrase = sutraStartupBestVietnamesePhraseFromLine( combined, captured );
+    if ( !phrase.isEmpty() ) {
+      return phrase;
+    }
+  }
+
+  if ( combinedHasCjk && combined.size() > 16 ) {
+    const QString window = sutraStartupSmallCjkWindowAtOffset( combined, combined.size() / 2 );
+    if ( !window.isEmpty() ) {
+      return window;
     }
   }
 
@@ -2251,7 +2408,9 @@ private:
     lookupInProgress = false;
   }
 
-  void waitForClipboardText( const std::function< void( const QString & ) > & callback, int attempt = 0 )
+  void waitForClipboardText( const std::function< void( const QString & ) > & callback,
+                             DWORD baselineSequence,
+                             int attempt = 0 )
   {
     QClipboard * clipboard = QApplication::clipboard();
     if ( !clipboard ) {
@@ -2259,14 +2418,23 @@ private:
       return;
     }
 
-    const QString text = clipboard->text( QClipboard::Clipboard );
-    if ( !text.trimmed().isEmpty() || attempt >= 15 ) {
+    const DWORD currentSequence = GetClipboardSequenceNumber();
+    const QString text = sutraStartupNormalizeOfficeText( clipboard->text( QClipboard::Clipboard ) );
+    const bool clipboardChanged = currentSequence != baselineSequence;
+
+    // Office 365 64-bit can publish Unicode text noticeably later than the
+    // selection itself. Wait for an actual clipboard sequence change so an old
+    // clipboard value is never mistaken for the selected phrase.
+    if ( ( clipboardChanged && !text.trimmed().isEmpty() ) || attempt >= 30 ) {
+      // The clipboard was cleared immediately before Ctrl+C, so any non-empty
+      // value at timeout is still safe to use even if a provider failed to
+      // advance the Windows sequence counter.
       callback( text );
       return;
     }
 
-    QTimer::singleShot( 70, this, [ this, callback, attempt ] {
-      waitForClipboardText( callback, attempt + 1 );
+    QTimer::singleShot( 80, this, [ this, callback, baselineSequence, attempt ] {
+      waitForClipboardText( callback, baselineSequence, attempt + 1 );
     } );
   }
 
@@ -2279,8 +2447,9 @@ private:
     }
 
     clipboard->clear( QClipboard::Clipboard );
+    const DWORD baselineSequence = GetClipboardSequenceNumber();
     sendSutraStartupCtrlC();
-    waitForClipboardText( callback );
+    waitForClipboardText( callback, baselineSequence );
   }
 
   void lookupSelectedText( const QPoint & globalPos, const QString & previousClipboardText )
