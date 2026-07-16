@@ -1557,7 +1557,8 @@ enum class SutraMouseLookupMode {
 
 enum class SutraMouseLookupCaptureMode {
   Automatic    = 0,
-  SelectedText = 1
+  SelectedText = 1,
+  EntirePhrase = 2
 };
 
 QString sutraMouseLookupModeSettingsKey()
@@ -1672,9 +1673,13 @@ SutraMouseLookupCaptureMode loadSutraMouseLookupCaptureMode()
   QSettings settings;
   const int value = settings.value( sutraMouseLookupCaptureModeSettingsKey(),
                                     static_cast< int >( SutraMouseLookupCaptureMode::Automatic ) ).toInt();
-  return value == static_cast< int >( SutraMouseLookupCaptureMode::SelectedText )
-           ? SutraMouseLookupCaptureMode::SelectedText
-           : SutraMouseLookupCaptureMode::Automatic;
+  if ( value == static_cast< int >( SutraMouseLookupCaptureMode::SelectedText ) ) {
+    return SutraMouseLookupCaptureMode::SelectedText;
+  }
+  if ( value == static_cast< int >( SutraMouseLookupCaptureMode::EntirePhrase ) ) {
+    return SutraMouseLookupCaptureMode::EntirePhrase;
+  }
+  return SutraMouseLookupCaptureMode::Automatic;
 }
 
 void saveSutraMouseLookupCaptureMode( SutraMouseLookupCaptureMode mode )
@@ -1685,9 +1690,15 @@ void saveSutraMouseLookupCaptureMode( SutraMouseLookupCaptureMode mode )
 
 QString sutraMouseLookupCaptureModeLabel( SutraMouseLookupCaptureMode mode )
 {
-  return mode == SutraMouseLookupCaptureMode::SelectedText
-           ? QStringLiteral( "Manual - selected text only" )
-           : QStringLiteral( "Automatic phrase detection" );
+  switch ( mode ) {
+    case SutraMouseLookupCaptureMode::SelectedText:
+      return QStringLiteral( "Manual - selected text only" );
+    case SutraMouseLookupCaptureMode::EntirePhrase:
+      return QStringLiteral( "Automatic - entire phrase" );
+    case SutraMouseLookupCaptureMode::Automatic:
+    default:
+      return QStringLiteral( "Automatic - precise phrase" );
+  }
 }
 
 void resetSutraPopupAppearanceDefaults()
@@ -5034,8 +5045,10 @@ ScanPopup::ScanPopup( QWidget * parent,
     } );
   };
 
-  addSutraMouseCaptureAction( tr( "Automatic - detect phrase under pointer" ),
+  addSutraMouseCaptureAction( tr( "Automatic - detect precise phrase under pointer" ),
                               SutraMouseLookupCaptureMode::Automatic );
+  addSutraMouseCaptureAction( tr( "Automatic - detect entire phrase under pointer" ),
+                              SutraMouseLookupCaptureMode::EntirePhrase );
   addSutraMouseCaptureAction( tr( "Manual - use selected text only" ),
                               SutraMouseLookupCaptureMode::SelectedText );
 
@@ -6161,13 +6174,15 @@ void ScanPopup::translateWord( const QString & word )
 {
   const QString normalizedWord = normalizeSmartLookupInput( cfg.preferences.sanitizeInputPhrase( word ) );
   const QStringList smartTerms = detectSmartLookupTerms( normalizedWord );
-  const bool manualCapture =
-    loadSutraMouseLookupCaptureMode() == SutraMouseLookupCaptureMode::SelectedText;
+  const SutraMouseLookupCaptureMode captureMode = loadSutraMouseLookupCaptureMode();
+  const bool manualCapture = captureMode == SutraMouseLookupCaptureMode::SelectedText;
+  const bool entirePhraseCapture = captureMode == SutraMouseLookupCaptureMode::EntirePhrase;
 
-  // Manual capture means the user intentionally highlighted the exact text to
-  // translate. Do not collapse that selection to the first detected glossary
-  // term. Automatic capture keeps the existing smart-term selection behavior.
-  pendingWord = manualCapture ? normalizedWord : chooseSmartLookupQuery( normalizedWord, smartTerms );
+  // Manual capture and Entire Phrase capture both preserve the exact incoming
+  // text. Precise automatic capture keeps the existing smart-term reduction.
+  pendingWord = ( manualCapture || entirePhraseCapture )
+                  ? normalizedWord
+                  : chooseSmartLookupQuery( normalizedWord, smartTerms );
 
   if ( pendingWord.isEmpty() ) {
     return; // Nothing there
@@ -6184,6 +6199,9 @@ void ScanPopup::translateWord( const QString & word )
 
   if ( manualCapture ) {
     showStatusBarMessage( tr( "Manual selection lookup" ), 3000 );
+  }
+  else if ( entirePhraseCapture ) {
+    showStatusBarMessage( tr( "Entire phrase lookup" ), 3000 );
   }
   else if ( !smartTerms.isEmpty() && pendingWord != normalizedWord ) {
     showStatusBarMessage( tr( "Smart terms: %1" ).arg( smartTerms.join( QStringLiteral( " | " ) ) ), 8000 );
