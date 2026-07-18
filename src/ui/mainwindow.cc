@@ -25,6 +25,11 @@
 #include <QPixmap>
 #include <QList>
 #include <QToolBar>
+#include <QAbstractItemView>
+#include <QDockWidget>
+#include <QLineEdit>
+#include <QSettings>
+#include <QTabBar>
 #include <QCloseEvent>
 #include <QDesktopServices>
 #include <QCryptographicHash>
@@ -715,6 +720,202 @@ MainWindow::MainWindow( Config::Class & cfg_ ):
 
   ui.tabWidget->setTabsClosable( true );
 
+
+  // Sutra Edition main-window UX refinement.
+  // This block changes only presentation and an optional dock layout mode.
+  // Existing lookup, history, favorites, toolbar and tab behavior remain untouched.
+  setProperty( "sutraMainUx", true );
+
+  navToolbar->setProperty( "sutraUxRole", "navigationToolbar" );
+  navToolbar->setContentsMargins( 4, 3, 4, 3 );
+
+  dictionaryBar.setProperty( "sutraUxRole", "dictionaryToolbar" );
+
+  const auto configureMainSearchField = [ this ]( QLineEdit * lineEdit ) {
+    if ( !lineEdit ) {
+      return;
+    }
+
+    lineEdit->setProperty( "sutraUxRole", "mainSearchField" );
+    lineEdit->setClearButtonEnabled( true );
+    lineEdit->setMinimumHeight( 34 );
+    lineEdit->setPlaceholderText( tr( "Search dictionaries (Ctrl+L)" ) );
+    lineEdit->setToolTip( tr( "Search dictionaries. Press Ctrl+L to focus this field." ) );
+    lineEdit->setAccessibleName( tr( "Dictionary search" ) );
+    lineEdit->setAccessibleDescription(
+      tr( "Type a word or phrase, then press Enter to search the active dictionaries." ) );
+  };
+
+  configureMainSearchField( ui.translateLine );
+  configureMainSearchField( translateBox->translateLine() );
+
+  const auto configureGroupSelector = [ this ]( GroupComboBox * comboBox ) {
+    if ( !comboBox ) {
+      return;
+    }
+
+    comboBox->setProperty( "sutraUxRole", "groupSelector" );
+    comboBox->setMinimumHeight( 34 );
+    comboBox->setMinimumWidth( 120 );
+    comboBox->setToolTip( tr( "Choose the dictionary group used for this search." ) );
+    comboBox->setAccessibleName( tr( "Dictionary group" ) );
+  };
+
+  configureGroupSelector( groupListInDock );
+  configureGroupSelector( groupListInToolbar );
+
+  if ( ui.tabWidget->tabBar() ) {
+    ui.tabWidget->tabBar()->setProperty( "sutraUxRole", "mainTabBar" );
+    ui.tabWidget->tabBar()->setUsesScrollButtons( true );
+    ui.tabWidget->tabBar()->setExpanding( false );
+    ui.tabWidget->tabBar()->setElideMode( Qt::ElideRight );
+  }
+
+  const QList< QDockWidget * > sutraSidebarDocks = {
+    ui.dictsPane,
+    ui.favoritesPane,
+    ui.historyPane,
+  };
+
+  for ( QDockWidget * dock : sutraSidebarDocks ) {
+    if ( !dock ) {
+      continue;
+    }
+
+    dock->setProperty( "sutraUxRole", "sidebarDock" );
+  }
+
+  dictsPaneTitleBar.setProperty( "sutraUxRole", "sidebarTitleBar" );
+
+  const QList< QAbstractItemView * > sutraSidebarLists = {
+    ui.dictsList,
+    ui.favoritesTree,
+    ui.historyList,
+  };
+
+  for ( QAbstractItemView * view : sutraSidebarLists ) {
+    if ( !view ) {
+      continue;
+    }
+
+    view->setProperty( "sutraUxRole", "sidebarList" );
+    view->setHorizontalScrollMode( QAbstractItemView::ScrollPerPixel );
+    view->setVerticalScrollMode( QAbstractItemView::ScrollPerPixel );
+  }
+
+  ui.dictsList->setAlternatingRowColors( true );
+  ui.historyList->setAlternatingRowColors( true );
+
+  // Optional: combine the three right-side panels into tabs. This is disabled
+  // by default, so existing users keep their current dock layout unchanged.
+  const QString tabbedSidebarSettingKey =
+    QStringLiteral( "SutraEdition/MainWindow/UseTabbedRightSidebar" );
+  const QString tabbedSidebarBackupKey =
+    QStringLiteral( "SutraEdition/MainWindow/SidebarStateBeforeTabs" );
+  const QString tabbedSidebarTabPositionKey =
+    QStringLiteral( "SutraEdition/MainWindow/SidebarTabPositionBeforeTabs" );
+
+  QAction * useTabbedSidebarAction =
+    new QAction( tr( "Use Tabbed Right Sidebar" ), this );
+  useTabbedSidebarAction->setObjectName( "useTabbedRightSidebarAction" );
+  useTabbedSidebarAction->setCheckable( true );
+  useTabbedSidebarAction->setToolTip(
+    tr( "Combine Found in Dictionaries, Favorites and History into one tabbed sidebar." ) );
+  useTabbedSidebarAction->setStatusTip(
+    tr( "Reduce sidebar clutter by displaying the three right-side panels as tabs." ) );
+
+  {
+    QSettings settings;
+    useTabbedSidebarAction->setChecked(
+      settings.value( tabbedSidebarSettingKey, false ).toBool() );
+  }
+
+  ui.menuView->addSeparator();
+  ui.menuView->addAction( useTabbedSidebarAction );
+
+  const auto applyTabbedRightSidebar =
+    [ this,
+      useTabbedSidebarAction,
+      tabbedSidebarSettingKey,
+      tabbedSidebarBackupKey,
+      tabbedSidebarTabPositionKey ]( bool enabled, bool userInitiated ) {
+      QSettings settings;
+
+      if ( userInitiated ) {
+        settings.setValue( tabbedSidebarSettingKey, enabled );
+      }
+
+      if ( enabled ) {
+        if ( userInitiated ) {
+          settings.setValue( tabbedSidebarBackupKey, saveState() );
+          settings.setValue(
+            tabbedSidebarTabPositionKey,
+            static_cast< int >( tabPosition( Qt::RightDockWidgetArea ) ) );
+        }
+
+        setTabPosition( Qt::RightDockWidgetArea, QTabWidget::North );
+        tabifyDockWidget( ui.dictsPane, ui.favoritesPane );
+        tabifyDockWidget( ui.favoritesPane, ui.historyPane );
+
+        if ( ui.dictsPane->isVisible() ) {
+          ui.dictsPane->raise();
+        }
+      }
+      else if ( userInitiated ) {
+        const QByteArray previousState =
+          settings.value( tabbedSidebarBackupKey ).toByteArray();
+
+        bool stateRestored = false;
+        if ( !previousState.isEmpty() ) {
+          stateRestored = restoreState( previousState );
+        }
+
+        if ( !stateRestored ) {
+          // Defensive fallback for a missing or incompatible saved state.
+          // Preserve visibility while rebuilding the original vertical stack.
+          const bool dictionariesVisible = ui.dictsPane->isVisible();
+          const bool favoritesVisible    = ui.favoritesPane->isVisible();
+          const bool historyVisible      = ui.historyPane->isVisible();
+
+          removeDockWidget( ui.dictsPane );
+          removeDockWidget( ui.favoritesPane );
+          removeDockWidget( ui.historyPane );
+
+          addDockWidget( Qt::RightDockWidgetArea, ui.dictsPane );
+          splitDockWidget( ui.dictsPane, ui.favoritesPane, Qt::Vertical );
+          splitDockWidget( ui.favoritesPane, ui.historyPane, Qt::Vertical );
+
+          ui.dictsPane->setVisible( dictionariesVisible );
+          ui.favoritesPane->setVisible( favoritesVisible );
+          ui.historyPane->setVisible( historyVisible );
+        }
+
+        const int previousTabPosition =
+          settings.value(
+                    tabbedSidebarTabPositionKey,
+                    static_cast< int >( QTabWidget::South ) )
+            .toInt();
+
+        setTabPosition(
+          Qt::RightDockWidgetArea,
+          static_cast< QTabWidget::TabPosition >( previousTabPosition ) );
+      }
+
+      useTabbedSidebarAction->setStatusTip(
+        enabled
+          ? tr( "Tabbed right sidebar is enabled." )
+          : tr( "The original stacked right sidebar is enabled." ) );
+
+      settings.sync();
+    };
+
+  connect( useTabbedSidebarAction,
+           &QAction::toggled,
+           this,
+           [ applyTabbedRightSidebar ]( bool enabled ) {
+             applyTabbedRightSidebar( enabled, true );
+           } );
+
   connect( ui.quit, &QAction::triggered, this, &MainWindow::quitApp );
 
   connect( ui.dictionaries, &QAction::triggered, this, &MainWindow::editDictionaries );
@@ -871,6 +1072,11 @@ MainWindow::MainWindow( Config::Class & cfg_ ):
   if ( cfg.mainWindowGeometry.size() ) {
     restoreGeometry( cfg.mainWindowGeometry );
   }
+
+
+  // Apply the optional tabbed sidebar after GoldenDict restores its normal
+  // saved layout. Re-applying an already-tabified state is harmless.
+  applyTabbedRightSidebar( useTabbedSidebarAction->isChecked(), false );
 
   // Show window unless it is configured not to
   if ( !cfg.preferences.enableTrayIcon || !cfg.preferences.startToTray ) {
@@ -1569,6 +1775,156 @@ void MainWindow::updateAppearances( const QString & addonStyle,
   }
 
 #endif
+
+  // Sutra Edition main-window UX stylesheet. It is scoped by dynamic
+  // properties and uses the active Qt palette, so Light/Dark themes continue
+  // to work. User and add-on styles are loaded afterwards and can override it.
+  css += R"CSS(
+
+QMainWindow[sutraMainUx="true"] QToolBar#navToolbar {
+  spacing: 4px;
+  padding: 3px 4px;
+  border: 0;
+  border-bottom: 1px solid palette(mid);
+}
+
+QMainWindow[sutraMainUx="true"] QToolBar[sutraUxRole="dictionaryToolbar"] {
+  spacing: 3px;
+  padding: 2px 4px;
+  border: 0;
+  border-bottom: 1px solid palette(mid);
+}
+
+QMainWindow[sutraMainUx="true"] QToolBar#navToolbar QToolButton,
+QMainWindow[sutraMainUx="true"] QToolBar[sutraUxRole="dictionaryToolbar"] QToolButton {
+  min-width: 28px;
+  min-height: 28px;
+  padding: 2px;
+  margin: 1px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+}
+
+QMainWindow[sutraMainUx="true"] QToolBar#navToolbar QToolButton:hover,
+QMainWindow[sutraMainUx="true"] QToolBar[sutraUxRole="dictionaryToolbar"] QToolButton:hover {
+  background: palette(alternate-base);
+  border-color: palette(mid);
+}
+
+QMainWindow[sutraMainUx="true"] QToolBar#navToolbar QToolButton:pressed,
+QMainWindow[sutraMainUx="true"] QToolBar[sutraUxRole="dictionaryToolbar"] QToolButton:pressed {
+  background: palette(midlight);
+  border-color: palette(dark);
+}
+
+QMainWindow[sutraMainUx="true"] QToolBar#navToolbar QToolButton:checked,
+QMainWindow[sutraMainUx="true"] QToolBar[sutraUxRole="dictionaryToolbar"] QToolButton:checked {
+  background: palette(highlight);
+  color: palette(highlighted-text);
+  border-color: palette(highlight);
+}
+
+QMainWindow[sutraMainUx="true"] QToolBar#navToolbar QToolButton:disabled,
+QMainWindow[sutraMainUx="true"] QToolBar[sutraUxRole="dictionaryToolbar"] QToolButton:disabled {
+  color: palette(mid);
+}
+
+QMainWindow[sutraMainUx="true"] QToolBar#navToolbar::separator,
+QMainWindow[sutraMainUx="true"] QToolBar[sutraUxRole="dictionaryToolbar"]::separator {
+  width: 1px;
+  margin: 6px 5px;
+  background: palette(mid);
+}
+
+QMainWindow[sutraMainUx="true"] QLineEdit[sutraUxRole="mainSearchField"] {
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid palette(mid);
+  border-radius: 6px;
+  background: palette(base);
+  color: palette(text);
+  selection-background-color: palette(highlight);
+  selection-color: palette(highlighted-text);
+}
+
+QMainWindow[sutraMainUx="true"] QLineEdit[sutraUxRole="mainSearchField"]:hover {
+  border-color: palette(dark);
+}
+
+QMainWindow[sutraMainUx="true"] QLineEdit[sutraUxRole="mainSearchField"]:focus {
+  border: 2px solid palette(highlight);
+  padding-left: 9px;
+  padding-right: 9px;
+}
+
+QMainWindow[sutraMainUx="true"] QComboBox[sutraUxRole="groupSelector"] {
+  min-height: 34px;
+  padding: 0 8px;
+  border: 1px solid palette(mid);
+  border-radius: 6px;
+  background: palette(base);
+  color: palette(text);
+}
+
+QMainWindow[sutraMainUx="true"] QComboBox[sutraUxRole="groupSelector"]:hover,
+QMainWindow[sutraMainUx="true"] QComboBox[sutraUxRole="groupSelector"]:focus {
+  border-color: palette(highlight);
+}
+
+QMainWindow[sutraMainUx="true"] QTabBar[sutraUxRole="mainTabBar"]::tab {
+  min-width: 76px;
+  max-width: 220px;
+  padding: 6px 12px;
+  margin-right: 1px;
+  border: 1px solid palette(mid);
+  border-bottom: 0;
+  border-top-left-radius: 5px;
+  border-top-right-radius: 5px;
+  background: palette(alternate-base);
+  color: palette(text);
+}
+
+QMainWindow[sutraMainUx="true"] QTabBar[sutraUxRole="mainTabBar"]::tab:selected {
+  background: palette(base);
+  border-color: palette(highlight);
+}
+
+QMainWindow[sutraMainUx="true"] QTabBar[sutraUxRole="mainTabBar"]::tab:hover:!selected {
+  background: palette(midlight);
+}
+
+QMainWindow[sutraMainUx="true"] QDockWidget[sutraUxRole="sidebarDock"]::title {
+  padding: 6px 8px;
+  font-weight: 600;
+  background: palette(alternate-base);
+  border-bottom: 1px solid palette(mid);
+}
+
+QMainWindow[sutraMainUx="true"] QWidget[sutraUxRole="sidebarTitleBar"] {
+  background: palette(alternate-base);
+  border-bottom: 1px solid palette(mid);
+}
+
+QMainWindow[sutraMainUx="true"] QAbstractItemView[sutraUxRole="sidebarList"] {
+  outline: 0;
+  border: 0;
+  background: palette(base);
+  color: palette(text);
+  alternate-background-color: palette(alternate-base);
+  selection-background-color: palette(highlight);
+  selection-color: palette(highlighted-text);
+}
+
+QMainWindow[sutraMainUx="true"] QAbstractItemView[sutraUxRole="sidebarList"]::item {
+  min-height: 24px;
+  padding: 3px 6px;
+}
+
+QMainWindow[sutraMainUx="true"] QAbstractItemView[sutraUxRole="sidebarList"]::item:hover:!selected {
+  background: palette(alternate-base);
+}
+
+)CSS";
 
   // Try loading a style sheet if there's one
   QFile cssFile( Config::getUserQtCssFileName() );
