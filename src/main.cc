@@ -874,6 +874,90 @@ QList< SutraStartupTextToken > sutraStartupTokenizePhraseText( const QString & t
   return tokens;
 }
 
+int sutraStartupLatinTokenCount( const QString & text )
+{
+  int count = 0;
+  for ( const SutraStartupTextToken & token : sutraStartupTokenizePhraseText( text ) ) {
+    if ( token.hasLatin ) {
+      ++count;
+    }
+  }
+
+  return count;
+}
+
+bool sutraStartupIsUsableOfficePhraseCandidate( const QString & text )
+{
+  const QString cleaned = text.trimmed();
+  if ( cleaned.isEmpty() ) {
+    return false;
+  }
+
+  int cjkIdeographCount = 0;
+  for ( const QChar & ch : cleaned ) {
+    if ( sutraStartupIsCjkIdeograph( ch ) ) {
+      ++cjkIdeographCount;
+    }
+  }
+
+  // Office 2010 and some 32-bit Office providers frequently expose only the
+  // TextUnit_Word under the pointer. Treat one Latin token or one CJK ideograph
+  // as incomplete context so the compatibility path can safely capture the
+  // visual line and resolve the nearest real phrase.
+  if ( cjkIdeographCount == 1 ) {
+    return false;
+  }
+  if ( sutraStartupHasLatinLetter( cleaned ) && cjkIdeographCount == 0 ) {
+    return sutraStartupLatinTokenCount( cleaned ) >= 2;
+  }
+
+  return true;
+}
+
+bool sutraStartupLooksLikeReorderedLatinSelection( const QString & selectedText,
+                                                    const QString & contextText )
+{
+  const QList< SutraStartupTextToken > selectedTokens = sutraStartupTokenizePhraseText( selectedText );
+  const QList< SutraStartupTextToken > contextTokens = sutraStartupTokenizePhraseText( contextText );
+
+  QStringList selectedNormalized;
+  QStringList contextNormalized;
+
+  for ( const SutraStartupTextToken & token : selectedTokens ) {
+    if ( token.hasLatin ) {
+      selectedNormalized << token.normalized;
+    }
+  }
+  for ( const SutraStartupTextToken & token : contextTokens ) {
+    if ( token.hasLatin ) {
+      contextNormalized << token.normalized;
+    }
+  }
+
+  if ( selectedNormalized.size() < 2 || contextNormalized.size() < 2 ) {
+    return false;
+  }
+
+  const QString selectedSequence = selectedNormalized.join( QLatin1Char( ' ' ) );
+  const QString contextSequence = contextNormalized.join( QLatin1Char( ' ' ) );
+  if ( contextSequence.contains( selectedSequence ) ) {
+    return false;
+  }
+
+  // Some Word 2016 UI Automation providers return split selection ranges in
+  // reverse order. Detect only that narrow case: every selected token exists in
+  // the nearby context, but not in the reported order.
+  QStringList remaining = contextNormalized;
+  for ( const QString & token : selectedNormalized ) {
+    if ( !remaining.removeOne( token ) ) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+
 struct SutraStartupVietnameseAlias
 {
   QStringList normalizedTokens;
@@ -987,27 +1071,54 @@ const QStringList & sutraStartupCjkGlossaryTerms()
                                ? document.array()
                                : document.object().value( QStringLiteral( "terms" ) ).toArray();
 
+    const auto appendCjkLookupTerm = [ &result, &seen ]( const QString & rawTerm ) {
+      const QString term = rawTerm.trimmed();
+      if ( term.isEmpty() || term.size() > 80 || seen.contains( term ) ) {
+        return;
+      }
+
+      int ideographCount = 0;
+      for ( const QChar & ch : term ) {
+        if ( sutraStartupIsCjkIdeograph( ch ) ) {
+          ++ideographCount;
+        }
+      }
+
+      if ( ideographCount == 0 ) {
+        return;
+      }
+
+      seen.insert( term );
+      result << term;
+    };
+
     for ( const QJsonValue & value : entries ) {
       if ( !value.isObject() ) {
         continue;
       }
 
       const QString term = value.toObject().value( QStringLiteral( "term" ) ).toString().trimmed();
-      if ( term.isEmpty() || term.size() > 80 || seen.contains( term ) ) {
-        continue;
-      }
+      appendCjkLookupTerm( term );
 
-      bool hasIdeograph = false;
-      for ( const QChar & ch : term ) {
-        if ( sutraStartupIsCjkIdeograph( ch ) ) {
-          hasIdeograph = true;
-          break;
+      // A number of Buddhist personal names are stored in the glossary with
+      // the honorific/title suffix U+4F5B (Buddha), while the source document
+      // commonly omits that final character. Add only the conservative
+      // four-or-more-character base alias. This lets a source such as
+      // U+91CB U+8FE6 U+725F U+5C3C resolve as one compound from the existing
+      // five-character glossary entry, without changing the JSON or weakening
+      // the longest-term preference when the suffix is actually present.
+      if ( term.endsWith( QChar( 0x4F5B ) ) ) {
+        const QString baseName = term.left( term.size() - 1 ).trimmed();
+        int baseIdeographCount = 0;
+        for ( const QChar & ch : baseName ) {
+          if ( sutraStartupIsCjkIdeograph( ch ) ) {
+            ++baseIdeographCount;
+          }
         }
-      }
 
-      if ( hasIdeograph ) {
-        seen.insert( term );
-        result << term;
+        if ( baseIdeographCount >= 4 ) {
+          appendCjkLookupTerm( baseName );
+        }
       }
     }
 
@@ -1437,10 +1548,21 @@ QString sutraStartupBestVietnamesePhraseFromLine( const QString & lineText, cons
       normalizedAnchorTokens << token.normalized;
     }
 
+    int bestAnchorDistance = ( std::numeric_limits< int >::max )();
     for ( int start = 0; start + normalizedAnchorTokens.size() <= lineTokens.size(); ++start ) {
-      if ( sutraStartupTokenSequenceMatches( lineTokens, start, normalizedAnchorTokens ) ) {
+      if ( !sutraStartupTokenSequenceMatches( lineTokens, start, normalizedAnchorTokens ) ) {
+        continue;
+      }
+
+      const int end = start + normalizedAnchorTokens.size() - 1;
+      const int occurrenceCenterTimesTwo = lineTokens.at( start ).start
+                                         + lineTokens.at( end ).end;
+      const int lineCenterTimesTwo = lineText.size();
+      const int distance = qAbs( occurrenceCenterTimesTwo - lineCenterTimesTwo );
+
+      if ( distance < bestAnchorDistance ) {
+        bestAnchorDistance = distance;
         anchorIndex = start + normalizedAnchorTokens.size() / 2;
-        break;
       }
     }
   }
@@ -1852,35 +1974,43 @@ QString sutraStartupLookupFromDelimitedContext( const QString & text,
 }
 
 QString sutraStartupTextFromUiAutomationRange( IUIAutomationTextRange * range,
-                                                SutraMouseLookupCaptureMode captureMode )
+                                                SutraMouseLookupCaptureMode captureMode,
+                                                bool officeCompatibilityMode )
 {
   if ( !range ) {
     return {};
   }
 
-  // Office versions expose different TextUnit_Word boundaries. Always build a
-  // character context around the pointer and limit matching to the nearest
-  // punctuation-delimited phrase before consulting the glossary.
+  // Word versions expose very different TextUnit boundaries. Build both a
+  // centered character context and an enclosing visual line. For Latin text in
+  // Microsoft Office, prefer TextUnit_Line because endpoint expansion around a
+  // point is known to split or reverse words on some Word 2016 providers.
   QString centeredText;
   int centeredOffset = -1;
   const bool hasCenteredContext = sutraStartupCenteredUiAutomationContext( range,
                                                                            &centeredText,
                                                                            &centeredOffset );
-  if ( hasCenteredContext && captureMode != SutraMouseLookupCaptureMode::EntirePhrase ) {
-    const QString phrase = sutraStartupLookupFromDelimitedContext( centeredText,
-                                                                   centeredOffset,
-                                                                   captureMode );
-    if ( !phrase.isEmpty() ) {
-      return phrase;
+
+  QString centeredCandidate;
+  if ( hasCenteredContext ) {
+    centeredCandidate = sutraStartupLookupFromDelimitedContext( centeredText,
+                                                                centeredOffset,
+                                                                captureMode );
+
+    const bool centeredIsPureLatin = sutraStartupHasLatinLetter( centeredCandidate )
+                                    && sutraStartupCjkIdeographCount( centeredCandidate ) == 0;
+    if ( !centeredCandidate.isEmpty()
+      && ( !officeCompatibilityMode
+        || ( !centeredIsPureLatin
+          && sutraStartupIsUsableOfficePhraseCandidate( centeredCandidate ) ) ) ) {
+      return centeredCandidate;
     }
   }
 
-  // Fall back to the enclosing visual line. Keep the original point range
-  // unchanged so the click offset can be calculated inside that line.
   IUIAutomationTextRange * lineRange = nullptr;
   if ( FAILED( range->Clone( &lineRange ) ) || !lineRange ) {
-    return hasCenteredContext
-             ? sutraStartupLookupFromDelimitedContext( centeredText, centeredOffset, captureMode )
+    return !officeCompatibilityMode || sutraStartupIsUsableOfficePhraseCandidate( centeredCandidate )
+             ? centeredCandidate
              : QString();
   }
 
@@ -1889,8 +2019,8 @@ QString sutraStartupTextFromUiAutomationRange( IUIAutomationTextRange * range,
   BSTR lineBstr = nullptr;
   if ( FAILED( lineRange->GetText( 700, &lineBstr ) ) ) {
     lineRange->Release();
-    return hasCenteredContext
-             ? sutraStartupLookupFromDelimitedContext( centeredText, centeredOffset, captureMode )
+    return !officeCompatibilityMode || sutraStartupIsUsableOfficePhraseCandidate( centeredCandidate )
+             ? centeredCandidate
              : QString();
   }
 
@@ -1913,25 +2043,27 @@ QString sutraStartupTextFromUiAutomationRange( IUIAutomationTextRange * range,
   lineRange->Release();
 
   if ( clickOffset >= 0 && !lineText.isEmpty() ) {
-    const QString phrase = sutraStartupLookupFromDelimitedContext( lineText,
-                                                                   clickOffset,
-                                                                   captureMode );
-    if ( !phrase.isEmpty() ) {
-      return phrase;
+    const QString lineCandidate = sutraStartupLookupFromDelimitedContext( lineText,
+                                                                          clickOffset,
+                                                                          captureMode );
+    if ( !lineCandidate.isEmpty()
+      && ( !officeCompatibilityMode
+        || sutraStartupIsUsableOfficePhraseCandidate( lineCandidate ) ) ) {
+      return lineCandidate;
     }
   }
 
-  if ( hasCenteredContext && captureMode == SutraMouseLookupCaptureMode::EntirePhrase ) {
-    const QString phrase = sutraStartupLookupFromDelimitedContext( centeredText,
-                                                                   centeredOffset,
-                                                                   captureMode );
-    if ( !phrase.isEmpty() ) {
-      return phrase;
-    }
+  // If the line provider did not expose a useful pointer offset, a centered
+  // multi-token candidate remains preferable to a one-word TextUnit fallback.
+  if ( !centeredCandidate.isEmpty()
+    && ( !officeCompatibilityMode
+      || sutraStartupIsUsableOfficePhraseCandidate( centeredCandidate ) ) ) {
+    return centeredCandidate;
   }
 
-  // Some controls expose only a usable word range. This fallback is read-only:
-  // it never double-clicks, changes the Office selection, or injects Ctrl+C.
+  // Some controls expose only TextUnit_Word. Preserve that behavior outside
+  // Microsoft Office. In Office, reject a one-token Latin result so the safe
+  // compatibility line-capture path can obtain enough context.
   IUIAutomationTextRange * wordRange = nullptr;
   if ( SUCCEEDED( range->Clone( &wordRange ) ) && wordRange ) {
     wordRange->ExpandToEnclosingUnit( TextUnit_Word );
@@ -1943,12 +2075,16 @@ QString sutraStartupTextFromUiAutomationRange( IUIAutomationTextRange * range,
 
       if ( !wordText.isEmpty() ) {
         if ( captureMode == SutraMouseLookupCaptureMode::EntirePhrase ) {
-          return wordText.left( 360 );
+          if ( !officeCompatibilityMode
+            || sutraStartupIsUsableOfficePhraseCandidate( wordText ) ) {
+            return wordText.left( 360 );
+          }
         }
-
-        if ( sutraStartupHasLatinLetter( wordText ) ) {
+        else if ( sutraStartupHasLatinLetter( wordText ) ) {
           const QString phrase = sutraStartupBestVietnamesePhraseFromLine( wordText, wordText );
-          if ( !phrase.isEmpty() ) {
+          if ( !phrase.isEmpty()
+            && ( !officeCompatibilityMode
+              || sutraStartupIsUsableOfficePhraseCandidate( phrase ) ) ) {
             return phrase;
           }
         }
@@ -1963,12 +2099,9 @@ QString sutraStartupTextFromUiAutomationRange( IUIAutomationTextRange * range,
         if ( wordCjkCount >= 2 && wordText.size() <= 80 ) {
           return wordText;
         }
-        if ( wordCjkCount == 0 && wordText.size() <= 80 ) {
+        if ( wordCjkCount == 0 && wordText.size() <= 80 && !officeCompatibilityMode ) {
           return wordText;
         }
-        // A one-character TextUnit_Word is not reliable for CJK phrase lookup.
-        // Return no result here so Office can use the safe legacy selection
-        // fallback instead of opening an unrelated single-character query.
       }
     }
     else {
@@ -1987,20 +2120,108 @@ QString sutraStartupTextFromUiAutomationRange( IUIAutomationTextRange * range,
     }
   }
 
-  // Never return an unbounded Office paragraph. Entire phrase mode may keep the
-  // punctuation-bounded line fragment; precise mode keeps only a compact word.
   if ( captureMode == SutraMouseLookupCaptureMode::EntirePhrase && !lineText.isEmpty() ) {
     const SutraStartupDelimitedPhrase delimited = sutraStartupDelimitedPhraseAtOffset(
       lineText,
       clickOffset >= 0 ? clickOffset : lineText.size() / 2 );
-    return delimited.text.left( 360 ).trimmed();
+    const QString candidate = delimited.text.left( 360 ).trimmed();
+    if ( !officeCompatibilityMode || sutraStartupIsUsableOfficePhraseCandidate( candidate ) ) {
+      return candidate;
+    }
   }
 
   if ( sutraStartupHasLatinLetter( lineText ) ) {
-    return sutraStartupBestVietnamesePhraseFromLine( lineText, QString() ).left( 160 );
+    const QString candidate = sutraStartupBestVietnamesePhraseFromLine( lineText, QString() ).left( 160 );
+    if ( !officeCompatibilityMode || sutraStartupIsUsableOfficePhraseCandidate( candidate ) ) {
+      return candidate;
+    }
   }
 
   return {};
+}
+
+
+QList< POINT > sutraStartupUiAutomationProbePoints( const QPoint & globalPos )
+{
+  // UI Automation hit testing in Word is not fully stable at larger font sizes:
+  // RangeFromPoint can land on the glyph edge or an insertion boundary and
+  // return no text even though the pointer is visibly over the character.
+  // Probe a compact, distance-ordered neighborhood. The radius remains well
+  // inside a normal 24-28 pt glyph/line, so it corrects hit-test rounding
+  // without drifting into unrelated paragraphs.
+  static const QPoint offsets[] = {
+    QPoint( 0, 0 ),
+    QPoint( 0, -2 ), QPoint( 0, 2 ), QPoint( -2, 0 ), QPoint( 2, 0 ),
+    QPoint( 0, -5 ), QPoint( 0, 5 ), QPoint( -5, 0 ), QPoint( 5, 0 ),
+    QPoint( -4, -4 ), QPoint( 4, -4 ), QPoint( -4, 4 ), QPoint( 4, 4 ),
+    QPoint( 0, -7 ), QPoint( 0, 7 ),
+    QPoint( -9, 0 ), QPoint( 9, 0 ), QPoint( -12, 0 ), QPoint( 12, 0 )
+  };
+
+  QList< POINT > points;
+  points.reserve( int( sizeof( offsets ) / sizeof( offsets[ 0 ] ) ) );
+
+  for ( const QPoint & offset : offsets ) {
+    POINT point;
+    point.x = globalPos.x() + offset.x();
+    point.y = globalPos.y() + offset.y();
+    points << point;
+  }
+
+  return points;
+}
+
+bool sutraStartupIsKnownCjkLookupCandidate( const QString & candidate )
+{
+  static const QSet< QString > knownTerms = [] {
+    QSet< QString > result;
+    for ( const QString & term : sutraStartupCjkGlossaryTerms() ) {
+      result.insert( term );
+    }
+    return result;
+  }();
+
+  return knownTerms.contains( candidate.trimmed() );
+}
+
+int sutraStartupUiAutomationCandidateScore( const QString & candidate,
+                                            SutraMouseLookupCaptureMode captureMode,
+                                            const POINT & probe,
+                                            const QPoint & origin )
+{
+  const QString cleaned = candidate.trimmed();
+  if ( cleaned.isEmpty() ) {
+    return ( std::numeric_limits< int >::min )();
+  }
+
+  const int distance = qAbs( int( probe.x ) - origin.x() )
+                     + qAbs( int( probe.y ) - origin.y() );
+
+  if ( captureMode == SutraMouseLookupCaptureMode::EntirePhrase ) {
+    // For full-clause lookup, pointer proximity is more important than length:
+    // a neighboring punctuation section must never outrank the exact clause.
+    return 20000 - distance * 100 + qMin( cleaned.size(), 360 );
+  }
+
+  const int cjkCount = sutraStartupCjkIdeographCount( cleaned );
+  if ( cjkCount > 0 ) {
+    int score = 10000 + cjkCount * 200 - distance * 40;
+
+    // A real glossary term (including the conservative title-free aliases)
+    // should outrank a generic two-character fallback from a glyph edge.
+    if ( sutraStartupIsKnownCjkLookupCandidate( cleaned ) ) {
+      score += 50000;
+    }
+
+    if ( cjkCount == 1 ) {
+      score -= 6000;
+    }
+
+    return score;
+  }
+
+  const int latinTokens = sutraStartupLatinTokenCount( cleaned );
+  return 5000 + latinTokens * 200 + qMin( cleaned.size(), 160 ) - distance * 40;
 }
 
 QString sutraStartupUiAutomationTextAtPoint( const QPoint & globalPos,
@@ -2043,6 +2264,15 @@ QString sutraStartupUiAutomationTextAtPoint( const QPoint & globalPos,
   IUIAutomationTreeWalker * walker = nullptr;
   automation->get_ControlViewWalker( &walker );
 
+  const bool officeCompatibilityMode = sutraStartupIsMicrosoftOfficeWindowAtPoint( globalPos );
+  QList< POINT > probePoints;
+  if ( officeCompatibilityMode ) {
+    probePoints = sutraStartupUiAutomationProbePoints( globalPos );
+  }
+  else {
+    probePoints << point;
+  }
+
   QString result;
   IUIAutomationElement * currentElement = element;
 
@@ -2053,14 +2283,51 @@ QString sutraStartupUiAutomationTextAtPoint( const QPoint & globalPos,
                                               IID_PPV_ARGS( &textPattern ) );
 
     if ( SUCCEEDED( hr ) && textPattern ) {
-      IUIAutomationTextRange * textRange = nullptr;
-      hr = textPattern->RangeFromPoint( point, &textRange );
+      QString bestCandidate;
+      int bestScore = ( std::numeric_limits< int >::min )();
 
-      if ( SUCCEEDED( hr ) && textRange ) {
-        result = sutraStartupTextFromUiAutomationRange( textRange, captureMode );
+      for ( const POINT & probePoint : probePoints ) {
+        IUIAutomationTextRange * textRange = nullptr;
+        hr = textPattern->RangeFromPoint( probePoint, &textRange );
+
+        if ( FAILED( hr ) || !textRange ) {
+          continue;
+        }
+
+        const QString candidate = sutraStartupTextFromUiAutomationRange(
+          textRange,
+          captureMode,
+          officeCompatibilityMode );
         textRange->Release();
+
+        if ( candidate.trimmed().isEmpty() ) {
+          continue;
+        }
+
+        if ( captureMode != SutraMouseLookupCaptureMode::Automatic ) {
+          bestCandidate = candidate;
+          break;
+        }
+
+        const int score = sutraStartupUiAutomationCandidateScore( candidate,
+                                                                   captureMode,
+                                                                   probePoint,
+                                                                   globalPos );
+        if ( score > bestScore ) {
+          bestScore = score;
+          bestCandidate = candidate;
+        }
+
+        // The exact pointer already produced a long, known CJK compound.
+        // No neighboring probe can improve its semantic precision.
+        if ( probePoint.x == point.x && probePoint.y == point.y
+          && sutraStartupCjkIdeographCount( candidate ) >= 4
+          && sutraStartupIsKnownCjkLookupCandidate( candidate ) ) {
+          break;
+        }
       }
 
+      result = bestCandidate.trimmed();
       textPattern->Release();
     }
 
@@ -2123,14 +2390,15 @@ QString sutraStartupSelectedTextFromPattern( IUIAutomationTextPattern * textPatt
   int length = 0;
   ranges->get_Length( &length );
 
-  QStringList selectedParts;
+  QList< IUIAutomationTextRange * > selectedRanges;
+  bool pointInsideSelection = pointRange == nullptr;
+
   for ( int i = 0; i < length; ++i ) {
     IUIAutomationTextRange * range = nullptr;
     if ( FAILED( ranges->GetElement( i, &range ) ) || !range ) {
       continue;
     }
 
-    bool containsPoint = true;
     if ( pointRange ) {
       int startsBeforeOrAtPoint = 1;
       int endsAfterOrAtPoint = -1;
@@ -2142,27 +2410,53 @@ QString sutraStartupSelectedTextFromPattern( IUIAutomationTextPattern * textPatt
                                                      pointRange,
                                                      TextPatternRangeEndpoint_Start,
                                                      &endsAfterOrAtPoint );
-      containsPoint = SUCCEEDED( startHr ) && SUCCEEDED( endHr )
-                   && startsBeforeOrAtPoint <= 0 && endsAfterOrAtPoint >= 0;
-    }
-
-    if ( containsPoint ) {
-      BSTR text = nullptr;
-      if ( SUCCEEDED( range->GetText( 600, &text ) ) ) {
-        const QString part = sutraStartupTextFromBstr( text ).trimmed();
-        if ( !part.isEmpty() ) {
-          selectedParts << part;
-        }
+      if ( SUCCEEDED( startHr ) && SUCCEEDED( endHr )
+        && startsBeforeOrAtPoint <= 0 && endsAfterOrAtPoint >= 0 ) {
+        pointInsideSelection = true;
       }
     }
 
-    range->Release();
+    selectedRanges << range;
   }
 
   ranges->Release();
   if ( pointRange ) {
     pointRange->Release();
   }
+
+  if ( !pointInsideSelection ) {
+    for ( IUIAutomationTextRange * range : selectedRanges ) {
+      range->Release();
+    }
+    return {};
+  }
+
+  // GetSelection() does not guarantee document order. Word 2016 can expose a
+  // Vietnamese selection as several ranges in reverse order. Sort by each
+  // range's start endpoint before joining the text.
+  std::stable_sort( selectedRanges.begin(),
+                    selectedRanges.end(),
+                    []( IUIAutomationTextRange * left, IUIAutomationTextRange * right ) {
+    int comparison = 0;
+    return SUCCEEDED( left->CompareEndpoints( TextPatternRangeEndpoint_Start,
+                                              right,
+                                              TextPatternRangeEndpoint_Start,
+                                              &comparison ) )
+        && comparison < 0;
+  } );
+
+  QStringList selectedParts;
+  for ( IUIAutomationTextRange * range : selectedRanges ) {
+    BSTR text = nullptr;
+    if ( SUCCEEDED( range->GetText( 600, &text ) ) ) {
+      const QString part = sutraStartupTextFromBstr( text ).trimmed();
+      if ( !part.isEmpty() ) {
+        selectedParts << part;
+      }
+    }
+    range->Release();
+  }
+
   return selectedParts.join( QLatin1Char( ' ' ) ).trimmed();
 }
 
@@ -2958,7 +3252,8 @@ private:
                                           SutraMouseLookupCaptureMode captureMode ) const
   {
     const QString explicitSelection = sutraStartupExplicitSelectionLookupText( capturedText );
-    if ( !explicitSelection.isEmpty() ) {
+    if ( !explicitSelection.isEmpty()
+      && !sutraStartupLooksLikeReorderedLatinSelection( explicitSelection, contextText ) ) {
       return explicitSelection;
     }
 
@@ -2974,11 +3269,84 @@ private:
     return sutraStartupBestAutomaticLookupText( capturedText, contextText );
   }
 
-  void finishLegacyAutomaticCapture( const QString & capturedText,
+  bool legacyOfficeCaptureNeedsLineContext( const QString & capturedText,
+                                            const QString & contextText,
+                                            SutraMouseLookupCaptureMode captureMode ) const
+  {
+    const QString candidate = automaticLookupTextFromCapture( capturedText,
+                                                               contextText,
+                                                               captureMode );
+    if ( candidate.trimmed().isEmpty() ) {
+      return true;
+    }
+
+    if ( sutraStartupHasLatinLetter( candidate )
+      && sutraStartupCjkIdeographCount( candidate ) == 0
+      && sutraStartupLatinTokenCount( candidate ) < 2 ) {
+      return true;
+    }
+
+    // Keep the successful CJK path unchanged, but let legacy Office expand a
+    // lone ideograph when no multi-character context was available.
+    return sutraStartupCjkIdeographCount( candidate ) == 1
+        && sutraStartupCjkIdeographCount( contextText ) <= 1;
+  }
+
+  void captureLegacyOfficeLineContext( const QPoint & globalPos,
+                                       const QString & anchorText,
+                                       SutraMouseLookupCaptureMode captureMode,
+                                       const QString & previousClipboardText )
+  {
+    // The physical modifiers were released before entering the legacy path.
+    // Use staged key events so older Word versions have time to place the caret,
+    // move to the visual-line start, and extend the selection to its end.
+    sendSutraStartupLeftClickAt( globalPos );
+
+    QTimer::singleShot( 70, this, [ this, globalPos, anchorText, captureMode, previousClipboardText ] {
+      sendSutraStartupVirtualKey( VK_HOME, true );
+      sendSutraStartupVirtualKey( VK_HOME, false );
+
+      QTimer::singleShot( 70, this, [ this, globalPos, anchorText, captureMode, previousClipboardText ] {
+        sendSutraStartupVirtualKey( VK_SHIFT, true );
+        sendSutraStartupVirtualKey( VK_END, true );
+        sendSutraStartupVirtualKey( VK_END, false );
+        sendSutraStartupVirtualKey( VK_SHIFT, false );
+
+        QTimer::singleShot( 140, this, [ this, anchorText, captureMode, previousClipboardText ] {
+          copyCurrentSelection( [ this, anchorText, captureMode, previousClipboardText ]( const QString & lineText ) {
+            QString lookupText = automaticLookupTextFromCapture( anchorText,
+                                                                 lineText,
+                                                                 captureMode );
+
+            if ( lookupText.trimmed().isEmpty() ) {
+              lookupText = sutraStartupCleanLookupText( anchorText ).left( 160 ).trimmed();
+            }
+
+            if ( !lookupText.trimmed().isEmpty() ) {
+              openLookup( lookupText );
+            }
+
+            restoreClipboardAndFinish( previousClipboardText );
+          } );
+        } );
+      } );
+    } );
+  }
+
+  void finishLegacyAutomaticCapture( const QPoint & globalPos,
+                                     const QString & capturedText,
                                      const QString & contextText,
                                      SutraMouseLookupCaptureMode captureMode,
                                      const QString & previousClipboardText )
   {
+    if ( legacyOfficeCaptureNeedsLineContext( capturedText, contextText, captureMode ) ) {
+      captureLegacyOfficeLineContext( globalPos,
+                                      capturedText,
+                                      captureMode,
+                                      previousClipboardText );
+      return;
+    }
+
     const QString lookupText = automaticLookupTextFromCapture( capturedText,
                                                                contextText,
                                                                captureMode );
@@ -2993,11 +3361,9 @@ private:
                                                      SutraMouseLookupCaptureMode captureMode,
                                                      const QString & previousClipboardText )
   {
-    // Word 2010 frequently exposes no usable TextPattern range at the pointer.
-    // Wait until the user's physical Ctrl/Alt/Shift keys are released before
-    // performing the compatibility double-click. This avoids the Office 365
-    // 32-bit failure where a synthetic Ctrl+C could arrive as a plain "c" and
-    // replace nearby text.
+    // Word 2010 and some 32-bit Office builds expose only a one-word range at
+    // the pointer. Wait for the physical modifiers to be released before any
+    // compatibility selection or clipboard operation.
     waitForPhysicalModifierRelease( [ this, globalPos, captureMode, previousClipboardText ] {
       if ( !sutraStartupIsMicrosoftOfficeWindowAtPoint( globalPos ) ) {
         lookupInProgress = false;
@@ -3011,22 +3377,22 @@ private:
         const QString refreshedContext = sutraStartupUiAutomationTextAtPoint( globalPos, captureMode );
 
         if ( !selectedByUiAutomation.trimmed().isEmpty() ) {
-          finishLegacyAutomaticCapture( selectedByUiAutomation,
+          finishLegacyAutomaticCapture( globalPos,
+                                        selectedByUiAutomation,
                                         refreshedContext,
                                         captureMode,
                                         previousClipboardText );
           return;
         }
 
-        // Office 2010 may expose the double-click selection only through the
-        // clipboard. Physical modifiers are already up, so Ctrl+C is sent as a
-        // complete key chord and cannot become a plain character insertion.
-        copyCurrentSelection( [ this, refreshedContext, captureMode, previousClipboardText ]( const QString & copiedText ) {
-          finishLegacyAutomaticCapture( copiedText,
-                                        refreshedContext,
-                                        captureMode,
-                                        previousClipboardText );
-        } );
+        copyCurrentSelection(
+          [ this, globalPos, refreshedContext, captureMode, previousClipboardText ]( const QString & copiedText ) {
+            finishLegacyAutomaticCapture( globalPos,
+                                          copiedText,
+                                          refreshedContext,
+                                          captureMode,
+                                          previousClipboardText );
+          } );
       } );
     } );
   }
@@ -3052,9 +3418,31 @@ private:
     }
 
     if ( sutraStartupIsMicrosoftOfficeWindowAtPoint( globalPos ) ) {
-      lookupAutomaticTextWithLegacyOfficeFallback( globalPos,
-                                                   captureMode,
-                                                   previousClipboardText );
+      // Word can briefly return an empty RangeFromPoint while it is repaginating
+      // after a font-size/layout change. Retry once after the layout settles,
+      // still using the read-only UI Automation path, before any legacy
+      // selection/clipboard fallback is allowed to run.
+      QTimer::singleShot( 65, this, [ this, globalPos, captureMode, previousClipboardText ] {
+        if ( !lookupInProgress ) {
+          return;
+        }
+
+        const QString retrySelectedText = sutraStartupUiAutomationSelectedTextAtPoint( globalPos );
+        const QString retryContextText = sutraStartupUiAutomationTextAtPoint( globalPos, captureMode );
+        const QString retryLookupText = automaticLookupTextFromCapture( retrySelectedText,
+                                                                        retryContextText,
+                                                                        captureMode );
+
+        if ( !retryLookupText.trimmed().isEmpty() ) {
+          openLookup( retryLookupText );
+          lookupInProgress = false;
+          return;
+        }
+
+        lookupAutomaticTextWithLegacyOfficeFallback( globalPos,
+                                                     captureMode,
+                                                     previousClipboardText );
+      } );
       return;
     }
 
