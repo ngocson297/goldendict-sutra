@@ -608,6 +608,68 @@ bool sutraStartupIsMicrosoftOfficeWindowAtPoint( const QPoint & globalPos )
   return officeExecutables.contains( executableName );
 }
 
+bool sutraStartupIsGoldenDictWindowAtPoint( const QPoint & globalPos )
+{
+  POINT point;
+  point.x = globalPos.x();
+  point.y = globalPos.y();
+
+  HWND window = WindowFromPoint( point );
+  if ( !window ) {
+    return false;
+  }
+
+  HWND rootWindow = GetAncestor( window, GA_ROOT );
+  if ( rootWindow ) {
+    window = rootWindow;
+  }
+
+  DWORD processId = 0;
+  GetWindowThreadProcessId( window, &processId );
+  if ( processId == 0 ) {
+    return false;
+  }
+
+  HANDLE process = OpenProcess( PROCESS_QUERY_LIMITED_INFORMATION, FALSE, processId );
+  if ( !process ) {
+    return false;
+  }
+
+  wchar_t targetExecutablePath[ 32768 ] = {};
+  DWORD targetPathLength = static_cast< DWORD >( sizeof( targetExecutablePath )
+                                                / sizeof( targetExecutablePath[ 0 ] ) );
+  const BOOL targetPathRead = QueryFullProcessImageNameW( process,
+                                                          0,
+                                                          targetExecutablePath,
+                                                          &targetPathLength );
+  CloseHandle( process );
+
+  if ( !targetPathRead || targetPathLength == 0 ) {
+    return false;
+  }
+
+  wchar_t currentExecutablePath[ 32768 ] = {};
+  const DWORD currentPathLength = GetModuleFileNameW( nullptr,
+                                                       currentExecutablePath,
+                                                       static_cast< DWORD >( sizeof( currentExecutablePath )
+                                                                          / sizeof( currentExecutablePath[ 0 ] ) ) );
+  if ( currentPathLength == 0 ) {
+    return false;
+  }
+
+  const QString targetPath = QString::fromWCharArray( targetExecutablePath,
+                                                       static_cast< int >( targetPathLength ) )
+                               .replace( QLatin1Char( '/' ), QLatin1Char( '\\' ) );
+  const QString currentPath = QString::fromWCharArray( currentExecutablePath,
+                                                        static_cast< int >( currentPathLength ) )
+                                .replace( QLatin1Char( '/' ), QLatin1Char( '\\' ) );
+
+  // The popup can be hosted by a second GoldenDict process. Comparing the
+  // executable path instead of the PID keeps lookup available in both the main
+  // result view and scan popup, while excluding unrelated Qt/Chromium windows.
+  return targetPath.compare( currentPath, Qt::CaseInsensitive ) == 0;
+}
+
 void sendSutraStartupCtrlC()
 {
   INPUT inputs[ 4 ] = {};
@@ -1363,6 +1425,8 @@ bool sutraStartupTokenSequenceMatches( const QList< SutraStartupTextToken > & li
   return true;
 }
 
+bool sutraStartupIsPhraseBoundaryAt( const QString & text, int index );
+
 QString sutraStartupFallbackVietnameseWindow( const QString & lineText,
                                                const QList< SutraStartupTextToken > & tokens,
                                                int anchorIndex )
@@ -1374,13 +1438,9 @@ QString sutraStartupFallbackVietnameseWindow( const QString & lineText,
   int clauseStart = anchorIndex;
   int clauseEnd = anchorIndex;
 
-  const auto containsStrongSeparator = [ &lineText ]( int from, int to ) {
+  const auto containsPhraseBoundary = [ &lineText ]( int from, int to ) {
     for ( int i = qMax( 0, from ); i < qMin( to, lineText.size() ); ++i ) {
-      const QChar ch = lineText.at( i );
-      if ( ch == QLatin1Char( ',' ) || ch == QLatin1Char( '.' ) || ch == QLatin1Char( ';' )
-        || ch == QLatin1Char( ':' ) || ch == QLatin1Char( '!' ) || ch == QLatin1Char( '?' )
-        || ch == QLatin1Char( '\r' ) || ch == QLatin1Char( '\n' )
-        || ch == QChar( 0x2013 ) || ch == QChar( 0x2014 ) ) {
+      if ( sutraStartupIsPhraseBoundaryAt( lineText, i ) ) {
         return true;
       }
     }
@@ -1388,30 +1448,45 @@ QString sutraStartupFallbackVietnameseWindow( const QString & lineText,
     return false;
   };
 
+  // Latin automatic lookup must never cross normal punctuation. This includes
+  // . , ? ! apostrophes, quotation marks, colons, semicolons, dashes and
+  // brackets. Hyphens/apostrophes inside a word remain intact because
+  // sutraStartupIsPhraseBoundaryAt() already checks both neighboring letters.
   while ( clauseStart > 0
-       && !containsStrongSeparator( tokens.at( clauseStart - 1 ).end, tokens.at( clauseStart ).start ) ) {
+       && !containsPhraseBoundary( tokens.at( clauseStart - 1 ).end,
+                                   tokens.at( clauseStart ).start ) ) {
     --clauseStart;
   }
 
   while ( clauseEnd + 1 < tokens.size()
-       && !containsStrongSeparator( tokens.at( clauseEnd ).end, tokens.at( clauseEnd + 1 ).start ) ) {
+       && !containsPhraseBoundary( tokens.at( clauseEnd ).end,
+                                   tokens.at( clauseEnd + 1 ).start ) ) {
     ++clauseEnd;
   }
 
   const int clauseTokenCount = clauseEnd - clauseStart + 1;
-  if ( clauseTokenCount <= 4 ) {
+  if ( clauseTokenCount <= 2 ) {
     return lineText.mid( tokens.at( clauseStart ).start,
                          tokens.at( clauseEnd ).end - tokens.at( clauseStart ).start ).trimmed();
   }
 
-  int windowStart = qMax( clauseStart, anchorIndex - 1 );
-  int windowEnd = qMin( clauseEnd, windowStart + 3 );
-  if ( windowEnd - windowStart < 3 ) {
-    windowStart = qMax( clauseStart, windowEnd - 3 );
-  }
+  // Known glossary aliases (including phrases longer than two words) are
+  // resolved before this fallback. When no alias matches, returning an entire
+  // three/four-word clause creates false queries such as
+  // "du phuong hoang hoa". Use the nearest natural two-token group instead:
+  // [du phuong] [hoang hoa]. This preserves precise lookup while Entire Phrase
+  // mode continues to return the full punctuation-delimited clause.
+  const int relativeAnchor = anchorIndex - clauseStart;
+  int pairStart = clauseStart + ( relativeAnchor / 2 ) * 2;
 
-  return lineText.mid( tokens.at( windowStart ).start,
-                       tokens.at( windowEnd ).end - tokens.at( windowStart ).start ).trimmed();
+  if ( pairStart + 1 > clauseEnd ) {
+    pairStart = clauseEnd - 1;
+  }
+  pairStart = qBound( clauseStart, pairStart, clauseEnd - 1 );
+
+  const int pairEnd = pairStart + 1;
+  return lineText.mid( tokens.at( pairStart ).start,
+                       tokens.at( pairEnd ).end - tokens.at( pairStart ).start ).trimmed();
 }
 
 QString sutraStartupBestVietnamesePhraseAtToken( const QString & lineText,
@@ -1756,11 +1831,14 @@ bool sutraStartupIsPhraseBoundaryAt( const QString & text, int index )
     return !( joinsLeft && joinsRight );
   }
 
-  // Apostrophes and quotation marks delimit phrases unless they are used
-  // inside a word. This covers normal Latin punctuation without breaking a
-  // legitimate apostrophe inside imported dictionary text.
-  if ( ch == QLatin1Char( '\'' ) || ch == QLatin1Char( '"' )
+  // Smart quotes are always phrase boundaries in Vietnamese/Chinese source
+  // text. Keep only an ASCII apostrophe inside a Latin contraction intact.
+  if ( ch == QLatin1Char( '"' )
     || code == 0x2018 || code == 0x2019 || code == 0x201C || code == 0x201D ) {
+    return true;
+  }
+
+  if ( ch == QLatin1Char( '\'' ) ) {
     const bool joinsLeft = index > 0 && text.at( index - 1 ).isLetterOrNumber();
     const bool joinsRight = index + 1 < text.size() && text.at( index + 1 ).isLetterOrNumber();
     return !( joinsLeft && joinsRight );
@@ -3312,8 +3390,8 @@ private:
         sendSutraStartupVirtualKey( VK_END, false );
         sendSutraStartupVirtualKey( VK_SHIFT, false );
 
-        QTimer::singleShot( 140, this, [ this, anchorText, captureMode, previousClipboardText ] {
-          copyCurrentSelection( [ this, anchorText, captureMode, previousClipboardText ]( const QString & lineText ) {
+        QTimer::singleShot( 140, this, [ this, globalPos, anchorText, captureMode, previousClipboardText ] {
+          copyCurrentSelection( [ this, globalPos, anchorText, captureMode, previousClipboardText ]( const QString & lineText ) {
             QString lookupText = automaticLookupTextFromCapture( anchorText,
                                                                  lineText,
                                                                  captureMode );
@@ -3321,6 +3399,12 @@ private:
             if ( lookupText.trimmed().isEmpty() ) {
               lookupText = sutraStartupCleanLookupText( anchorText ).left( 160 ).trimmed();
             }
+
+            // The line selection was created by GoldenDict only to read legacy
+            // Word. Collapse it immediately so the next automatic lookup does
+            // not mistake that stale programmatic selection for a deliberate
+            // user selection. This changes only the caret, never document text.
+            sendSutraStartupLeftClickAt( globalPos );
 
             if ( !lookupText.trimmed().isEmpty() ) {
               openLookup( lookupText );
@@ -3350,11 +3434,69 @@ private:
     const QString lookupText = automaticLookupTextFromCapture( capturedText,
                                                                contextText,
                                                                captureMode );
+
+    // The legacy path may have double-clicked a word. Collapse only the
+    // selection that GoldenDict created so it cannot leak into the next lookup.
+    sendSutraStartupLeftClickAt( globalPos );
+
     if ( !lookupText.trimmed().isEmpty() ) {
       openLookup( lookupText );
     }
 
     restoreClipboardAndFinish( previousClipboardText );
+  }
+
+  void lookupAutomaticTextWithGoldenDictFallback( const QPoint & globalPos,
+                                                    SutraMouseLookupCaptureMode captureMode,
+                                                    const QString & previousClipboardText )
+  {
+    // Qt WebEngine does not always expose TextPattern/RangeFromPoint for the
+    // dictionary result or scan popup. Older Sutra builds still worked there
+    // because they selected the word and copied it. Restore that behavior only
+    // for GoldenDict's own executable, after every physical modifier is up.
+    waitForPhysicalModifierRelease( [ this, globalPos, captureMode, previousClipboardText ] {
+      if ( !sutraStartupIsGoldenDictWindowAtPoint( globalPos ) ) {
+        lookupInProgress = false;
+        return;
+      }
+
+      sendSutraStartupLeftDoubleClickAt( globalPos );
+
+      QTimer::singleShot( 140, this, [ this, globalPos, captureMode, previousClipboardText ] {
+        const QString selectedByUiAutomation = sutraStartupUiAutomationSelectedTextAtPoint( globalPos );
+        if ( !selectedByUiAutomation.trimmed().isEmpty() ) {
+          QString lookupText = automaticLookupTextFromCapture( selectedByUiAutomation,
+                                                               selectedByUiAutomation,
+                                                               captureMode );
+          if ( lookupText.trimmed().isEmpty() ) {
+            lookupText = sutraStartupCleanLookupText( selectedByUiAutomation ).left( 160 ).trimmed();
+          }
+
+          sendSutraStartupLeftClickAt( globalPos );
+          if ( !lookupText.trimmed().isEmpty() ) {
+            openLookup( lookupText );
+          }
+          restoreClipboardAndFinish( previousClipboardText );
+          return;
+        }
+
+        copyCurrentSelection(
+          [ this, globalPos, captureMode, previousClipboardText ]( const QString & copiedText ) {
+            QString lookupText = automaticLookupTextFromCapture( copiedText,
+                                                                 copiedText,
+                                                                 captureMode );
+            if ( lookupText.trimmed().isEmpty() ) {
+              lookupText = sutraStartupCleanLookupText( copiedText ).left( 160 ).trimmed();
+            }
+
+            sendSutraStartupLeftClickAt( globalPos );
+            if ( !lookupText.trimmed().isEmpty() ) {
+              openLookup( lookupText );
+            }
+            restoreClipboardAndFinish( previousClipboardText );
+          } );
+      } );
+    } );
   }
 
   void lookupAutomaticTextWithLegacyOfficeFallback( const QPoint & globalPos,
@@ -3414,6 +3556,13 @@ private:
     if ( !lookupText.trimmed().isEmpty() ) {
       openLookup( lookupText );
       lookupInProgress = false;
+      return;
+    }
+
+    if ( sutraStartupIsGoldenDictWindowAtPoint( globalPos ) ) {
+      lookupAutomaticTextWithGoldenDictFallback( globalPos,
+                                                 captureMode,
+                                                 previousClipboardText );
       return;
     }
 
