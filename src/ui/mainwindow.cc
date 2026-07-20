@@ -731,6 +731,12 @@ MainWindow::MainWindow( Config::Class & cfg_ ):
 
   dictionaryBar.setProperty( "sutraUxRole", "dictionaryToolbar" );
 
+  // Keep toolbar action styling away from the controls embedded inside the
+  // search widget. The previous descendant selector also reached the search
+  // adornment buttons and forced them to the toolbar button dimensions, which
+  // stretched the magnifier and drop-down icons on Windows.
+  translateBoxWidget->setProperty( "sutraUxRole", "mainSearchContainer" );
+
   const auto configureMainSearchField = [ this ]( QLineEdit * lineEdit ) {
     if ( !lineEdit ) {
       return;
@@ -748,6 +754,34 @@ MainWindow::MainWindow( Config::Class & cfg_ ):
 
   configureMainSearchField( ui.translateLine );
   configureMainSearchField( translateBox->translateLine() );
+
+  const auto configureSearchAdornmentButtons = []( QWidget * root ) {
+    if ( !root ) {
+      return;
+    }
+
+    const QList< QToolButton * > buttons = root->findChildren< QToolButton * >();
+    for ( QToolButton * button : buttons ) {
+      if ( !button ) {
+        continue;
+      }
+
+      button->setProperty( "sutraUxRole", "searchAdornmentButton" );
+      button->setAutoRaise( true );
+      button->setSizePolicy( QSizePolicy::Fixed, QSizePolicy::Fixed );
+      button->setMinimumSize( QSize( 24, 24 ) );
+      button->setMaximumSize( QSize( 24, 24 ) );
+      button->setIconSize( QSize( 16, 16 ) );
+    }
+  };
+
+  configureSearchAdornmentButtons( translateBoxWidget );
+
+  // QLineEdit may create its clear button lazily. Re-run once after the event
+  // loop starts so every search adornment receives the same square geometry.
+  QTimer::singleShot( 0, this, [ translateBoxWidget, configureSearchAdornmentButtons ] {
+    configureSearchAdornmentButtons( translateBoxWidget );
+  } );
 
   const auto configureGroupSelector = [ this ]( GroupComboBox * comboBox ) {
     if ( !comboBox ) {
@@ -1795,8 +1829,8 @@ QMainWindow[sutraMainUx="true"] QToolBar[sutraUxRole="dictionaryToolbar"] {
   border-bottom: 1px solid palette(mid);
 }
 
-QMainWindow[sutraMainUx="true"] QToolBar#navToolbar QToolButton,
-QMainWindow[sutraMainUx="true"] QToolBar[sutraUxRole="dictionaryToolbar"] QToolButton {
+QMainWindow[sutraMainUx="true"] QToolBar#navToolbar > QToolButton,
+QMainWindow[sutraMainUx="true"] QToolBar[sutraUxRole="dictionaryToolbar"] > QToolButton {
   min-width: 28px;
   min-height: 28px;
   padding: 2px;
@@ -1805,27 +1839,27 @@ QMainWindow[sutraMainUx="true"] QToolBar[sutraUxRole="dictionaryToolbar"] QToolB
   border-radius: 5px;
 }
 
-QMainWindow[sutraMainUx="true"] QToolBar#navToolbar QToolButton:hover,
-QMainWindow[sutraMainUx="true"] QToolBar[sutraUxRole="dictionaryToolbar"] QToolButton:hover {
+QMainWindow[sutraMainUx="true"] QToolBar#navToolbar > QToolButton:hover,
+QMainWindow[sutraMainUx="true"] QToolBar[sutraUxRole="dictionaryToolbar"] > QToolButton:hover {
   background: palette(alternate-base);
   border-color: palette(mid);
 }
 
-QMainWindow[sutraMainUx="true"] QToolBar#navToolbar QToolButton:pressed,
-QMainWindow[sutraMainUx="true"] QToolBar[sutraUxRole="dictionaryToolbar"] QToolButton:pressed {
+QMainWindow[sutraMainUx="true"] QToolBar#navToolbar > QToolButton:pressed,
+QMainWindow[sutraMainUx="true"] QToolBar[sutraUxRole="dictionaryToolbar"] > QToolButton:pressed {
   background: palette(midlight);
   border-color: palette(dark);
 }
 
-QMainWindow[sutraMainUx="true"] QToolBar#navToolbar QToolButton:checked,
-QMainWindow[sutraMainUx="true"] QToolBar[sutraUxRole="dictionaryToolbar"] QToolButton:checked {
+QMainWindow[sutraMainUx="true"] QToolBar#navToolbar > QToolButton:checked,
+QMainWindow[sutraMainUx="true"] QToolBar[sutraUxRole="dictionaryToolbar"] > QToolButton:checked {
   background: palette(highlight);
   color: palette(highlighted-text);
   border-color: palette(highlight);
 }
 
-QMainWindow[sutraMainUx="true"] QToolBar#navToolbar QToolButton:disabled,
-QMainWindow[sutraMainUx="true"] QToolBar[sutraUxRole="dictionaryToolbar"] QToolButton:disabled {
+QMainWindow[sutraMainUx="true"] QToolBar#navToolbar > QToolButton:disabled,
+QMainWindow[sutraMainUx="true"] QToolBar[sutraUxRole="dictionaryToolbar"] > QToolButton:disabled {
   color: palette(mid);
 }
 
@@ -1834,6 +1868,26 @@ QMainWindow[sutraMainUx="true"] QToolBar[sutraUxRole="dictionaryToolbar"]::separ
   width: 1px;
   margin: 6px 5px;
   background: palette(mid);
+}
+
+QMainWindow[sutraMainUx="true"] QWidget[sutraUxRole="mainSearchContainer"] QToolButton[sutraUxRole="searchAdornmentButton"] {
+  min-width: 24px;
+  max-width: 24px;
+  min-height: 24px;
+  max-height: 24px;
+  padding: 0;
+  margin: 0 2px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+}
+
+QMainWindow[sutraMainUx="true"] QWidget[sutraUxRole="mainSearchContainer"] QToolButton[sutraUxRole="searchAdornmentButton"]:hover {
+  background: palette(alternate-base);
+}
+
+QMainWindow[sutraMainUx="true"] QWidget[sutraUxRole="mainSearchContainer"] QToolButton[sutraUxRole="searchAdornmentButton"]:pressed {
+  background: palette(midlight);
 }
 
 QMainWindow[sutraMainUx="true"] QLineEdit[sutraUxRole="mainSearchField"] {
