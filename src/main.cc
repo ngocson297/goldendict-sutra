@@ -16,6 +16,8 @@
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QMenu>
+#include <QAction>
 #include <QPalette>
 #include <QPointer>
 #include <QStyle>
@@ -976,6 +978,45 @@ bool sutraStartupIsUsableOfficePhraseCandidate( const QString & text )
   return true;
 }
 
+bool sutraStartupIsSafeStandaloneOfficeCandidate( const QString & candidate,
+                                                    const QString & context )
+{
+  const QString cleanedCandidate = candidate.trimmed();
+  const QString cleanedContext = context.trimmed();
+  if ( cleanedCandidate.isEmpty() || cleanedContext.isEmpty() ) {
+    return false;
+  }
+
+  const auto cjkCount = []( const QString & text ) {
+    int count = 0;
+    for ( const QChar & ch : text ) {
+      if ( sutraStartupIsCjkIdeograph( ch ) ) {
+        ++count;
+      }
+    }
+    return count;
+  };
+
+  const int candidateCjkCount = cjkCount( cleanedCandidate );
+  const int contextCjkCount = cjkCount( cleanedContext );
+  const int candidateLatinCount = sutraStartupLatinTokenCount( cleanedCandidate );
+  const int contextLatinCount = sutraStartupLatinTokenCount( cleanedContext );
+
+  // A one-character/one-word result is valid only after the enclosing context
+  // has also proved that no larger candidate exists. This keeps 2+ character
+  // phrase detection first, while restoring genuine standalone lookups on the
+  // 32-bit Office providers that previously returned an empty result.
+  if ( candidateCjkCount == 1 ) {
+    return contextCjkCount == 1;
+  }
+
+  if ( candidateCjkCount == 0 && candidateLatinCount == 1 ) {
+    return contextLatinCount == 1;
+  }
+
+  return false;
+}
+
 bool sutraStartupLooksLikeReorderedLatinSelection( const QString & selectedText,
                                                     const QString & contextText )
 {
@@ -1254,19 +1295,10 @@ QString sutraStartupCjkFallbackWindowAtOffset( const QString & context, int clic
     return {};
   }
 
-  if ( compact.text.size() == 1 ) {
-    return compact.text;
-  }
-
-  // Precise lookup must not collapse a multi-character CJK clause to one
-  // ideograph. If no glossary entry matches, keep the nearest two-character
-  // window so ordinary dictionaries still receive a useful word candidate.
-  int start = qBound( 0, anchor - 1, compact.text.size() - 2 );
-  if ( anchor == 0 ) {
-    start = 0;
-  }
-
-  return compact.text.mid( start, 2 );
+  // Known 2+ character glossary terms are resolved before this fallback. When
+  // none contains the pointer, return exactly the ideograph under the pointer
+  // instead of fabricating an unrelated neighboring pair.
+  return compact.text.mid( anchor, 1 );
 }
 
 QString sutraStartupBestCjkGlossaryTermAtOffset( const QString & context, int clickOffset )
@@ -1427,6 +1459,157 @@ bool sutraStartupTokenSequenceMatches( const QList< SutraStartupTextToken > & li
 
 bool sutraStartupIsPhraseBoundaryAt( const QString & text, int index );
 
+bool sutraStartupVietnameseSpanCrossesBoundary(
+  const QString & lineText,
+  const QList< SutraStartupTextToken > & tokens,
+  int start,
+  int end )
+{
+  if ( start < 0 || end < start || end >= tokens.size() ) {
+    return true;
+  }
+
+  for ( int tokenIndex = start; tokenIndex < end; ++tokenIndex ) {
+    const int gapStart = qMax( 0, tokens.at( tokenIndex ).end );
+    const int gapEnd = qMin( lineText.size(), tokens.at( tokenIndex + 1 ).start );
+
+    for ( int charIndex = gapStart; charIndex < gapEnd; ++charIndex ) {
+      if ( sutraStartupIsPhraseBoundaryAt( lineText, charIndex ) ) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+int sutraStartupVietnameseTokenCountPriority( int tokenCount )
+{
+  // Vietnamese/Han-Viet headwords are most often two words. Four-word idioms
+  // and translated Sanskrit names are the next most useful group, followed by
+  // three-word terms. Other known aliases remain supported after these groups.
+  switch ( tokenCount ) {
+    case 2:
+      return 0;
+    case 4:
+      return 1;
+    case 3:
+      return 2;
+    default:
+      return 20 + qAbs( tokenCount - 4 );
+  }
+}
+
+bool sutraStartupIsVietnameseConnectorToken( const SutraStartupTextToken & token )
+{
+  // Treat standalone conjunctions as soft phrase boundaries only for the
+  // heuristic fallback. Exact glossary aliases are resolved before this step,
+  // so a real headword containing one of these words still remains available.
+  // This prevents pairs such as "va Phat" from being produced for
+  // "tin do va Phat tu" while keeping normal punctuation behavior unchanged.
+  static const QStringList connectors = {
+    QStringLiteral( "va" ),
+    QStringLiteral( "hoac" ),
+    QStringLiteral( "hay" )
+  };
+
+  return token.hasLatin && connectors.contains( token.normalized );
+}
+
+bool sutraStartupIsPreferredVietnameseTwoWordCompoundText( const QString & phrase )
+{
+  // These are high-frequency two-word Han-Viet/Buddhist compounds repeatedly
+  // observed in real user documents. They resolve the otherwise ambiguous
+  // shape "two-word term + two-word term" without forcing every four-token
+  // expression to split. The comparison is accent/case insensitive.
+  static const QSet< QString > preferredCompounds = {
+    QStringLiteral( "du phuong" ),
+    QStringLiteral( "hoang hoa" ),
+    QStringLiteral( "xien duong" ),
+    QStringLiteral( "giao nghia" ),
+    QStringLiteral( "hung thinh" ),
+    QStringLiteral( "phat trien" ),
+    QStringLiteral( "cao tang" ),
+    QStringLiteral( "phat giao" ),
+    QStringLiteral( "tin do" ),
+    QStringLiteral( "do de" ),
+    QStringLiteral( "phat tu" )
+  };
+
+  return preferredCompounds.contains(
+    sutraStartupNormalizeVietnameseLookupText( phrase ) );
+}
+
+bool sutraStartupIsPreferredVietnameseTwoWordCompound(
+  const QString & lineText,
+  const QList< SutraStartupTextToken > & tokens,
+  int start )
+{
+  if ( start < 0 || start + 1 >= tokens.size()
+    || !tokens.at( start ).hasLatin
+    || !tokens.at( start + 1 ).hasLatin
+    || sutraStartupVietnameseSpanCrossesBoundary( lineText, tokens, start, start + 1 ) ) {
+    return false;
+  }
+
+  const QString phrase = lineText.mid( tokens.at( start ).start,
+                                       tokens.at( start + 1 ).end - tokens.at( start ).start );
+  return sutraStartupIsPreferredVietnameseTwoWordCompoundText( phrase );
+}
+
+bool sutraStartupIsPreferredVietnameseFourWordCompoundText( const QString & phrase )
+{
+  // Common four-word Han-Viet idioms reported by users. These are kept as one
+  // lookup when no stronger glossary alias exists. The comparison remains
+  // accent- and case-insensitive.
+  static const QSet< QString > preferredCompounds = {
+    QStringLiteral( "tu ma nan truy" ),
+    QStringLiteral( "tam thap luc ke" ),
+    QStringLiteral( "ban tu vi su" ),
+    QStringLiteral( "tau vi thuong sach" )
+  };
+
+  return preferredCompounds.contains(
+    sutraStartupNormalizeVietnameseLookupText( phrase ) );
+}
+
+QString sutraStartupVietnameseTokenText( const QString & lineText,
+                                         const QList< SutraStartupTextToken > & tokens,
+                                         int start,
+                                         int end )
+{
+  if ( start < 0 || end < start || end >= tokens.size() ) {
+    return {};
+  }
+
+  return lineText.mid( tokens.at( start ).start,
+                       tokens.at( end ).end - tokens.at( start ).start ).trimmed();
+}
+
+bool sutraStartupIsExactVietnameseGlossaryAlias( const QString & text )
+{
+  const QList< SutraStartupTextToken > tokens = sutraStartupTokenizePhraseText( text );
+  if ( tokens.size() < 2 ) {
+    return false;
+  }
+
+  QStringList normalizedTokens;
+  for ( const SutraStartupTextToken & token : tokens ) {
+    if ( !token.hasLatin ) {
+      return false;
+    }
+    normalizedTokens << token.normalized;
+  }
+
+  for ( const SutraStartupVietnameseAlias & alias : sutraStartupVietnameseGlossaryAliases() ) {
+    if ( alias.normalizedTokens == normalizedTokens ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 QString sutraStartupFallbackVietnameseWindow( const QString & lineText,
                                                const QList< SutraStartupTextToken > & tokens,
                                                int anchorIndex )
@@ -1448,10 +1631,9 @@ QString sutraStartupFallbackVietnameseWindow( const QString & lineText,
     return false;
   };
 
-  // Latin automatic lookup must never cross normal punctuation. This includes
-  // . , ? ! apostrophes, quotation marks, colons, semicolons, dashes and
-  // brackets. Hyphens/apostrophes inside a word remain intact because
-  // sutraStartupIsPhraseBoundaryAt() already checks both neighboring letters.
+  // Latin lookup is bounded by whitespace tokens plus normal punctuation.
+  // Capitalization at the beginning of a line/sentence does not change token
+  // identity because all comparisons are accent- and case-insensitive.
   while ( clauseStart > 0
        && !containsPhraseBoundary( tokens.at( clauseStart - 1 ).end,
                                    tokens.at( clauseStart ).start ) ) {
@@ -1464,30 +1646,117 @@ QString sutraStartupFallbackVietnameseWindow( const QString & lineText,
     ++clauseEnd;
   }
 
-  const int clauseTokenCount = clauseEnd - clauseStart + 1;
-  if ( clauseTokenCount <= 2 ) {
-    return lineText.mid( tokens.at( clauseStart ).start,
-                         tokens.at( clauseEnd ).end - tokens.at( clauseStart ).start ).trimmed();
+  // Standalone conjunctions are soft boundaries for the heuristic path.
+  // Exact glossary aliases have already been checked before this function.
+  int segmentStart = clauseStart;
+  int segmentEnd = clauseEnd;
+
+  if ( sutraStartupIsVietnameseConnectorToken( tokens.at( anchorIndex ) ) ) {
+    return sutraStartupVietnameseTokenText( lineText, tokens, anchorIndex, anchorIndex );
   }
 
-  // Known glossary aliases (including phrases longer than two words) are
-  // resolved before this fallback. When no alias matches, returning an entire
-  // three/four-word clause creates false queries such as
-  // "du phuong hoang hoa". Use the nearest natural two-token group instead:
-  // [du phuong] [hoang hoa]. This preserves precise lookup while Entire Phrase
-  // mode continues to return the full punctuation-delimited clause.
-  const int relativeAnchor = anchorIndex - clauseStart;
-  int pairStart = clauseStart + ( relativeAnchor / 2 ) * 2;
-
-  if ( pairStart + 1 > clauseEnd ) {
-    pairStart = clauseEnd - 1;
+  for ( int i = anchorIndex - 1; i >= clauseStart; --i ) {
+    if ( sutraStartupIsVietnameseConnectorToken( tokens.at( i ) ) ) {
+      segmentStart = i + 1;
+      break;
+    }
   }
-  pairStart = qBound( clauseStart, pairStart, clauseEnd - 1 );
 
-  const int pairEnd = pairStart + 1;
-  return lineText.mid( tokens.at( pairStart ).start,
-                       tokens.at( pairEnd ).end - tokens.at( pairStart ).start ).trimmed();
+  for ( int i = anchorIndex + 1; i <= clauseEnd; ++i ) {
+    if ( sutraStartupIsVietnameseConnectorToken( tokens.at( i ) ) ) {
+      segmentEnd = i - 1;
+      break;
+    }
+  }
+
+  const QString singleToken =
+    sutraStartupVietnameseTokenText( lineText, tokens, anchorIndex, anchorIndex );
+  if ( segmentStart > segmentEnd ) {
+    return singleToken;
+  }
+
+  // Priority 1: a verified/common two-word compound containing the pointer.
+  // Check both possible windows because the pointer may be on either word.
+  struct TwoWordCandidate
+  {
+    QString text;
+    bool exactAlias = false;
+    int distance = 0;
+  };
+
+  QList< TwoWordCandidate > twoWordCandidates;
+  for ( int pairStart = anchorIndex - 1; pairStart <= anchorIndex; ++pairStart ) {
+    const int pairEnd = pairStart + 1;
+    if ( pairStart < segmentStart || pairEnd > segmentEnd
+      || sutraStartupVietnameseSpanCrossesBoundary( lineText, tokens, pairStart, pairEnd ) ) {
+      continue;
+    }
+
+    const QString pair =
+      sutraStartupVietnameseTokenText( lineText, tokens, pairStart, pairEnd );
+    const bool exactAlias = sutraStartupIsExactVietnameseGlossaryAlias( pair );
+    const bool preferred =
+      sutraStartupIsPreferredVietnameseTwoWordCompoundText( pair );
+
+    if ( exactAlias || preferred ) {
+      twoWordCandidates.push_back(
+        TwoWordCandidate{ pair,
+                          exactAlias,
+                          qAbs( ( pairStart + pairEnd ) - anchorIndex * 2 ) } );
+    }
+  }
+
+  if ( !twoWordCandidates.isEmpty() ) {
+    std::sort( twoWordCandidates.begin(),
+               twoWordCandidates.end(),
+               []( const TwoWordCandidate & left, const TwoWordCandidate & right ) {
+      if ( left.exactAlias != right.exactAlias ) {
+        return left.exactAlias;
+      }
+      return left.distance < right.distance;
+    } );
+    return twoWordCandidates.first().text;
+  }
+
+  const int segmentTokenCount = segmentEnd - segmentStart + 1;
+
+  // Priority 2: a verified/common four-word phrase containing the pointer.
+  // Unknown four-token text is not automatically treated as a phrase; when no
+  // known compound exists, lookup falls through to the exact word under the
+  // pointer, as requested.
+  if ( segmentTokenCount == 4 ) {
+    const QString fourWordPhrase =
+      sutraStartupVietnameseTokenText( lineText, tokens, segmentStart, segmentEnd );
+    if ( sutraStartupIsExactVietnameseGlossaryAlias( fourWordPhrase )
+      || sutraStartupIsPreferredVietnameseFourWordCompoundText( fourWordPhrase ) ) {
+      return fourWordPhrase;
+    }
+  }
+
+  // Priority 3: known three-word aliases. Most are already resolved by
+  // sutraStartupBestVietnamesePhraseAtToken(), but this keeps the fallback
+  // self-contained when a provider gives a reduced token view.
+  for ( int phraseStart = anchorIndex - 2; phraseStart <= anchorIndex; ++phraseStart ) {
+    const int phraseEnd = phraseStart + 2;
+    if ( phraseStart < segmentStart || phraseEnd > segmentEnd
+      || sutraStartupVietnameseSpanCrossesBoundary( lineText, tokens,
+                                                    phraseStart, phraseEnd ) ) {
+      continue;
+    }
+
+    const QString phrase =
+      sutraStartupVietnameseTokenText( lineText, tokens, phraseStart, phraseEnd );
+    if ( sutraStartupIsExactVietnameseGlossaryAlias( phrase ) ) {
+      return phrase;
+    }
+  }
+
+  // Final fallback: the exact Latin token under the pointer. This restores the
+  // original one-word behavior only after every 2+/4/3-word candidate has
+  // failed, so it cannot override a valid compound.
+  return singleToken;
 }
+
 
 QString sutraStartupBestVietnamesePhraseAtToken( const QString & lineText,
                                                   const QList< SutraStartupTextToken > & lineTokens,
@@ -1499,12 +1768,13 @@ QString sutraStartupBestVietnamesePhraseAtToken( const QString & lineText,
 
   int bestStart = -1;
   int bestEnd = -1;
-  int bestTokenCount = 0;
+  int bestTokenCount = -1;
+  int bestAnchorDistance = ( std::numeric_limits< int >::max )();
   int bestCharacterCount = 0;
 
   for ( const SutraStartupVietnameseAlias & alias : sutraStartupVietnameseGlossaryAliases() ) {
     const int aliasTokenCount = alias.normalizedTokens.size();
-    if ( aliasTokenCount < bestTokenCount || aliasTokenCount > lineTokens.size() ) {
+    if ( aliasTokenCount > lineTokens.size() ) {
       continue;
     }
 
@@ -1517,12 +1787,23 @@ QString sutraStartupBestVietnamesePhraseAtToken( const QString & lineText,
       }
 
       const int end = start + aliasTokenCount - 1;
+      if ( sutraStartupVietnameseSpanCrossesBoundary( lineText, lineTokens, start, end ) ) {
+        continue;
+      }
+
+      // When several known aliases overlap the pointer, the longest real
+      // headword is the primary lookup. Shorter overlapping candidates are
+      // offered separately by the mouse hook, so they are not lost.
+      const int anchorDistance = qAbs( ( start + end ) - anchorIndex * 2 );
       const int characterCount = lineTokens.at( end ).end - lineTokens.at( start ).start;
       if ( aliasTokenCount > bestTokenCount
-        || ( aliasTokenCount == bestTokenCount && characterCount > bestCharacterCount ) ) {
+        || ( aliasTokenCount == bestTokenCount && anchorDistance < bestAnchorDistance )
+        || ( aliasTokenCount == bestTokenCount && anchorDistance == bestAnchorDistance
+          && characterCount > bestCharacterCount ) ) {
         bestStart = start;
         bestEnd = end;
         bestTokenCount = aliasTokenCount;
+        bestAnchorDistance = anchorDistance;
         bestCharacterCount = characterCount;
       }
     }
@@ -1617,7 +1898,8 @@ QString sutraStartupBestVietnamesePhraseFromLine( const QString & lineText, cons
   }
 
   int anchorIndex = -1;
-  if ( !anchorTokens.isEmpty() ) {
+  const bool hasExplicitAnchor = !anchorTokens.isEmpty();
+  if ( hasExplicitAnchor ) {
     QStringList normalizedAnchorTokens;
     for ( const SutraStartupTextToken & token : anchorTokens ) {
       normalizedAnchorTokens << token.normalized;
@@ -1640,6 +1922,13 @@ QString sutraStartupBestVietnamesePhraseFromLine( const QString & lineText, cons
         anchorIndex = start + normalizedAnchorTokens.size() / 2;
       }
     }
+  }
+
+  if ( anchorIndex < 0 && hasExplicitAnchor ) {
+    // The provider supplied an anchor, but that anchor is not present in the
+    // captured visual line. Never redirect the lookup to the first word of the
+    // paragraph; let the caller retry or use the exact captured token instead.
+    return {};
   }
 
   if ( anchorIndex < 0 ) {
@@ -2048,6 +2337,15 @@ QString sutraStartupLookupFromDelimitedContext( const QString & text,
                                                    delimited.clickOffset );
   }
 
+  if ( sutraStartupHasLatinLetter( delimited.text ) ) {
+    // Resolve Vietnamese/Latin text from the exact pointer offset. Known
+    // 2/4/3-word phrases still win inside
+    // sutraStartupBestVietnamesePhraseAtOffset(); when none contains the
+    // pointer, that function returns the exact token under the pointer.
+    return sutraStartupBestVietnamesePhraseAtOffset( delimited.text,
+                                                      delimited.clickOffset );
+  }
+
   return {};
 }
 
@@ -2077,17 +2375,26 @@ QString sutraStartupTextFromUiAutomationRange( IUIAutomationTextRange * range,
 
     const bool centeredIsPureLatin = sutraStartupHasLatinLetter( centeredCandidate )
                                     && sutraStartupCjkIdeographCount( centeredCandidate ) == 0;
+
+    // Character-centered context can span adjacent lines in Notepad and some
+    // other Win32 text controls. For Latin text, try TextUnit_Line first in all
+    // applications; it preserves the actual visual line and prevents results
+    // such as "giao nghiahung". CJK remains on the proven centered path because
+    // it has no whitespace word boundaries and already uses punctuation limits.
     if ( !centeredCandidate.isEmpty()
+      && !centeredIsPureLatin
       && ( !officeCompatibilityMode
-        || ( !centeredIsPureLatin
-          && sutraStartupIsUsableOfficePhraseCandidate( centeredCandidate ) ) ) ) {
+        || sutraStartupIsUsableOfficePhraseCandidate( centeredCandidate )
+        || sutraStartupIsSafeStandaloneOfficeCandidate( centeredCandidate, centeredText ) ) ) {
       return centeredCandidate;
     }
   }
 
   IUIAutomationTextRange * lineRange = nullptr;
   if ( FAILED( range->Clone( &lineRange ) ) || !lineRange ) {
-    return !officeCompatibilityMode || sutraStartupIsUsableOfficePhraseCandidate( centeredCandidate )
+    return !officeCompatibilityMode
+        || sutraStartupIsUsableOfficePhraseCandidate( centeredCandidate )
+        || sutraStartupIsSafeStandaloneOfficeCandidate( centeredCandidate, centeredText )
              ? centeredCandidate
              : QString();
   }
@@ -2097,7 +2404,9 @@ QString sutraStartupTextFromUiAutomationRange( IUIAutomationTextRange * range,
   BSTR lineBstr = nullptr;
   if ( FAILED( lineRange->GetText( 700, &lineBstr ) ) ) {
     lineRange->Release();
-    return !officeCompatibilityMode || sutraStartupIsUsableOfficePhraseCandidate( centeredCandidate )
+    return !officeCompatibilityMode
+        || sutraStartupIsUsableOfficePhraseCandidate( centeredCandidate )
+        || sutraStartupIsSafeStandaloneOfficeCandidate( centeredCandidate, centeredText )
              ? centeredCandidate
              : QString();
   }
@@ -2124,9 +2433,11 @@ QString sutraStartupTextFromUiAutomationRange( IUIAutomationTextRange * range,
     const QString lineCandidate = sutraStartupLookupFromDelimitedContext( lineText,
                                                                           clickOffset,
                                                                           captureMode );
-    if ( !lineCandidate.isEmpty()
-      && ( !officeCompatibilityMode
-        || sutraStartupIsUsableOfficePhraseCandidate( lineCandidate ) ) ) {
+    if ( !lineCandidate.isEmpty() && lineCandidate.size() <= 360 ) {
+      // This result was derived from the visual line and the actual pointer
+      // endpoint. It is therefore safe to return a single Latin token or CJK
+      // ideograph after compound matching has failed, even when unrelated text
+      // exists elsewhere on the same line.
       return lineCandidate;
     }
   }
@@ -2135,7 +2446,8 @@ QString sutraStartupTextFromUiAutomationRange( IUIAutomationTextRange * range,
   // multi-token candidate remains preferable to a one-word TextUnit fallback.
   if ( !centeredCandidate.isEmpty()
     && ( !officeCompatibilityMode
-      || sutraStartupIsUsableOfficePhraseCandidate( centeredCandidate ) ) ) {
+      || sutraStartupIsUsableOfficePhraseCandidate( centeredCandidate )
+      || sutraStartupIsSafeStandaloneOfficeCandidate( centeredCandidate, centeredText ) ) ) {
     return centeredCandidate;
   }
 
@@ -2154,7 +2466,8 @@ QString sutraStartupTextFromUiAutomationRange( IUIAutomationTextRange * range,
       if ( !wordText.isEmpty() ) {
         if ( captureMode == SutraMouseLookupCaptureMode::EntirePhrase ) {
           if ( !officeCompatibilityMode
-            || sutraStartupIsUsableOfficePhraseCandidate( wordText ) ) {
+            || sutraStartupIsUsableOfficePhraseCandidate( wordText )
+            || sutraStartupIsSafeStandaloneOfficeCandidate( wordText, lineText ) ) {
             return wordText.left( 360 );
           }
         }
@@ -2162,7 +2475,8 @@ QString sutraStartupTextFromUiAutomationRange( IUIAutomationTextRange * range,
           const QString phrase = sutraStartupBestVietnamesePhraseFromLine( wordText, wordText );
           if ( !phrase.isEmpty()
             && ( !officeCompatibilityMode
-              || sutraStartupIsUsableOfficePhraseCandidate( phrase ) ) ) {
+              || sutraStartupIsUsableOfficePhraseCandidate( phrase )
+              || sutraStartupIsSafeStandaloneOfficeCandidate( phrase, lineText ) ) ) {
             return phrase;
           }
         }
@@ -2175,6 +2489,10 @@ QString sutraStartupTextFromUiAutomationRange( IUIAutomationTextRange * range,
         }
 
         if ( wordCjkCount >= 2 && wordText.size() <= 80 ) {
+          return wordText;
+        }
+        if ( wordCjkCount == 1 && wordText.size() <= 80
+          && sutraStartupIsSafeStandaloneOfficeCandidate( wordText, lineText ) ) {
           return wordText;
         }
         if ( wordCjkCount == 0 && wordText.size() <= 80 && !officeCompatibilityMode ) {
@@ -2203,18 +2521,18 @@ QString sutraStartupTextFromUiAutomationRange( IUIAutomationTextRange * range,
       lineText,
       clickOffset >= 0 ? clickOffset : lineText.size() / 2 );
     const QString candidate = delimited.text.left( 360 ).trimmed();
-    if ( !officeCompatibilityMode || sutraStartupIsUsableOfficePhraseCandidate( candidate ) ) {
+    if ( !officeCompatibilityMode
+      || sutraStartupIsUsableOfficePhraseCandidate( candidate )
+      || sutraStartupIsSafeStandaloneOfficeCandidate( candidate, lineText ) ) {
       return candidate;
     }
   }
 
-  if ( sutraStartupHasLatinLetter( lineText ) ) {
-    const QString candidate = sutraStartupBestVietnamesePhraseFromLine( lineText, QString() ).left( 160 );
-    if ( !officeCompatibilityMode || sutraStartupIsUsableOfficePhraseCandidate( candidate ) ) {
-      return candidate;
-    }
-  }
-
+  // Do not guess from the first Latin token when the provider failed to expose
+  // a pointer offset. That old fallback could redirect a click on "truyền" in
+  // "Phật giáo truyền" to "Phật" or "Phật giáo". Returning no candidate here
+  // lets the existing Office compatibility path obtain an exact word/line
+  // selection instead.
   return {};
 }
 
@@ -2262,6 +2580,82 @@ bool sutraStartupIsKnownCjkLookupCandidate( const QString & candidate )
   return knownTerms.contains( candidate.trimmed() );
 }
 
+QString sutraStartupCleanLookupText( const QString & text );
+
+bool sutraStartupCandidateContainsExactPointerAnchor( const QString & candidate,
+                                                       const QString & exactAnchor )
+{
+  const QString cleanedCandidate = sutraStartupCleanLookupText( candidate ).trimmed();
+  const QString cleanedAnchor = sutraStartupCleanLookupText( exactAnchor ).trimmed();
+  if ( cleanedCandidate.isEmpty() || cleanedAnchor.isEmpty() ) {
+    return false;
+  }
+
+  const int anchorCjkCount = sutraStartupCjkIdeographCount( cleanedAnchor );
+  const bool anchorHasLatin = sutraStartupHasLatinLetter( cleanedAnchor );
+
+  if ( anchorCjkCount > 0 && !anchorHasLatin ) {
+    const QString compactCandidate = sutraStartupCompactCjkText( cleanedCandidate ).text;
+    const QString compactAnchor = sutraStartupCompactCjkText( cleanedAnchor ).text;
+    return !compactAnchor.isEmpty() && compactCandidate.contains( compactAnchor );
+  }
+
+  if ( anchorHasLatin && anchorCjkCount == 0 ) {
+    const QList< SutraStartupTextToken > candidateTokens =
+      sutraStartupTokenizePhraseText( cleanedCandidate );
+    const QList< SutraStartupTextToken > anchorTokens =
+      sutraStartupTokenizePhraseText( cleanedAnchor );
+
+    QStringList normalizedAnchorTokens;
+    for ( const SutraStartupTextToken & token : anchorTokens ) {
+      if ( token.hasLatin ) {
+        normalizedAnchorTokens << token.normalized;
+      }
+    }
+
+    if ( normalizedAnchorTokens.isEmpty() ) {
+      return false;
+    }
+
+    for ( int start = 0;
+          start + normalizedAnchorTokens.size() <= candidateTokens.size();
+          ++start ) {
+      if ( sutraStartupTokenSequenceMatches( candidateTokens,
+                                             start,
+                                             normalizedAnchorTokens ) ) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  return cleanedCandidate.contains( cleanedAnchor, Qt::CaseInsensitive );
+}
+
+bool sutraStartupIsIncompleteOfficePointerCandidate(
+  const QString & candidate,
+  SutraMouseLookupCaptureMode captureMode )
+{
+  if ( captureMode != SutraMouseLookupCaptureMode::Automatic ) {
+    return false;
+  }
+
+  const QString cleaned = candidate.trimmed();
+  if ( cleaned.isEmpty() ) {
+    return true;
+  }
+
+  const int cjkCount = sutraStartupCjkIdeographCount( cleaned );
+  if ( cjkCount == 1 && !sutraStartupHasLatinLetter( cleaned ) ) {
+    return true;
+  }
+
+  return cjkCount == 0
+      && sutraStartupHasLatinLetter( cleaned )
+      && sutraStartupLatinTokenCount( cleaned ) == 1;
+}
+
 int sutraStartupUiAutomationCandidateScore( const QString & candidate,
                                             SutraMouseLookupCaptureMode captureMode,
                                             const POINT & probe,
@@ -2299,7 +2693,35 @@ int sutraStartupUiAutomationCandidateScore( const QString & candidate,
   }
 
   const int latinTokens = sutraStartupLatinTokenCount( cleaned );
-  return 5000 + latinTokens * 200 + qMin( cleaned.size(), 160 ) - distance * 40;
+  const bool exactAlias = sutraStartupIsExactVietnameseGlossaryAlias( cleaned );
+  const bool preferredTwoWordCompound =
+    latinTokens == 2 && sutraStartupIsPreferredVietnameseTwoWordCompoundText( cleaned );
+
+  int tokenShapeScore = 0;
+  switch ( latinTokens ) {
+    case 2:
+      // A verified/common two-word compound remains the strongest candidate.
+      // An arbitrary two-word window must not outrank a complete four-word
+      // idiom returned by a neighboring UI Automation probe.
+      tokenShapeScore = exactAlias || preferredTwoWordCompound ? 16000 : 10500;
+      break;
+    case 4:
+      tokenShapeScore = 14000;
+      break;
+    case 3:
+      tokenShapeScore = 10000;
+      break;
+    case 1:
+      tokenShapeScore = -6000;
+      break;
+    default:
+      tokenShapeScore = 2000 - qAbs( latinTokens - 2 ) * 500;
+      break;
+  }
+
+  const int glossaryBonus = exactAlias ? 1800 : 0;
+  return 5000 + tokenShapeScore + glossaryBonus
+       + qMin( cleaned.size(), 160 ) - distance * 40;
 }
 
 QString sutraStartupUiAutomationTextAtPoint( const QPoint & globalPos,
@@ -2362,6 +2784,7 @@ QString sutraStartupUiAutomationTextAtPoint( const QPoint & globalPos,
 
     if ( SUCCEEDED( hr ) && textPattern ) {
       QString bestCandidate;
+      QString exactPointerCandidate;
       int bestScore = ( std::numeric_limits< int >::min )();
 
       for ( const POINT & probePoint : probePoints ) {
@@ -2387,6 +2810,40 @@ QString sutraStartupUiAutomationTextAtPoint( const QPoint & globalPos,
           break;
         }
 
+        const bool exactPointer =
+          probePoint.x == point.x && probePoint.y == point.y;
+        if ( exactPointer ) {
+          exactPointerCandidate = candidate.trimmed();
+          bestCandidate = exactPointerCandidate;
+
+          // A multi-token/multi-character result at the exact pointer is
+          // already complete. A single Word/TextUnit result is only an anchor:
+          // continue probing for a larger phrase that still contains it.
+          if ( !officeCompatibilityMode
+            || !sutraStartupIsIncompleteOfficePointerCandidate(
+                 exactPointerCandidate,
+                 captureMode ) ) {
+            break;
+          }
+
+          bestScore = sutraStartupUiAutomationCandidateScore(
+            exactPointerCandidate,
+            captureMode,
+            probePoint,
+            globalPos );
+          continue;
+        }
+
+        // Nearby probes are hit-test recovery only. They may expand the exact
+        // token/ideograph, but must never move the semantic anchor to a word or
+        // character elsewhere in the line or a previously selected phrase.
+        if ( !exactPointerCandidate.isEmpty()
+          && !sutraStartupCandidateContainsExactPointerAnchor(
+               candidate,
+               exactPointerCandidate ) ) {
+          continue;
+        }
+
         const int score = sutraStartupUiAutomationCandidateScore( candidate,
                                                                    captureMode,
                                                                    probePoint,
@@ -2395,17 +2852,11 @@ QString sutraStartupUiAutomationTextAtPoint( const QPoint & globalPos,
           bestScore = score;
           bestCandidate = candidate;
         }
-
-        // The exact pointer already produced a long, known CJK compound.
-        // No neighboring probe can improve its semantic precision.
-        if ( probePoint.x == point.x && probePoint.y == point.y
-          && sutraStartupCjkIdeographCount( candidate ) >= 4
-          && sutraStartupIsKnownCjkLookupCandidate( candidate ) ) {
-          break;
-        }
       }
 
-      result = bestCandidate.trimmed();
+      result = ( !bestCandidate.isEmpty()
+               ? bestCandidate
+               : exactPointerCandidate ).trimmed();
       textPattern->Release();
     }
 
@@ -2647,6 +3098,68 @@ QString sutraStartupCleanLookupText( const QString & text )
   return result.mid( start, 220 ).trimmed();
 }
 
+int sutraStartupAnchorOffsetInContext( const QString & contextText,
+                                       const QString & anchorText )
+{
+  const QString context = sutraStartupCleanLookupText( contextText );
+  const QString anchor = sutraStartupCleanLookupText( anchorText ).trimmed();
+  if ( context.isEmpty() ) {
+    return -1;
+  }
+
+  if ( anchor.isEmpty() ) {
+    return context.size() / 2;
+  }
+
+  // First preserve exact Unicode text, including CJK.
+  int bestOffset = -1;
+  int bestDistance = ( std::numeric_limits< int >::max )();
+  int occurrence = context.indexOf( anchor, 0, Qt::CaseInsensitive );
+  while ( occurrence >= 0 ) {
+    const int center = occurrence + anchor.size() / 2;
+    const int distance = qAbs( center * 2 - context.size() );
+    if ( distance < bestDistance ) {
+      bestDistance = distance;
+      bestOffset = center;
+    }
+    occurrence = context.indexOf( anchor, occurrence + 1, Qt::CaseInsensitive );
+  }
+
+  if ( bestOffset >= 0 ) {
+    return bestOffset;
+  }
+
+  // Office may normalize accents or split an explicit selection into ranges.
+  // Match normalized Latin tokens while retaining offsets into the original
+  // context string.
+  const QList< SutraStartupTextToken > contextTokens = sutraStartupTokenizePhraseText( context );
+  const QList< SutraStartupTextToken > anchorTokens = sutraStartupTokenizePhraseText( anchor );
+  QStringList normalizedAnchorTokens;
+  for ( const SutraStartupTextToken & token : anchorTokens ) {
+    if ( token.hasLatin ) {
+      normalizedAnchorTokens << token.normalized;
+    }
+  }
+
+  if ( !normalizedAnchorTokens.isEmpty() ) {
+    for ( int start = 0; start + normalizedAnchorTokens.size() <= contextTokens.size(); ++start ) {
+      if ( !sutraStartupTokenSequenceMatches( contextTokens, start, normalizedAnchorTokens ) ) {
+        continue;
+      }
+
+      const int end = start + normalizedAnchorTokens.size() - 1;
+      const int center = ( contextTokens.at( start ).start + contextTokens.at( end ).end ) / 2;
+      const int distance = qAbs( center * 2 - context.size() );
+      if ( distance < bestDistance ) {
+        bestDistance = distance;
+        bestOffset = center;
+      }
+    }
+  }
+
+  return bestOffset >= 0 ? bestOffset : context.size() / 2;
+}
+
 int sutraStartupCjkAnchorOffsetFromText( const QString & context,
                                            const QString & anchorText )
 {
@@ -2684,25 +3197,278 @@ int sutraStartupCjkAnchorOffsetFromText( const QString & context,
   return compactContext.originalOffsets.at( qBound( 0, anchorIndex, compactContext.originalOffsets.size() - 1 ) );
 }
 
-QString sutraStartupExplicitSelectionLookupText( const QString & selectedText )
+QStringList sutraStartupVietnameseLookupAlternatives( const QString & lineText,
+                                                        const QString & anchorText,
+                                                        const QString & primary )
+{
+  QStringList result;
+  const QList< SutraStartupTextToken > tokens = sutraStartupTokenizePhraseText( lineText );
+  const QList< SutraStartupTextToken > anchorTokens = sutraStartupTokenizePhraseText( anchorText );
+  if ( tokens.isEmpty() || anchorTokens.isEmpty() ) {
+    return result;
+  }
+
+  int anchorIndex = -1;
+  QStringList normalizedAnchor;
+  for ( const SutraStartupTextToken & token : anchorTokens ) {
+    if ( token.hasLatin ) {
+      normalizedAnchor << token.normalized;
+    }
+  }
+
+  if ( !normalizedAnchor.isEmpty() ) {
+    int bestDistance = ( std::numeric_limits< int >::max )();
+    for ( int start = 0; start + normalizedAnchor.size() <= tokens.size(); ++start ) {
+      if ( !sutraStartupTokenSequenceMatches( tokens, start, normalizedAnchor ) ) {
+        continue;
+      }
+      const int end = start + normalizedAnchor.size() - 1;
+      const int distance = qAbs( tokens.at( start ).start + tokens.at( end ).end - lineText.size() );
+      if ( distance < bestDistance ) {
+        bestDistance = distance;
+        anchorIndex = start + normalizedAnchor.size() / 2;
+      }
+    }
+  }
+
+  if ( anchorIndex < 0 ) {
+    return result;
+  }
+
+  int segmentStart = anchorIndex;
+  int segmentEnd = anchorIndex;
+  const auto gapHasBoundary = [ & ]( int leftToken, int rightToken ) {
+    for ( int i = tokens.at( leftToken ).end; i < tokens.at( rightToken ).start; ++i ) {
+      if ( sutraStartupIsPhraseBoundaryAt( lineText, i ) ) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  while ( segmentStart > 0
+       && !gapHasBoundary( segmentStart - 1, segmentStart )
+       && !sutraStartupIsVietnameseConnectorToken( tokens.at( segmentStart - 1 ) ) ) {
+    --segmentStart;
+  }
+  while ( segmentEnd + 1 < tokens.size()
+       && !gapHasBoundary( segmentEnd, segmentEnd + 1 )
+       && !sutraStartupIsVietnameseConnectorToken( tokens.at( segmentEnd + 1 ) ) ) {
+    ++segmentEnd;
+  }
+
+  const int primaryCount = sutraStartupLatinTokenCount( primary );
+  if ( primaryCount < 3 ) {
+    return result;
+  }
+
+  QList< int > preferredLengths;
+  preferredLengths << 2 << 4 << 3;
+  for ( int length = 5; length <= qMin( 10, primaryCount - 1 ); ++length ) {
+    preferredLengths << length;
+  }
+  preferredLengths << 1;
+
+  const QString normalizedPrimary = sutraStartupNormalizeVietnameseLookupText( primary );
+  for ( const int length : preferredLengths ) {
+    if ( length >= primaryCount || length > segmentEnd - segmentStart + 1 ) {
+      continue;
+    }
+
+    struct Candidate
+    {
+      QString text;
+      bool exactAlias = false;
+      int distance = 0;
+    };
+    QList< Candidate > candidates;
+
+    const int firstStart = qMax( segmentStart, anchorIndex - length + 1 );
+    const int lastStart = qMin( anchorIndex, segmentEnd - length + 1 );
+    for ( int start = firstStart; start <= lastStart; ++start ) {
+      const int end = start + length - 1;
+      if ( sutraStartupVietnameseSpanCrossesBoundary( lineText, tokens, start, end ) ) {
+        continue;
+      }
+
+      const QString candidateText = lineText.mid( tokens.at( start ).start,
+                                                   tokens.at( end ).end - tokens.at( start ).start ).trimmed();
+      if ( candidateText.isEmpty()
+        || sutraStartupNormalizeVietnameseLookupText( candidateText ) == normalizedPrimary ) {
+        continue;
+      }
+
+      candidates.push_back( Candidate{ candidateText,
+                                       sutraStartupIsExactVietnameseGlossaryAlias( candidateText ),
+                                       qAbs( ( start + end ) - anchorIndex * 2 ) } );
+    }
+
+    std::sort( candidates.begin(), candidates.end(), []( const Candidate & left, const Candidate & right ) {
+      if ( left.exactAlias != right.exactAlias ) {
+        return left.exactAlias;
+      }
+      return left.distance < right.distance;
+    } );
+
+    for ( const Candidate & candidate : candidates ) {
+      if ( !result.contains( candidate.text, Qt::CaseInsensitive ) ) {
+        result << candidate.text;
+      }
+      if ( result.size() >= 6 ) {
+        return result;
+      }
+    }
+  }
+
+  return result;
+}
+
+QStringList sutraStartupCjkLookupAlternatives( const QString & context,
+                                               const QString & anchorText,
+                                               const QString & primary )
+{
+  QStringList result;
+  const SutraStartupCompactCjkText compact = sutraStartupCompactCjkText( context );
+  const int anchorOffset = sutraStartupCjkAnchorOffsetFromText( context, anchorText );
+  const int anchor = sutraStartupCompactCjkAnchorAtOffset( compact, anchorOffset );
+  const QString compactPrimary = sutraStartupCompactCjkText( primary ).text;
+  if ( anchor < 0 || compactPrimary.size() < 3 ) {
+    return result;
+  }
+
+  for ( const QString & term : sutraStartupCjkGlossaryTerms() ) {
+    const QString compactTerm = sutraStartupCompactCjkText( term ).text;
+    if ( compactTerm.isEmpty() || compactTerm.size() >= compactPrimary.size() ) {
+      continue;
+    }
+
+    int occurrence = compact.text.indexOf( compactTerm );
+    while ( occurrence >= 0 ) {
+      const int end = occurrence + compactTerm.size() - 1;
+      if ( anchor >= occurrence && anchor <= end && !result.contains( term ) ) {
+        result << term;
+        break;
+      }
+      occurrence = compact.text.indexOf( compactTerm, occurrence + 1 );
+    }
+    if ( result.size() >= 5 ) {
+      break;
+    }
+  }
+
+  if ( compact.text.size() >= 2 ) {
+    const int leftStart = qBound( 0, anchor - 1, compact.text.size() - 2 );
+    const int rightStart = qBound( 0, anchor, compact.text.size() - 2 );
+    const QString leftPair = compact.text.mid( leftStart, 2 );
+    const QString rightPair = compact.text.mid( rightStart, 2 );
+    if ( leftPair != compactPrimary && !result.contains( leftPair ) ) {
+      result << leftPair;
+    }
+    if ( rightPair != compactPrimary && !result.contains( rightPair ) ) {
+      result << rightPair;
+    }
+  }
+
+  const QString single = compact.text.mid( anchor, 1 );
+  if ( !single.isEmpty() && single != compactPrimary && !result.contains( single ) ) {
+    result << single;
+  }
+
+  while ( result.size() > 6 ) {
+    result.removeLast();
+  }
+  return result;
+}
+
+QStringList sutraStartupAlternativeLookupCandidates( const QString & capturedText,
+                                                     const QString & contextText,
+                                                     const QString & primary )
+{
+  const QString context = sutraStartupCleanLookupText( contextText );
+  const QString captured = sutraStartupCleanLookupText( capturedText );
+  const QString combined = !context.isEmpty() ? context : captured;
+  if ( combined.isEmpty() || primary.trimmed().isEmpty() ) {
+    return {};
+  }
+
+  if ( sutraStartupCjkIdeographCount( primary ) >= 3 ) {
+    return sutraStartupCjkLookupAlternatives( combined, captured, primary );
+  }
+  if ( sutraStartupLatinTokenCount( primary ) >= 3 ) {
+    return sutraStartupVietnameseLookupAlternatives( combined, captured, primary );
+  }
+  return {};
+}
+
+QString sutraStartupExactSingleExplicitSelectionLookupText(
+  const QString & selectedText )
+{
+  const QString selected =
+    sutraStartupCleanLookupText( selectedText ).trimmed();
+  if ( selected.isEmpty() || selected.size() > 160 ) {
+    return {};
+  }
+
+  const int cjkCount = sutraStartupCjkIdeographCount( selected );
+  const int latinTokenCount = sutraStartupLatinTokenCount( selected );
+  const bool hasLatin = sutraStartupHasLatinLetter( selected );
+
+  // A deliberate existing highlight is authoritative even in automatic
+  // capture modes. Keep exactly one Latin token or one CJK ideograph instead
+  // of expanding it to a neighboring compound.
+  if ( hasLatin && cjkCount == 0 && latinTokenCount == 1 ) {
+    return selected;
+  }
+
+  if ( !hasLatin && cjkCount == 1 ) {
+    return selected;
+  }
+
+  return {};
+}
+
+QString sutraStartupPreciseExplicitSelectionLookupText( const QString & selectedText )
 {
   const QString selected = sutraStartupCleanLookupText( selectedText ).trimmed();
   if ( selected.isEmpty() || selected.size() > 160 ) {
     return {};
   }
 
+  // CJK has no whitespace word boundaries, so preserve an explicit
+  // multi-character selection exactly as before.
   if ( sutraStartupCjkIdeographCount( selected ) >= 2 ) {
     return selected;
   }
 
-  const QList< SutraStartupTextToken > tokens = sutraStartupTokenizePhraseText( selected );
+  if ( !sutraStartupHasLatinLetter( selected )
+    || sutraStartupCjkIdeographCount( selected ) > 0 ) {
+    return {};
+  }
+
+  const QList< SutraStartupTextToken > selectedTokens = sutraStartupTokenizePhraseText( selected );
   int latinTokenCount = 0;
-  for ( const SutraStartupTextToken & token : tokens ) {
+  bool containsConnector = false;
+  for ( const SutraStartupTextToken & token : selectedTokens ) {
     if ( token.hasLatin ) {
       ++latinTokenCount;
+      containsConnector = containsConnector || sutraStartupIsVietnameseConnectorToken( token );
     }
   }
-  return latinTokenCount >= 2 ? selected : QString();
+
+  // In Automatic Precise mode, two words are already the most likely
+  // Vietnamese/Han-Viet headword, unless the accessibility provider fabricated
+  // a pair around a conjunction (for example "va Phat"). A three/four-word
+  // provider selection is kept only when it is an exact glossary alias.
+  if ( latinTokenCount == 2 && !containsConnector ) {
+    return selected;
+  }
+
+  if ( ( latinTokenCount == 4 || latinTokenCount == 3 )
+    && sutraStartupIsExactVietnameseGlossaryAlias( selected ) ) {
+    return selected;
+  }
+
+  return {};
 }
 
 QString sutraStartupBestAutomaticLookupText( const QString & capturedText, const QString & contextText )
@@ -2714,9 +3480,10 @@ QString sutraStartupBestAutomaticLookupText( const QString & capturedText, const
     return {};
   }
 
-  // A real multi-character selection under the pointer is an explicit user
-  // instruction. Preserve it exactly instead of shrinking it to one CJK char.
-  const QString explicitSelection = sutraStartupExplicitSelectionLookupText( captured );
+  // Some Office providers report the whole Latin clause as a selection. In
+  // Automatic Precise mode, preserve only safe explicit selections and resolve
+  // longer Latin ranges around the actual context.
+  const QString explicitSelection = sutraStartupPreciseExplicitSelectionLookupText( captured );
   if ( !explicitSelection.isEmpty() ) {
     return explicitSelection;
   }
@@ -3214,13 +3981,46 @@ private:
     return CallNextHookEx( instance ? instance->hook : nullptr, code, wParam, lParam );
   }
 
-  void openLookup( const QString & rawText )
+  void showAlternativeLookupMenu( const QStringList & alternatives )
   {
+    if ( alternatives.isEmpty() ) {
+      return;
+    }
+
+    QMenu * menu = new QMenu();
+    menu->setAttribute( Qt::WA_DeleteOnClose );
+    QAction * title = menu->addAction( tr( "Other lookup candidates" ) );
+    title->setEnabled( false );
+    menu->addSeparator();
+
+    for ( const QString & alternative : alternatives ) {
+      QAction * action = menu->addAction( alternative );
+      connect( action, &QAction::triggered, this, [ this, alternative ] {
+        pendingAlternativeLookups.clear();
+        openLookup( alternative, false );
+      } );
+    }
+
+    menu->popup( lastLookupGlobalPos + QPoint( 14, 14 ) );
+  }
+
+  void openLookup( const QString & rawText, bool offerAlternatives = true )
+  {
+    Q_UNUSED( offerAlternatives );
+
     const QString lookupText = sutraStartupCleanLookupText( rawText );
 
     if ( lookupText.isEmpty() ) {
+      pendingAlternativeLookups.clear();
       return;
     }
+
+    // Alternative candidates are heuristic suggestions. They are calculated
+    // before the detached scan popup knows whether the primary query has a
+    // dictionary result, so the old menu could appear even when the lookup
+    // showed "No translation found". Disable that secondary popup completely
+    // while leaving primary phrase detection and lookup unchanged.
+    pendingAlternativeLookups.clear();
 
     QProcess::startDetached( QCoreApplication::applicationFilePath(),
                               QStringList() << QStringLiteral( "--scanpopup" ) << lookupText );
@@ -3327,29 +4127,51 @@ private:
 
   QString automaticLookupTextFromCapture( const QString & capturedText,
                                           const QString & contextText,
-                                          SutraMouseLookupCaptureMode captureMode ) const
+                                          SutraMouseLookupCaptureMode captureMode )
   {
-    const QString explicitSelection = sutraStartupExplicitSelectionLookupText( capturedText );
-    if ( !explicitSelection.isEmpty()
-      && !sutraStartupLooksLikeReorderedLatinSelection( explicitSelection, contextText ) ) {
-      return explicitSelection;
-    }
+    pendingAlternativeLookups.clear();
+
+    const auto finalize = [ this, &capturedText, &contextText ]( const QString & value ) {
+      const QString cleaned = sutraStartupCleanLookupText( value ).trimmed();
+      pendingAlternativeLookups = sutraStartupAlternativeLookupCandidates( capturedText,
+                                                                           contextText,
+                                                                           cleaned );
+      return cleaned;
+    };
 
     if ( captureMode == SutraMouseLookupCaptureMode::EntirePhrase ) {
-      const QString refreshedContext = sutraStartupCleanLookupText( contextText ).left( 360 ).trimmed();
+      const QString refreshedContext = sutraStartupCleanLookupText( contextText ).left( 700 ).trimmed();
+      const QString refreshedAnchor = sutraStartupCleanLookupText( capturedText ).left( 220 ).trimmed();
+
       if ( !refreshedContext.isEmpty() ) {
-        return refreshedContext;
+        const int anchorOffset = sutraStartupAnchorOffsetInContext( refreshedContext,
+                                                                    refreshedAnchor );
+        if ( anchorOffset >= 0 ) {
+          const SutraStartupDelimitedPhrase delimited =
+            sutraStartupDelimitedPhraseAtOffset( refreshedContext, anchorOffset );
+          if ( !delimited.text.isEmpty() ) {
+            return finalize( delimited.text.left( 360 ).trimmed() );
+          }
+        }
+
+        return finalize( refreshedContext.left( 360 ).trimmed() );
       }
 
-      return sutraStartupCleanLookupText( capturedText ).left( 360 ).trimmed();
+      return finalize( refreshedAnchor.left( 360 ).trimmed() );
     }
 
-    return sutraStartupBestAutomaticLookupText( capturedText, contextText );
+    const QString explicitSelection = sutraStartupPreciseExplicitSelectionLookupText( capturedText );
+    if ( !explicitSelection.isEmpty()
+      && !sutraStartupLooksLikeReorderedLatinSelection( explicitSelection, contextText ) ) {
+      return finalize( explicitSelection );
+    }
+
+    return finalize( sutraStartupBestAutomaticLookupText( capturedText, contextText ) );
   }
 
   bool legacyOfficeCaptureNeedsLineContext( const QString & capturedText,
                                             const QString & contextText,
-                                            SutraMouseLookupCaptureMode captureMode ) const
+                                            SutraMouseLookupCaptureMode captureMode )
   {
     const QString candidate = automaticLookupTextFromCapture( capturedText,
                                                                contextText,
@@ -3358,16 +4180,32 @@ private:
       return true;
     }
 
-    if ( sutraStartupHasLatinLetter( candidate )
+    if ( captureMode == SutraMouseLookupCaptureMode::EntirePhrase
+      && sutraStartupHasLatinLetter( candidate )
       && sutraStartupCjkIdeographCount( candidate ) == 0
-      && sutraStartupLatinTokenCount( candidate ) < 2 ) {
+      && sutraStartupLatinTokenCount( candidate ) <= 2 ) {
+      // A one/two-token Office result can be only TextUnit_Word or a truncated
+      // centered range. Capture the visual line, then delimit it around the
+      // clicked anchor. A genuinely two-word phrase still resolves to itself.
       return true;
     }
 
-    // Keep the successful CJK path unchanged, but let legacy Office expand a
-    // lone ideograph when no multi-character context was available.
-    return sutraStartupCjkIdeographCount( candidate ) == 1
-        && sutraStartupCjkIdeographCount( contextText ) <= 1;
+    if ( sutraStartupHasLatinLetter( candidate )
+      && sutraStartupCjkIdeographCount( candidate ) == 0
+      && sutraStartupLatinTokenCount( candidate ) < 2 ) {
+      // Capture the visual line when the provider gave no usable context. Once
+      // that line confirms a genuine standalone word, one-word lookup is the
+      // final and correct fallback.
+      return contextText.trimmed().isEmpty()
+          || sutraStartupLatinTokenCount( contextText ) > 1;
+    }
+
+    if ( sutraStartupCjkIdeographCount( candidate ) == 1 ) {
+      return contextText.trimmed().isEmpty()
+          || sutraStartupCjkIdeographCount( contextText ) > 1;
+    }
+
+    return false;
   }
 
   void captureLegacyOfficeLineContext( const QPoint & globalPos,
@@ -3380,24 +4218,45 @@ private:
     // move to the visual-line start, and extend the selection to its end.
     sendSutraStartupLeftClickAt( globalPos );
 
-    QTimer::singleShot( 70, this, [ this, globalPos, anchorText, captureMode, previousClipboardText ] {
+    QTimer::singleShot( 110, this, [ this, globalPos, anchorText, captureMode, previousClipboardText ] {
       sendSutraStartupVirtualKey( VK_HOME, true );
       sendSutraStartupVirtualKey( VK_HOME, false );
 
-      QTimer::singleShot( 70, this, [ this, globalPos, anchorText, captureMode, previousClipboardText ] {
+      QTimer::singleShot( 120, this, [ this, globalPos, anchorText, captureMode, previousClipboardText ] {
         sendSutraStartupVirtualKey( VK_SHIFT, true );
         sendSutraStartupVirtualKey( VK_END, true );
         sendSutraStartupVirtualKey( VK_END, false );
         sendSutraStartupVirtualKey( VK_SHIFT, false );
 
-        QTimer::singleShot( 140, this, [ this, globalPos, anchorText, captureMode, previousClipboardText ] {
+        QTimer::singleShot( 220, this, [ this, globalPos, anchorText, captureMode, previousClipboardText ] {
           copyCurrentSelection( [ this, globalPos, anchorText, captureMode, previousClipboardText ]( const QString & lineText ) {
             QString lookupText = automaticLookupTextFromCapture( anchorText,
                                                                  lineText,
                                                                  captureMode );
 
             if ( lookupText.trimmed().isEmpty() ) {
-              lookupText = sutraStartupCleanLookupText( anchorText ).left( 160 ).trimmed();
+              const QString cleanedAnchor =
+                sutraStartupCleanLookupText( anchorText ).left( 160 ).trimmed();
+
+              // The visual-line pass has already attempted every valid phrase.
+              // If none matched, restore the original behavior from early
+              // builds: look up the exact Latin token or CJK ideograph under
+              // the pointer, even when unrelated words/characters exist on the
+              // same line.
+              const bool exactLatinToken =
+                sutraStartupHasLatinLetter( cleanedAnchor )
+                && sutraStartupCjkIdeographCount( cleanedAnchor ) == 0
+                && sutraStartupLatinTokenCount( cleanedAnchor ) == 1;
+              const bool exactCjkIdeograph =
+                sutraStartupCjkIdeographCount( cleanedAnchor ) == 1
+                && !sutraStartupHasLatinLetter( cleanedAnchor );
+
+              if ( exactLatinToken
+                || exactCjkIdeograph
+                || sutraStartupLatinTokenCount( cleanedAnchor ) >= 2
+                || sutraStartupCjkIdeographCount( cleanedAnchor ) >= 2 ) {
+                lookupText = cleanedAnchor;
+              }
             }
 
             // The line selection was created by GoldenDict only to read legacy
@@ -3514,23 +4373,29 @@ private:
 
       sendSutraStartupLeftDoubleClickAt( globalPos );
 
-      QTimer::singleShot( 180, this, [ this, globalPos, captureMode, previousClipboardText ] {
-        const QString selectedByUiAutomation = sutraStartupUiAutomationSelectedTextAtPoint( globalPos );
-        const QString refreshedContext = sutraStartupUiAutomationTextAtPoint( globalPos, captureMode );
-
-        if ( !selectedByUiAutomation.trimmed().isEmpty() ) {
-          finishLegacyAutomaticCapture( globalPos,
-                                        selectedByUiAutomation,
-                                        refreshedContext,
-                                        captureMode,
-                                        previousClipboardText );
-          return;
-        }
-
+      QTimer::singleShot( 190, this, [ this, globalPos, captureMode, previousClipboardText ] {
+        // After a real double-click, Ctrl+C is the most reliable source of the
+        // exact word under the pointer on Office 2010 32-bit. UI Automation can
+        // still report a stale selection from an earlier paragraph, so use it
+        // only when the clipboard capture is empty.
         copyCurrentSelection(
-          [ this, globalPos, refreshedContext, captureMode, previousClipboardText ]( const QString & copiedText ) {
+          [ this, globalPos, captureMode, previousClipboardText ]( const QString & copiedText ) {
+            QString anchorText = sutraStartupCleanLookupText( copiedText ).trimmed();
+            if ( anchorText.isEmpty() ) {
+              anchorText = sutraStartupUiAutomationSelectedTextAtPoint( globalPos );
+            }
+
+            const QString refreshedContext =
+              sutraStartupUiAutomationTextAtPoint( globalPos, captureMode );
+
+            if ( anchorText.trimmed().isEmpty() ) {
+              sendSutraStartupLeftClickAt( globalPos );
+              restoreClipboardAndFinish( previousClipboardText );
+              return;
+            }
+
             finishLegacyAutomaticCapture( globalPos,
-                                          copiedText,
+                                          anchorText,
                                           refreshedContext,
                                           captureMode,
                                           previousClipboardText );
@@ -3547,13 +4412,49 @@ private:
     // Office 2016/365 and every application that exposes a usable UI Automation
     // TextPattern. The legacy Office fallback runs only when this path returns
     // no usable text and the window under the pointer is Microsoft Office.
-    const QString selectedText = sutraStartupUiAutomationSelectedTextAtPoint( globalPos );
-    const QString contextText = sutraStartupUiAutomationTextAtPoint( globalPos, captureMode );
+    const QString selectedText =
+      sutraStartupUiAutomationSelectedTextAtPoint( globalPos );
+
+    // The low-level mouse hook suppresses the configured click, so an existing
+    // user highlight remains intact. When that highlight contains exactly one
+    // Latin token or one CJK ideograph, treat it as an explicit request and do
+    // not expand it to a surrounding phrase. This interception happens only
+    // on the initial read; selections temporarily created by the legacy Office
+    // fallback continue through the existing phrase-context logic.
+    const QString exactSingleSelection =
+      sutraStartupExactSingleExplicitSelectionLookupText( selectedText );
+    if ( !exactSingleSelection.isEmpty() ) {
+      openLookup( exactSingleSelection );
+      lookupInProgress = false;
+      return;
+    }
+
+    const QString contextText =
+      sutraStartupUiAutomationTextAtPoint( globalPos, captureMode );
     const QString lookupText = automaticLookupTextFromCapture( selectedText,
                                                                contextText,
                                                                captureMode );
+    const bool officeWindow = sutraStartupIsMicrosoftOfficeWindowAtPoint( globalPos );
+    const bool incompleteOfficeEntirePhrase =
+      officeWindow
+      && captureMode == SutraMouseLookupCaptureMode::EntirePhrase
+      && sutraStartupHasLatinLetter( lookupText )
+      && sutraStartupCjkIdeographCount( lookupText ) == 0
+      && sutraStartupLatinTokenCount( lookupText ) <= 2;
 
-    if ( !lookupText.trimmed().isEmpty() ) {
+    const bool incompleteOfficePreciseCandidate =
+      officeWindow
+      && sutraStartupIsIncompleteOfficePointerCandidate( lookupText,
+                                                          captureMode );
+
+    const bool usableLookupText = !lookupText.trimmed().isEmpty()
+                               && !incompleteOfficeEntirePhrase
+                               && !incompleteOfficePreciseCandidate
+                               && ( !officeWindow
+                                 || captureMode == SutraMouseLookupCaptureMode::EntirePhrase
+                                 || sutraStartupIsUsableOfficePhraseCandidate( lookupText ) );
+
+    if ( usableLookupText ) {
       openLookup( lookupText );
       lookupInProgress = false;
       return;
@@ -3566,12 +4467,12 @@ private:
       return;
     }
 
-    if ( sutraStartupIsMicrosoftOfficeWindowAtPoint( globalPos ) ) {
+    if ( officeWindow ) {
       // Word can briefly return an empty RangeFromPoint while it is repaginating
       // after a font-size/layout change. Retry once after the layout settles,
       // still using the read-only UI Automation path, before any legacy
       // selection/clipboard fallback is allowed to run.
-      QTimer::singleShot( 65, this, [ this, globalPos, captureMode, previousClipboardText ] {
+      QTimer::singleShot( 140, this, [ this, globalPos, captureMode, previousClipboardText ] {
         if ( !lookupInProgress ) {
           return;
         }
@@ -3581,8 +4482,23 @@ private:
         const QString retryLookupText = automaticLookupTextFromCapture( retrySelectedText,
                                                                         retryContextText,
                                                                         captureMode );
+        const bool incompleteRetryEntirePhrase =
+          captureMode == SutraMouseLookupCaptureMode::EntirePhrase
+          && sutraStartupHasLatinLetter( retryLookupText )
+          && sutraStartupCjkIdeographCount( retryLookupText ) == 0
+          && sutraStartupLatinTokenCount( retryLookupText ) <= 2;
 
-        if ( !retryLookupText.trimmed().isEmpty() ) {
+        const bool incompleteRetryPreciseCandidate =
+          sutraStartupIsIncompleteOfficePointerCandidate( retryLookupText,
+                                                           captureMode );
+
+        const bool usableRetryLookup = !retryLookupText.trimmed().isEmpty()
+                                    && !incompleteRetryEntirePhrase
+                                    && !incompleteRetryPreciseCandidate
+                                    && ( captureMode == SutraMouseLookupCaptureMode::EntirePhrase
+                                      || sutraStartupIsUsableOfficePhraseCandidate( retryLookupText ) );
+
+        if ( usableRetryLookup ) {
           openLookup( retryLookupText );
           lookupInProgress = false;
           return;
@@ -3601,6 +4517,8 @@ private:
   void lookupAt( const QPoint & globalPos )
   {
     lookupInProgress = true;
+    lastLookupGlobalPos = globalPos;
+    pendingAlternativeLookups.clear();
 
     QClipboard * clipboard = QApplication::clipboard();
     if ( !clipboard ) {
@@ -3620,6 +4538,8 @@ private:
   }
 
   HHOOK hook = nullptr;
+  QStringList pendingAlternativeLookups;
+  QPoint lastLookupGlobalPos;
   bool lookupInProgress = false;
   bool suppressButtonRelease = false;
   SutraMouseLookupButton suppressedButton = SutraMouseLookupButton::Right;

@@ -149,82 +149,56 @@ constexpr int sutraPopupFitMaxWidthPercent  = 80;
 constexpr int sutraPopupFitMaxHeightPercent = 82;
 
 
-QString sutraPopupLayoutModeSettingsKeyFocusBaseV2()
-;
-
 QString sutraPopupLayoutModeSettingsKey()
 {
-  QString base = sutraPopupLayoutModeSettingsKeyFocusBaseV2(  );
+  return QStringLiteral( "SutraEdition/PopupLayoutMode" );
+}
 
-  // sutraGlossaryUiPolishV4
-  // Keep the UI mostly inline because QTextBrowser supports a limited CSS subset on Windows.
-
-  base.replace( QStringLiteral( "NGH&#296;A TI&#7870;NG VI&#7878;T" ),
-                QStringLiteral( "<div style='margin:16px 0 8px 0;font-size:12px;font-weight:800;letter-spacing:1px;color:#64748b;'>NGH&#296;A TI&#7870;NG VI&#7878;T</div>" ) );
-  base.replace( QStringLiteral( "NGHÄ¨A TIáº¾NG VIá»†T" ),
-                QStringLiteral( "<div style='margin:16px 0 8px 0;font-size:12px;font-weight:800;letter-spacing:1px;color:#64748b;'>NGH&#296;A TI&#7870;NG VI&#7878;T</div>" ) );
-
-  base.replace( QStringLiteral( "PINYIN" ),
-                QStringLiteral( "<div style='margin:12px 0 5px 0;font-size:12px;font-weight:800;letter-spacing:1px;color:#64748b;'>PINYIN</div>" ) );
-
-  base.replace( QStringLiteral( "G&#7906;I &#221; D&#7882;CH" ),
-                QStringLiteral( "<div style='margin:12px 0 6px 0;font-size:12px;font-weight:800;letter-spacing:1px;color:#64748b;'>G&#7906;I &#221; D&#7882;CH</div>" ) );
-  base.replace( QStringLiteral( "Gá»¢I Ã Dá»ŠCH" ),
-                QStringLiteral( "<div style='margin:12px 0 6px 0;font-size:12px;font-weight:800;letter-spacing:1px;color:#64748b;'>G&#7906;I &#221; D&#7882;CH</div>" ) );
-
-  base.replace( QStringLiteral( "LI&#202;N QUAN" ),
-                QStringLiteral( "<div style='margin:12px 0 6px 0;font-size:12px;font-weight:800;letter-spacing:1px;color:#64748b;'>LI&#202;N QUAN</div>" ) );
-  base.replace( QStringLiteral( "LIÃŠN QUAN" ),
-                QStringLiteral( "<div style='margin:12px 0 6px 0;font-size:12px;font-weight:800;letter-spacing:1px;color:#64748b;'>LI&#202;N QUAN</div>" ) );
-
-  base.replace( QStringLiteral( "class='chip'" ),
-                QStringLiteral( "style='display:inline-block;margin:4px 7px 4px 0;padding:4px 9px;border-radius:12px;background:#f8fafc;border:1px solid #e2e8f0;color:#334155;font-weight:700;'" ) );
-  base.replace( QStringLiteral( "class=\"chip\"" ),
-                QStringLiteral( "style=\"display:inline-block;margin:4px 7px 4px 0;padding:4px 9px;border-radius:12px;background:#f8fafc;border:1px solid #e2e8f0;color:#334155;font-weight:700;\"" ) );
-
-  base.replace( QStringLiteral( "class='badge'" ),
-                QStringLiteral( "style='display:inline-block;margin:6px 0 12px 0;padding:5px 9px;border-radius:10px;background:#ecfdf5;border:1px solid #bbf7d0;color:#047857;font-weight:800;'" ) );
-  base.replace( QStringLiteral( "class=\"badge\"" ),
-                QStringLiteral( "style=\"display:inline-block;margin:6px 0 12px 0;padding:5px 9px;border-radius:10px;background:#ecfdf5;border:1px solid #bbf7d0;color:#047857;font-weight:800;\"" ) );
-
-  base.replace( QStringLiteral( "<a " ),
-                QStringLiteral( "<a style='display:inline-block;margin:4px 7px 4px 0;padding:4px 9px;border-radius:12px;background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;text-decoration:none;font-weight:700;' " ) );
-
-  const QString primaryOpen = QStringLiteral(
+// Older Sutra builds accidentally wrapped the QSettings key in glossary HTML.
+// Keep this exact legacy key only for one-time migration so existing users do
+// not lose their selected popup layout when upgrading.
+QString sutraPopupLegacyLayoutModeSettingsKey()
+{
+  return QStringLiteral(
     "<div style='box-sizing:border-box;margin:10px 8px 18px 0;padding:22px 26px 24px 26px;"
     "background:#ffffff;border:1px solid #dbeafe;border-left:6px solid #0f766e;'>"
     "<div style='font-size:12px;font-weight:800;letter-spacing:1px;color:#0f766e;margin:0 0 12px 0;'>"
-    "K&#7870;T QU&#7842; CH&#205;NH</div>" );
-
-  const QString relatedOpen = QStringLiteral(
-    "<div style='box-sizing:border-box;margin:8px 8px 12px 0;padding:14px 16px;"
-    "background:#fffdf8;border:1px solid #fed7aa;border-left:4px solid #f97316;'>" );
-
-  const QString close = QStringLiteral( "</div>" );
-
-  if ( true ) {
-    base.replace( QStringLiteral( "<h1" ), QStringLiteral( "<h1 style='font-size:34px;line-height:1.18;margin:0 0 8px 0;color:#020617;font-weight:800;'" ) );
-    base.replace( QStringLiteral( "<h2" ), QStringLiteral( "<h2 style='font-size:34px;line-height:1.18;margin:0 0 8px 0;color:#020617;font-weight:800;'" ) );
-    base.replace( QStringLiteral( "<h3" ), QStringLiteral( "<h3 style='font-size:34px;line-height:1.18;margin:0 0 8px 0;color:#020617;font-weight:800;'" ) );
-
-    return primaryOpen + base + close;
-  }
-
-  base.replace( QStringLiteral( "<h1" ), QStringLiteral( "<h1 style='font-size:23px;line-height:1.2;margin:0 0 4px 0;color:#7c2d12;font-weight:750;'" ) );
-  base.replace( QStringLiteral( "<h2" ), QStringLiteral( "<h2 style='font-size:23px;line-height:1.2;margin:0 0 4px 0;color:#7c2d12;font-weight:750;'" ) );
-  base.replace( QStringLiteral( "<h3" ), QStringLiteral( "<h3 style='font-size:23px;line-height:1.2;margin:0 0 4px 0;color:#7c2d12;font-weight:750;'" ) );
-
-  return relatedOpen + base + close;
-}
-
-QString sutraPopupLayoutModeSettingsKeyFocusBaseV2()
-{
-  return QStringLiteral( "SutraEdition/PopupLayoutMode" );
+    "K&#7870;T QU&#7842; CH&#205;NH</div>"
+    "SutraEdition/PopupLayoutMode</div>" );
 }
 
 QString sutraPopupFixedGeometrySettingsKey()
 {
   return QStringLiteral( "SutraEdition/PopupFixedGeometry" );
+}
+
+QString sutraPopupAlwaysOnTopSettingsKey()
+{
+  return QStringLiteral( "SutraEdition/PopupAlwaysOnTop" );
+}
+
+bool loadSutraPopupAlwaysOnTop( bool legacyValue )
+{
+  QSettings settings;
+
+  // New installations and upgraded installations default to enabled once.
+  // After that, the user's explicit choice is persisted independently of the
+  // legacy Config value, including when the application exits unexpectedly.
+  if ( !settings.contains( sutraPopupAlwaysOnTopSettingsKey() ) ) {
+    settings.setValue( sutraPopupAlwaysOnTopSettingsKey(), true );
+    settings.sync();
+    return true;
+  }
+
+  return settings.value( sutraPopupAlwaysOnTopSettingsKey(),
+                         legacyValue ).toBool();
+}
+
+void saveSutraPopupAlwaysOnTop( bool enabled )
+{
+  QSettings settings;
+  settings.setValue( sutraPopupAlwaysOnTopSettingsKey(), enabled );
+  settings.sync();
 }
 
 QString sutraPopupFontSizeSettingsKey()
@@ -748,6 +722,30 @@ QIcon sutraPopupFixedLayoutIcon( const QColor & color )
   return QIcon( pixmap );
 }
 
+QIcon sutraPopupFitLayoutIcon( const QColor & color )
+{
+  QPixmap pixmap( 18, 18 );
+  pixmap.fill( Qt::transparent );
+
+  QPainter painter( &pixmap );
+  painter.setRenderHint( QPainter::Antialiasing, true );
+  painter.setPen( QPen( color, 1.55, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin ) );
+  painter.setBrush( Qt::NoBrush );
+
+  // Four clean corner marks communicate "fit content to window" more clearly
+  // than the previous text glyph, and remain readable in all popup themes.
+  painter.drawLine( QPointF( 3.0, 7.0 ), QPointF( 3.0, 3.0 ) );
+  painter.drawLine( QPointF( 3.0, 3.0 ), QPointF( 7.0, 3.0 ) );
+  painter.drawLine( QPointF( 11.0, 3.0 ), QPointF( 15.0, 3.0 ) );
+  painter.drawLine( QPointF( 15.0, 3.0 ), QPointF( 15.0, 7.0 ) );
+  painter.drawLine( QPointF( 3.0, 11.0 ), QPointF( 3.0, 15.0 ) );
+  painter.drawLine( QPointF( 3.0, 15.0 ), QPointF( 7.0, 15.0 ) );
+  painter.drawLine( QPointF( 11.0, 15.0 ), QPointF( 15.0, 15.0 ) );
+  painter.drawLine( QPointF( 15.0, 15.0 ), QPointF( 15.0, 11.0 ) );
+  painter.drawRoundedRect( QRectF( 6.2, 6.2, 5.6, 5.6 ), 1.0, 1.0 );
+  return QIcon( pixmap );
+}
+
 QString sutraPopupThemeModeLabel( SutraPopupThemeMode mode )
 {
   switch ( mode ) {
@@ -1194,6 +1192,7 @@ QString sutraPopupCornerToolsThemeStyleSheet()
       "  border-radius: 3px;"
       "}"
       "QToolButton:pressed { background: %4; padding-top: 2px; }"
+      "QToolButton:checked { background: %4; border: 1px solid %2; border-radius: 3px; }"
       "QToolButton:focus { border: 1px solid %2; border-radius: 3px; }"
       "QToolButton:disabled { color: %2; }"
       "QFrame[sutraToolbarSeparator=\"true\"] {"
@@ -1226,6 +1225,7 @@ QString sutraPopupCornerToolsThemeStyleSheet()
       "  border-radius: 3px;"
       "}"
       "QToolButton:pressed { background: rgba(96, 165, 250, 105); padding-top: 2px; }"
+      "QToolButton:checked { background: rgba(96, 165, 250, 105); border: 1px solid #60a5fa; border-radius: 3px; }"
       "QToolButton:focus { border: 1px solid #60a5fa; border-radius: 3px; }"
       "QToolButton:disabled { color: #64748b; }"
       "QFrame[sutraToolbarSeparator=\"true\"] {"
@@ -1254,6 +1254,7 @@ QString sutraPopupCornerToolsThemeStyleSheet()
     "  border-radius: 3px;"
     "}"
     "QToolButton:pressed { background: rgba(80, 140, 220, 95); padding-top: 2px; }"
+    "QToolButton:checked { background: rgba(80, 140, 220, 85); border: 1px solid #2563eb; border-radius: 3px; }"
     "QToolButton:focus { border: 1px solid #2563eb; border-radius: 3px; }"
     "QToolButton:disabled { color: #94a3b8; }"
     "QFrame[sutraToolbarSeparator=\"true\"] {"
@@ -1419,6 +1420,11 @@ void updateSutraPopupThemeToggleButton( QWidget * popup )
     quickFix->setText( QString() );
     quickFix->setIcon( sutraPopupFixedLayoutIcon( iconColor ) );
     quickFix->setIconSize( QSize( 18, 18 ) );
+  }
+  if ( QToolButton * quickFit = popup->findChild< QToolButton * >( QStringLiteral( "sutraPopupQuickFitButton" ) ) ) {
+    quickFit->setText( QString() );
+    quickFit->setIcon( sutraPopupFitLayoutIcon( iconColor ) );
+    quickFit->setIconSize( QSize( 18, 18 ) );
   }
   if ( QAbstractButton * mainSettings = popup->findChild< QAbstractButton * >( QStringLiteral( "pinButton" ) ) ) {
     mainSettings->setText( QString() );
@@ -1705,6 +1711,7 @@ void resetSutraPopupAppearanceDefaults()
 {
   QSettings settings;
   settings.setValue( sutraPopupLayoutModeSettingsKey(), QStringLiteral( "auto" ) );
+  settings.remove( sutraPopupLegacyLayoutModeSettingsKey() );
   settings.remove( sutraPopupFixedGeometrySettingsKey() );
   settings.setValue( sutraPopupFontSizeSettingsKey(), sutraPopupDefaultFontSize );
   settings.setValue( sutraPopupOpacitySettingsKey(), sutraPopupDefaultOpacityPercent );
@@ -1719,6 +1726,7 @@ void resetSutraPopupAppearanceDefaults()
   settings.setValue( sutraMouseLookupButtonSettingsKey(), 2 );
   settings.setValue( sutraMouseLookupCaptureModeSettingsKey(),
                      static_cast< int >( SutraMouseLookupCaptureMode::Automatic ) );
+  settings.sync();
 }
 
 void applySutraPopupOpacity( QWidget * popup )
@@ -2095,8 +2103,14 @@ void updateSutraPopupCornerToolsResponsive( QWidget * popup )
   setVisible( "sutraSeparatorAppearanceLayout", true );
 
   if ( QToolButton * options = popup->findChild< QToolButton * >( QStringLiteral( "sutraPopupOptionsButton" ) ) ) {
-    options->setToolTip( showExtended ? QObject::tr( "Popup settings" )
-                                      : QObject::tr( "Popup settings and hidden compact controls" ) );
+    QString modeLabel = popup->property( "sutraPopupLayoutModeLabel" ).toString();
+    if ( modeLabel.isEmpty() ) {
+      modeLabel = QObject::tr( "Auto" );
+    }
+    options->setToolTip(
+      showExtended
+        ? QObject::tr( "Popup settings - Layout: %1" ).arg( modeLabel )
+        : QObject::tr( "Popup settings and hidden compact controls - Layout: %1" ).arg( modeLabel ) );
   }
 }
 
@@ -2135,6 +2149,19 @@ QString sutraPopupLayoutModeToString( SutraPopupLayoutMode mode )
   }
 }
 
+QString sutraPopupLayoutModeLabel( SutraPopupLayoutMode mode )
+{
+  switch ( mode ) {
+    case SutraPopupLayoutMode::Fixed:
+      return QObject::tr( "Fixed size and position" );
+    case SutraPopupLayoutMode::FitToResults:
+      return QObject::tr( "Fit to results" );
+    case SutraPopupLayoutMode::Auto:
+    default:
+      return QObject::tr( "Auto" );
+  }
+}
+
 SutraPopupLayoutMode sutraPopupLayoutModeFromString( const QString & value )
 {
   const QString normalized = value.trimmed().toLower();
@@ -2153,14 +2180,76 @@ SutraPopupLayoutMode sutraPopupLayoutModeFromString( const QString & value )
 SutraPopupLayoutMode loadSutraPopupLayoutMode()
 {
   QSettings settings;
-  return sutraPopupLayoutModeFromString(
-    settings.value( sutraPopupLayoutModeSettingsKey(), QStringLiteral( "auto" ) ).toString() );
+  const QString currentKey = sutraPopupLayoutModeSettingsKey();
+
+  if ( settings.contains( currentKey ) ) {
+    return sutraPopupLayoutModeFromString( settings.value( currentKey ).toString() );
+  }
+
+  // Migrate the malformed key used by older Sutra builds. The migration is
+  // intentionally one-way; all future writes use the stable plain key.
+  const QString legacyKey = sutraPopupLegacyLayoutModeSettingsKey();
+  if ( settings.contains( legacyKey ) ) {
+    const QString value = settings.value( legacyKey, QStringLiteral( "auto" ) ).toString();
+    settings.setValue( currentKey, value );
+    settings.remove( legacyKey );
+    settings.sync();
+    return sutraPopupLayoutModeFromString( value );
+  }
+
+  return SutraPopupLayoutMode::Auto;
 }
 
 void saveSutraPopupLayoutMode( SutraPopupLayoutMode mode )
 {
   QSettings settings;
   settings.setValue( sutraPopupLayoutModeSettingsKey(), sutraPopupLayoutModeToString( mode ) );
+  settings.remove( sutraPopupLegacyLayoutModeSettingsKey() );
+  settings.sync();
+}
+
+void updateSutraPopupLayoutControls( QWidget * popup )
+{
+  if ( !popup ) {
+    return;
+  }
+
+  const SutraPopupLayoutMode mode = loadSutraPopupLayoutMode();
+  const QString modeLabel = sutraPopupLayoutModeLabel( mode );
+  popup->setProperty( "sutraPopupLayoutModeLabel", modeLabel );
+
+  if ( QToolButton * fixedButton =
+         popup->findChild< QToolButton * >( QStringLiteral( "sutraPopupQuickFixButton" ) ) ) {
+    const bool active = mode == SutraPopupLayoutMode::Fixed;
+    fixedButton->setChecked( active );
+    fixedButton->setToolTip(
+      active ? QObject::tr( "Fixed size and position is active" )
+             : QObject::tr( "Remember the current popup size and position" ) );
+  }
+
+  if ( QToolButton * fitButton =
+         popup->findChild< QToolButton * >( QStringLiteral( "sutraPopupQuickFitButton" ) ) ) {
+    const bool active = mode == SutraPopupLayoutMode::FitToResults;
+    fitButton->setChecked( active );
+    fitButton->setToolTip(
+      active ? QObject::tr( "Fit to results is active" )
+             : QObject::tr( "Resize the popup to fit the current result" ) );
+  }
+
+  if ( QAction * infoAction =
+         popup->findChild< QAction * >( QStringLiteral( "sutraPopupLayoutInfoAction" ) ) ) {
+    infoAction->setText( QObject::tr( "Current layout: %1" ).arg( modeLabel ) );
+  }
+
+  const QString settingsTip = QObject::tr( "Popup settings - Layout: %1" ).arg( modeLabel );
+  if ( QToolButton * optionsButton =
+         popup->findChild< QToolButton * >( QStringLiteral( "sutraPopupOptionsButton" ) ) ) {
+    optionsButton->setToolTip( settingsTip );
+  }
+  if ( QAbstractButton * mainSettingsButton =
+         popup->findChild< QAbstractButton * >( QStringLiteral( "pinButton" ) ) ) {
+    mainSettingsButton->setToolTip( settingsTip );
+  }
 }
 
 QRect safeSutraPopupGeometry( QRect geometry )
@@ -4708,6 +4797,8 @@ ScanPopup::ScanPopup( QWidget * parent,
   }
 
 
+  cfg.popupWindowAlwaysOnTop =
+    loadSutraPopupAlwaysOnTop( cfg.popupWindowAlwaysOnTop );
   ui.onTopButton->setChecked( cfg.popupWindowAlwaysOnTop );
   ui.onTopButton->setVisible( cfg.pinPopupWindow );
   connect( ui.onTopButton, &QAbstractButton::clicked, this, &ScanPopup::alwaysOnTopClicked );
@@ -4722,6 +4813,7 @@ ScanPopup::ScanPopup( QWidget * parent,
   ui.pinButton->setAccessibleName( tr( "Popup settings" ) );
 
   QMenu * sutraPopupLayoutMenu = new QMenu( tr( "Popup options" ), ui.pinButton );
+  sutraPopupLayoutMenu->setToolTipsVisible( true );
 
   QAction * sutraPopupPinAction = sutraPopupLayoutMenu->addAction( tr( "Pin / keep popup open" ) );
   sutraPopupPinAction->setCheckable( true );
@@ -4738,6 +4830,10 @@ ScanPopup::ScanPopup( QWidget * parent,
   QAction * sutraPopupFixedAction = sutraPopupLayoutMenu->addAction( tr( "Fix current size and position" ) );
   QAction * sutraPopupFitAction   = sutraPopupLayoutMenu->addAction( tr( "Fit window size to results" ) );
 
+  sutraPopupAutoAction->setToolTip( tr( "Use GoldenDict's normal popup sizing behavior" ) );
+  sutraPopupFixedAction->setToolTip( tr( "Remember the popup's current size and screen position" ) );
+  sutraPopupFitAction->setToolTip( tr( "Resize the popup to fit the current result" ) );
+
   sutraPopupLayoutGroup->setExclusive( true );
   for ( QAction * action : { sutraPopupAutoAction, sutraPopupFixedAction, sutraPopupFitAction } ) {
     action->setCheckable( true );
@@ -4748,14 +4844,35 @@ ScanPopup::ScanPopup( QWidget * parent,
                                               sutraPopupAutoAction,
                                               sutraPopupFixedAction,
                                               sutraPopupFitAction ]( SutraPopupLayoutMode mode ) {
-    // Clear the old mark first. This avoids a stale checked action when the
-    // selected layout mode is changed programmatically or through QSettings.
+    // Clear every mark before applying the persisted mode. Temporarily
+    // disabling exclusivity makes programmatic updates deterministic on all
+    // supported Qt/Windows versions.
     sutraPopupLayoutGroup->setExclusive( false );
-    sutraPopupAutoAction->setChecked( mode == SutraPopupLayoutMode::Auto );
-    sutraPopupFixedAction->setChecked( mode == SutraPopupLayoutMode::Fixed );
-    sutraPopupFitAction->setChecked( mode == SutraPopupLayoutMode::FitToResults );
+    sutraPopupAutoAction->setChecked( false );
+    sutraPopupFixedAction->setChecked( false );
+    sutraPopupFitAction->setChecked( false );
+
+    switch ( mode ) {
+      case SutraPopupLayoutMode::Fixed:
+        sutraPopupFixedAction->setChecked( true );
+        break;
+      case SutraPopupLayoutMode::FitToResults:
+        sutraPopupFitAction->setChecked( true );
+        break;
+      case SutraPopupLayoutMode::Auto:
+      default:
+        sutraPopupAutoAction->setChecked( true );
+        break;
+    }
+
     sutraPopupLayoutGroup->setExclusive( true );
   };
+
+  QAction * sutraPopupLayoutInfoAction =
+    sutraPopupLayoutMenu->addAction( tr( "Current layout: %1" )
+                                       .arg( sutraPopupLayoutModeLabel( loadSutraPopupLayoutMode() ) ) );
+  sutraPopupLayoutInfoAction->setObjectName( QStringLiteral( "sutraPopupLayoutInfoAction" ) );
+  sutraPopupLayoutInfoAction->setEnabled( false );
 
   sutraPopupLayoutMenu->addSeparator();
 
@@ -4788,6 +4905,22 @@ ScanPopup::ScanPopup( QWidget * parent,
       return;
     }
 
+    // Zoom is a presentation-only action. Keep the tab that the user is
+    // currently reading instead of allowing a custom-tab refresh to move the
+    // selection to the Definition tab.
+    QPointer< QWidget > previousCurrentTab = tabWidget ? tabWidget->currentWidget() : nullptr;
+    const int previousCurrentIndex         = tabWidget ? tabWidget->currentIndex() : -1;
+
+    QPointer< QTextBrowser > previousTextBrowser =
+      previousCurrentTab ? qobject_cast< QTextBrowser * >( previousCurrentTab.data() ) : nullptr;
+    int previousScrollValue   = 0;
+    int previousScrollMaximum = 0;
+
+    if ( previousTextBrowser && previousTextBrowser->verticalScrollBar() ) {
+      previousScrollValue   = previousTextBrowser->verticalScrollBar()->value();
+      previousScrollMaximum = previousTextBrowser->verticalScrollBar()->maximum();
+    }
+
     saveSutraPopupFontSize( fontSize );
     applyZoomFactor();
 
@@ -4795,6 +4928,36 @@ ScanPopup::ScanPopup( QWidget * parent,
     // The current lookup text and translation result remain unchanged.
     refreshSutraCustomTabs( tabWidget, pendingWord, translateBox->translateLine()->text() );
     applySutraPopupFontSizeToTabs( tabWidget );
+
+    if ( previousCurrentTab && tabWidget && tabWidget->indexOf( previousCurrentTab ) >= 0 ) {
+      tabWidget->setCurrentWidget( previousCurrentTab );
+    }
+    else if ( tabWidget && previousCurrentIndex >= 0 && previousCurrentIndex < tabWidget->count() ) {
+      tabWidget->setCurrentIndex( previousCurrentIndex );
+    }
+
+    // QTextBrowser::setHtml() resets its scroll position. Restore the relative
+    // reading position after the new font size has been laid out.
+    if ( previousTextBrowser ) {
+      QTimer::singleShot( 0,
+                          this,
+                          [ previousTextBrowser, previousScrollValue, previousScrollMaximum ] {
+        if ( !previousTextBrowser || !previousTextBrowser->verticalScrollBar() ) {
+          return;
+        }
+
+        QScrollBar * scrollBar = previousTextBrowser->verticalScrollBar();
+        if ( previousScrollMaximum > 0 ) {
+          const double relativePosition =
+            static_cast< double >( previousScrollValue ) / previousScrollMaximum;
+          scrollBar->setValue( qRound( relativePosition * scrollBar->maximum() ) );
+        }
+        else {
+          scrollBar->setValue( 0 );
+        }
+      } );
+    }
+
     updateSutraPopupZoomIndicator( this );
 
     if ( loadSutraPopupLayoutMode() == SutraPopupLayoutMode::FitToResults ) {
@@ -5068,6 +5231,7 @@ ScanPopup::ScanPopup( QWidget * parent,
                                             sutraPopupAutoAction,
                                             sutraPopupFixedAction,
                                             sutraPopupFitAction,
+                                            sutraPopupLayoutInfoAction,
                                             syncSutraPopupLayoutActions,
                                             sutraPopupFontSizeActions,
                                             sutraPopupTransparencyActions,
@@ -5116,7 +5280,11 @@ ScanPopup::ScanPopup( QWidget * parent,
         .arg( sutraMouseLookupModeLabel( currentMouseLookupMode ),
               sutraMouseLookupCaptureModeLabel( currentCaptureMode ) ) );
 
-    syncSutraPopupLayoutActions( loadSutraPopupLayoutMode() );
+    const SutraPopupLayoutMode currentLayoutMode = loadSutraPopupLayoutMode();
+    sutraPopupLayoutInfoAction->setText(
+      tr( "Current layout: %1" ).arg( sutraPopupLayoutModeLabel( currentLayoutMode ) ) );
+    syncSutraPopupLayoutActions( currentLayoutMode );
+    updateSutraPopupLayoutControls( this );
   };
 
   connect( sutraPopupLayoutMenu, &QMenu::aboutToShow, this, updateSutraPopupLayoutMenu );
@@ -5138,12 +5306,14 @@ ScanPopup::ScanPopup( QWidget * parent,
   connect( sutraPopupAutoAction, &QAction::triggered, this, [ this, syncSutraPopupLayoutActions ] {
     saveSutraPopupLayoutMode( SutraPopupLayoutMode::Auto );
     syncSutraPopupLayoutActions( SutraPopupLayoutMode::Auto );
+    updateSutraPopupLayoutControls( this );
     showStatusBarMessage( tr( "Popup layout: Auto" ), 4000 );
   } );
 
   connect( sutraPopupFixedAction, &QAction::triggered, this, [ this, syncSutraPopupLayoutActions ] {
     saveSutraPopupFixedGeometry( this );
     syncSutraPopupLayoutActions( SutraPopupLayoutMode::Fixed );
+    updateSutraPopupLayoutControls( this );
     showStatusBarMessage( tr( "Popup layout: fixed current size and position" ), 5000 );
   } );
 
@@ -5151,6 +5321,7 @@ ScanPopup::ScanPopup( QWidget * parent,
     saveSutraPopupLayoutMode( SutraPopupLayoutMode::FitToResults );
     syncSutraPopupLayoutActions( SutraPopupLayoutMode::FitToResults );
     fitSutraPopupToResults( this, tabWidget );
+    updateSutraPopupLayoutControls( this );
     showStatusBarMessage( tr( "Popup layout: fit to results" ), 4000 );
   } );
 
@@ -5204,6 +5375,12 @@ ScanPopup::ScanPopup( QWidget * parent,
 
   connect( sutraPopupRestoreDefaultsAction, &QAction::triggered, this, [ this ] {
     resetSutraPopupAppearanceDefaults();
+
+    // Always-on-top is part of the Sutra popup defaults. Keep pinning separate:
+    // enabling this preference does not force the popup to remain open.
+    ui.onTopButton->setChecked( true );
+    alwaysOnTopClicked( true );
+
     applySutraPopupOpacity( this );
     applySutraPopupTheme( this, tabWidget );
     applyZoomFactor();
@@ -5212,13 +5389,14 @@ ScanPopup::ScanPopup( QWidget * parent,
     applySutraPopupTheme( this, tabWidget );
     updateSutraPopupZoomIndicator( this );
     applySutraPopupLayoutMode( this, tabWidget );
+    updateSutraPopupLayoutControls( this );
 
     QTimer::singleShot( 0, this, [ this ] {
       positionSutraPopupCornerTools( this );
     } );
 
     showStatusBarMessage(
-      tr( "Popup defaults restored: optional tabs hidden, Light theme, Auto layout, 100% zoom, 100% opacity, Ctrl + Right Click, automatic capture" ),
+      tr( "Popup defaults restored: Always stay on top enabled, optional tabs hidden, Light theme, Auto layout, 100% zoom, 100% opacity, Ctrl + Right Click, automatic capture" ),
       5000 );
   } );
 
@@ -5675,14 +5853,18 @@ ScanPopup::ScanPopup( QWidget * parent,
   sutraPopupQuickFixButton->setIcon( sutraPopupFixedLayoutIcon( sutraPopupActiveTextColor() ) );
   sutraPopupQuickFixButton->setIconSize( QSize( 18, 18 ) );
   sutraPopupQuickFixButton->setAccessibleName( tr( "Fix current size and position" ) );
-  sutraPopupQuickFixButton->setToolTip( tr( "Fix current size and position" ) );
+  sutraPopupQuickFixButton->setToolTip( tr( "Remember the current popup size and position" ) );
+  sutraPopupQuickFixButton->setCheckable( true );
   sutraPopupQuickFixButton->setAutoRaise( true );
 
   QToolButton * sutraPopupQuickFitButton = new QToolButton( sutraPopupCornerTools );
   sutraPopupQuickFitButton->setObjectName( QStringLiteral( "sutraPopupQuickFitButton" ) );
-  sutraPopupQuickFitButton->setText( QStringLiteral( "▣" ) );
+  sutraPopupQuickFitButton->setText( QString() );
+  sutraPopupQuickFitButton->setIcon( sutraPopupFitLayoutIcon( sutraPopupActiveTextColor() ) );
+  sutraPopupQuickFitButton->setIconSize( QSize( 18, 18 ) );
   sutraPopupQuickFitButton->setAccessibleName( tr( "Fit window size to results" ) );
-  sutraPopupQuickFitButton->setToolTip( tr( "Fit window size to results" ) );
+  sutraPopupQuickFitButton->setToolTip( tr( "Resize the popup to fit the current result" ) );
+  sutraPopupQuickFitButton->setCheckable( true );
   sutraPopupQuickFitButton->setAutoRaise( true );
 
   const auto createSutraToolbarSeparator = [ sutraPopupCornerTools ]( const QString & objectName ) {
@@ -5784,6 +5966,7 @@ ScanPopup::ScanPopup( QWidget * parent,
 
   updateSutraPopupZoomIndicator( this );
   updateSutraLookupFeatureControls( this );
+  updateSutraPopupLayoutControls( this );
   applySutraPopupPointingCursors( this );
   sutraPopupCornerTools->show();
   positionSutraPopupCornerTools( this );
@@ -5791,6 +5974,7 @@ ScanPopup::ScanPopup( QWidget * parent,
   applySutraPopupTheme( this, tabWidget );
   applySutraPopupLayoutMode( this, tabWidget );
   applySutraPopupOpacity( this );
+  updateSutraPopupLayoutControls( this );
 
 #ifdef Q_OS_WIN
 #include <windows.h>
@@ -7106,6 +7290,7 @@ void ScanPopup::openSearch()
 void ScanPopup::alwaysOnTopClicked( bool checked )
 {
   cfg.popupWindowAlwaysOnTop = checked;
+  saveSutraPopupAlwaysOnTop( checked );
 
   if ( !ui.pinButton->isChecked() ) {
     return;
